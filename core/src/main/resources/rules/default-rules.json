@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "minQualityScore": 0.0,
+  "builtIn": [
+    { "id": "K01", "enabled": true, "weight": 3.0 },
+    { "id": "K02", "enabled": true, "weight": 2.0 },
+    { "id": "K03", "enabled": true, "weight": 2.0 },
+    { "id": "K04", "enabled": true, "weight": 1.0 },
+    { "id": "K05", "enabled": true, "weight": 1.0 },
+    { "id": "K06", "enabled": true, "weight": 1.0 },
+    { "id": "K07", "enabled": true, "weight": 2.0 },
+    { "id": "K08", "enabled": true, "weight": 2.0 },
+    { "id": "K09", "enabled": true, "weight": 1.0 },
+    { "id": "K10", "enabled": true, "weight": 1.0 },
+    { "id": "K11", "enabled": true, "weight": 2.0 }
+  ],
+  "custom": []
+}

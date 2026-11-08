@@ -10,6 +10,7 @@ kotlin {
 application {
     mainClass.set("com.spotbot.cli.MainKt")
     applicationName = "cryptoscan"
+    applicationDefaultJvmArgs = listOf("-Dfile.encoding=UTF-8", "-Dstdout.encoding=UTF-8", "-Dstderr.encoding=UTF-8")
 }
 
 dependencies {

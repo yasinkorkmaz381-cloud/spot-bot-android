@@ -51,7 +51,7 @@ class TimeframeAnalysis(val series: Series, val endIndex: Int) {
 
     /** [endIndex] itibarıyla onaylanmış ve geriye bakış penceresindeki swingler. */
     val swings: List<SwingPoint> by lazy {
-        series.swings.filter { it.confirmedAt <= endIndex && it.index >= from }
+        series.confirmedSwings(from, endIndex)
     }
 
     val structure: StructureState by lazy { Structure.structure(swings, series.close, endIndex) }

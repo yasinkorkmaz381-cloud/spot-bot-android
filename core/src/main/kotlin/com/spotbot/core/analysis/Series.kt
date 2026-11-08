@@ -31,6 +31,25 @@ class Series(val symbol: String, val timeframe: Timeframe, val candles: List<Can
     /** Tüm seri için bir kez hesaplanan pivotlar; her birinin onaylandığı indeks bilinir. */
     val swings: List<SwingPoint> by lazy { Structure.findSwings(high, low, config.swingStrength(timeframe)) }
 
+    /** [from, endIndex] aralığında başlayıp [endIndex] itibarıyla onaylanmış swingler (ikili arama ile). */
+    fun confirmedSwings(from: Int, endIndex: Int): List<SwingPoint> {
+        val lastIndex = endIndex - config.swingStrength(timeframe)
+        if (lastIndex < from) return emptyList()
+        val start = lowerBound(from)
+        val end = lowerBound(lastIndex + 1)
+        return swings.subList(start, end)
+    }
+
+    private fun lowerBound(index: Int): Int {
+        var lo = 0
+        var hi = swings.size
+        while (lo < hi) {
+            val mid = (lo + hi) ushr 1
+            if (swings[mid].index < index) lo = mid + 1 else hi = mid
+        }
+        return lo
+    }
+
     /** [closeTime] anında kapanmış son mumun indeksi (yoksa -1). */
     fun indexAtOrBefore(closeTime: Long): Int {
         var lo = 0
