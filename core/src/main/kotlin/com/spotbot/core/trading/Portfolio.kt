@@ -37,7 +37,17 @@ data class Position(
     val rationale: TradeRationale,
     val ruleReport: RuleReport? = null,
     val lastPrice: Double = entryPrice,
+    /** R hesabının dayandığı ilk stop (başa baş taşımasından etkilenmez). */
+    val initialStopPrice: Double = stopPrice,
+    val initialQuantity: Double = quantity,
+    /** Kısmi çıkışlardan gerçekleşmiş net kâr/zarar (ücretler dahil). */
+    val realizedPnl: Double = 0.0,
+    /** Kısmi çıkışlarda ödenen ücretler (giriş ücretinin ilgili payı dahil). */
+    val partialFees: Double = 0.0,
+    val partialTaken: Boolean = false,
+    val breakEvenSet: Boolean = false,
 ) {
+    /** Kalan miktarın maliyeti (giriş ücretinin kalan payı dahil). */
     val cost: Double get() = entryPrice * quantity + entryFee
 
     /** Şu an satılırsa net kâr/zarar (satış ücreti ve kayma dahil). */
@@ -55,7 +65,9 @@ data class Position(
 @Serializable
 enum class ExitReason(val title: String) {
     STOP_LOSS("Stop-loss"),
+    BREAK_EVEN("Başa baş stop"),
     TAKE_PROFIT("Kâr hedefi"),
+    TIME_EXIT("Süre doldu"),
     INVALIDATION("Yapısal bozulma"),
     MANUAL("Manuel kapatma"),
 }
@@ -70,9 +82,10 @@ data class ClosedTrade(
     val note: String,
 ) {
     val proceeds: Double get() = exitPrice * position.quantity - exitFee
-    val netPnl: Double get() = proceeds - position.cost
+    /** Kalan miktarın sonucu + kısmi çıkışlardan gerçekleşen kâr/zarar. */
+    val netPnl: Double get() = proceeds - position.cost + position.realizedPnl
     val rMultiple: Double get() = if (position.riskAmount > 0) netPnl / position.riskAmount else 0.0
-    val fees: Double get() = position.entryFee + exitFee
+    val fees: Double get() = position.entryFee + exitFee + position.partialFees
 }
 
 @Serializable
@@ -130,9 +143,11 @@ object PaperAccount {
         rationale: TradeRationale,
         report: RuleReport?,
         now: Long,
+        maker: Boolean = false,
     ): PortfolioState {
-        val fill = costs.buyPrice(askReference)
-        val fee = fill * quantity * costs.takerFee
+        // Limit (maker) emir tam limit fiyatından dolar; piyasa emri spread ve kayma öder.
+        val fill = if (maker) askReference else costs.buyPrice(askReference)
+        val fee = fill * quantity * (if (maker) costs.makerFee else costs.takerFee)
         val position = Position(
             id = "P${state.nextPositionId}",
             symbol = setup.symbol,
@@ -171,10 +186,11 @@ object PaperAccount {
         note: String,
         costs: CostModel,
         now: Long,
+        maker: Boolean = false,
     ): PortfolioState {
         val position = state.positions.firstOrNull { it.id == positionId } ?: return state
-        val fill = costs.sellPrice(exitReference)
-        val fee = fill * position.quantity * costs.takerFee
+        val fill = if (maker) exitReference else costs.sellPrice(exitReference)
+        val fee = fill * position.quantity * (if (maker) costs.makerFee else costs.takerFee)
         val trade = ClosedTrade(position, now, fill, fee, reason, note)
         val decision = Decision(
             now, position.symbol, position.strategy, DecisionOutcome.CLOSED,
@@ -189,6 +205,45 @@ object PaperAccount {
             ),
             decision,
         )
+    }
+
+    /** Pozisyonun [fraction] kadarını kapatır; gerçekleşen sonuç pozisyonda biriktirilir. */
+    fun partialClose(
+        state: PortfolioState,
+        positionId: String,
+        fraction: Double,
+        exitReference: Double,
+        maker: Boolean,
+        note: String,
+        costs: CostModel,
+        now: Long,
+    ): PortfolioState {
+        val p = state.positions.firstOrNull { it.id == positionId } ?: return state
+        val qty = p.quantity * fraction.coerceIn(0.0, 1.0)
+        if (qty <= 0) return state
+        val fill = if (maker) exitReference else costs.sellPrice(exitReference)
+        val exitFee = fill * qty * (if (maker) costs.makerFee else costs.takerFee)
+        val entryFeeShare = p.entryFee * fraction
+        val pnl = fill * qty - exitFee - (p.entryPrice * qty + entryFeeShare)
+        val updated = p.copy(
+            quantity = p.quantity - qty,
+            entryFee = p.entryFee - entryFeeShare,
+            realizedPnl = p.realizedPnl + pnl,
+            partialFees = p.partialFees + entryFeeShare + exitFee,
+            partialTaken = true,
+        )
+        val decision = Decision(now, p.symbol, p.strategy, DecisionOutcome.INFO, "${p.symbol}: %%%.0f kısmi kâr alındı (%+.2f USDT)".format(fraction * 100, pnl), listOf(note))
+        return log(
+            state.copy(cash = state.cash + fill * qty - exitFee, positions = state.positions.map { if (it.id == positionId) updated else it }),
+            decision,
+        )
+    }
+
+    fun moveStop(state: PortfolioState, positionId: String, newStop: Double, note: String, now: Long): PortfolioState {
+        val p = state.positions.firstOrNull { it.id == positionId } ?: return state
+        if (newStop <= p.stopPrice) return state
+        val decision = Decision(now, p.symbol, p.strategy, DecisionOutcome.INFO, "${p.symbol}: stop ${"%.6g".format(newStop)} seviyesine taşındı", listOf(note))
+        return log(state.copy(positions = state.positions.map { if (it.id == positionId) it.copy(stopPrice = newStop, breakEvenSet = true) else it }), decision)
     }
 
     fun log(state: PortfolioState, decision: Decision): PortfolioState =

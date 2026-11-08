@@ -29,6 +29,8 @@ data class CostModel(
     val takerFee: Double = 0.0005,
     val slippage: Double = 0.0005,
     val halfSpread: Double = 0.00025,
+    /** MEXC spot maker komisyonu (Kasım 2026: %0). */
+    val makerFee: Double = 0.0,
 ) {
     /** Alımda ödenen efektif fiyat (spread + kayma dahil). */
     fun buyPrice(reference: Double) = reference * (1 + slippage + halfSpread)
@@ -36,7 +38,7 @@ data class CostModel(
     /** Satımda alınan efektif fiyat. */
     fun sellPrice(reference: Double) = reference * (1 - slippage - halfSpread)
 
-    fun withSymbolFee(info: SymbolInfo?) = if (info == null) this else copy(takerFee = info.takerFee)
+    fun withSymbolFee(info: SymbolInfo?) = if (info == null) this else copy(takerFee = info.takerFee, makerFee = info.makerFee)
 }
 
 @Serializable
@@ -49,14 +51,18 @@ data class RiskReward(
     val ratio: Double get() = if (riskPerUnit > 0) rewardPerUnit / riskPerUnit else Double.NaN
 }
 
-/** Komisyon, spread ve kayma düşüldükten sonraki net risk/getiri. */
-fun netRiskReward(entry: Double, stop: Double, target: Double, costs: CostModel): RiskReward {
-    val paid = costs.buyPrice(entry)
-    val entryFee = paid * costs.takerFee
+/**
+ * Komisyon, spread ve kayma düşüldükten sonraki net risk/getiri. [makerEntry] limit girişte giriş fiyatı
+ * kaymasız ve maker ücretlidir; [makerTarget] hedefe limit emirle çıkışta aynısı geçerlidir. Stop her zaman
+ * piyasa emridir.
+ */
+fun netRiskReward(entry: Double, stop: Double, target: Double, costs: CostModel, makerEntry: Boolean = false, makerTarget: Boolean = false): RiskReward {
+    val paid = if (makerEntry) entry else costs.buyPrice(entry)
+    val entryFee = paid * (if (makerEntry) costs.makerFee else costs.takerFee)
     val stopOut = costs.sellPrice(stop)
-    val targetOut = costs.sellPrice(target)
+    val targetOut = if (makerTarget) target else costs.sellPrice(target)
     val risk = paid - stopOut + entryFee + stopOut * costs.takerFee
-    val reward = targetOut - paid - entryFee - targetOut * costs.takerFee
+    val reward = targetOut - paid - entryFee - targetOut * (if (makerTarget) costs.makerFee else costs.takerFee)
     return RiskReward(risk, reward)
 }
 
@@ -89,11 +95,13 @@ object PositionSizer {
         info: SymbolInfo?,
         costs: CostModel,
         config: RiskConfig,
+        makerEntry: Boolean = false,
+        makerTarget: Boolean = false,
     ): SizingResult {
         if (stop >= entry) return SizingResult.Rejected("Stop girişin altında değil")
-        val rr = netRiskReward(entry, stop, target, costs)
+        val rr = netRiskReward(entry, stop, target, costs, makerEntry, makerTarget)
         if (rr.riskPerUnit <= 0) return SizingResult.Rejected("Birim risk hesaplanamadı")
-        val paid = costs.buyPrice(entry)
+        val paid = if (makerEntry) entry else costs.buyPrice(entry)
         val riskBudget = equity * config.riskPerTradePercent / 100
         var quantity = riskBudget / rr.riskPerUnit
         var cappedBy: String? = null
@@ -103,7 +111,7 @@ object PositionSizer {
             quantity = maxNotional / paid
             cappedBy = "Pozisyon üst sınırı (%%%.0f)".format(config.maxPositionPercentOfEquity)
         }
-        val spendable = availableQuote / (1 + costs.takerFee)
+        val spendable = availableQuote / (1 + (if (makerEntry) costs.makerFee else costs.takerFee))
         if (quantity * paid > spendable) {
             quantity = spendable / paid
             cappedBy = "Kullanılabilir USDT"

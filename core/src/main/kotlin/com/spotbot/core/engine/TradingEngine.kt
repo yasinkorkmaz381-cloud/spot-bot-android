@@ -31,6 +31,10 @@ import com.spotbot.core.trading.DecisionOutcome
 import com.spotbot.core.trading.DecisionPipeline
 import com.spotbot.core.trading.ExitReason
 import com.spotbot.core.trading.ExitRules
+import com.spotbot.core.trading.EntryMode
+import com.spotbot.core.trading.ExecutionConfig
+import com.spotbot.core.trading.ExitManager
+import com.spotbot.core.trading.asPendingPosition
 import com.spotbot.core.trading.PaperAccount
 import com.spotbot.core.trading.PortfolioState
 import com.spotbot.core.trading.Position
@@ -70,6 +74,7 @@ data class EngineConfig(
     /** Sinyal kapanışı ile anlık alış fiyatı arasında izin verilen en büyük kayma (%). */
     val maxEntryDriftPercent: Double = 0.3,
     val universeRefreshMillis: Long = 4 * 60 * 60_000L,
+    val execution: ExecutionConfig = ExecutionConfig(),
 )
 
 /** Portföy durumunu kalıcı saklama (Android'de uygulama dosyası, CLI'da yerel JSON). */
@@ -95,6 +100,8 @@ data class EngineHealth(
     val serverTimeOffsetMillis: Long = 0,
     val universe: List<String> = emptyList(),
     val message: String? = null,
+    /** Bekleyen limit giriş emirleri (ör. "ETHUSDT @ 2751.7"). */
+    val pendingOrders: List<String> = emptyList(),
 )
 
 sealed interface EngineEvent {
@@ -211,7 +218,16 @@ class TradingEngine(
         return MultiTimeframe(symbol, h4.analyze(), h1.analyze(), m15.analyze())
     }
 
-    private fun buildPipeline() = DecisionPipeline(RuleEngine(ruleConfig), config.risk, config.enabledStrategies, config.strategyParams)
+    private fun buildPipeline() = DecisionPipeline(RuleEngine(ruleConfig), config.risk, config.enabledStrategies, config.strategyParams, config.execution)
+
+    /** Bekleyen limit giriş emri (yalnız bellekte; uygulama yeniden başlarsa iptal olur). */
+    private class PendingLimit(val decision: CandidateDecision.Enter, val expiresAt: Long)
+
+    private val pendingLimits = mutableListOf<PendingLimit>()
+
+    private fun publishPending() {
+        _health.update { h -> h.copy(pendingOrders = pendingLimits.map { "${it.decision.symbol} @ ${"%.6g".format(it.decision.setup.entryPrice)}" }) }
+    }
 
     private fun now() = timeSource.now() + serverOffset
 
@@ -364,11 +380,12 @@ class TradingEngine(
                 now = now(),
                 equity = equity,
                 availableQuote = state.cash,
-                openPositions = state.positions,
+                openPositions = state.positions + pendingLimits.map { it.decision.asPendingPosition(now()) },
                 dailyPnlPercent = (equity - state.dayStartEquity) / state.dayStartEquity * 100,
                 market = report.market,
                 btc = analysis("BTCUSDT"),
                 hourlyCloses = candles.mapValues { (_, byTf) -> byTf[Timeframe.H1].orEmpty().takeLast(config.risk.correlationWindowBars + 1).map { it.close }.toDoubleArray() },
+                closedTrades = state.closedTrades,
             )
             val candidate = Candidate(mtf, report.coins.firstOrNull { it.symbol == symbol }, symbols[symbol], costsFor(symbol))
             when (val decision = pipeline.evaluate(candidate, context)) {
@@ -390,6 +407,18 @@ class TradingEngine(
 
     private fun enter(decision: CandidateDecision.Enter) {
         val setup = decision.setup
+        if (config.execution.entryMode == EntryMode.LIMIT) {
+            pendingLimits += PendingLimit(decision, now() + config.execution.limitEntryMaxBars * Timeframe.M15.millis)
+            publishPending()
+            log(
+                Decision(
+                    now(), setup.symbol, setup.strategy, DecisionOutcome.INFO,
+                    "${setup.symbol}: limit alış emri verildi @ ${"%.6g".format(setup.entryPrice)} (${config.execution.limitEntryMaxBars} mum geçerli)",
+                    listOf(decision.rationale.whyEntry), decision.report.qualityScore,
+                ),
+            )
+            return
+        }
         val ask = feed.prices.value[setup.symbol]?.ask
         val drift = ask?.let { (it / setup.entryPrice - 1) * 100 }
         if (ask == null || ask <= setup.stopPrice || drift!! > config.maxEntryDriftPercent) {
@@ -412,12 +441,53 @@ class TradingEngine(
     }
 
     private fun onPrices(prices: Map<String, BookTicker>) {
+        fillPendingLimits(prices)
         for (position in _portfolio.value.positions.toList()) {
             val bid = prices[position.symbol]?.bid ?: continue
             if (bid <= 0) continue
-            val reason = ExitRules.onPrice(position, bid) ?: continue
-            closeAt(position, bid, reason, if (reason == ExitReason.STOP_LOSS) "Fiyat stop seviyesine indi (yazılım stopu)" else "Fiyat hedefe ulaştı")
+            val actions = ExitManager.onPrice(position, bid, now(), config.execution)
+            if (actions.isEmpty()) continue
+            val before = _portfolio.value
+            val updated = ExitManager.apply(before, position.id, actions, costsFor(position.symbol), now())
+            publish(updated)
+            if (updated.closedTrades.size > before.closedTrades.size) _events.tryEmit(EngineEvent.Closed(updated.closedTrades.last()))
         }
+    }
+
+    /** Limit alış emri: en iyi satış fiyatı limitin altına inerse emir dolmuş sayılır (maker). */
+    private fun fillPendingLimits(prices: Map<String, BookTicker>) {
+        if (pendingLimits.isEmpty()) return
+        val iterator = pendingLimits.iterator()
+        var changed = false
+        while (iterator.hasNext()) {
+            val pending = iterator.next()
+            val setup = pending.decision.setup
+            val ask = prices[setup.symbol]?.ask
+            when {
+                now() > pending.expiresAt -> {
+                    iterator.remove()
+                    changed = true
+                    log(Decision(now(), setup.symbol, setup.strategy, DecisionOutcome.INFO, "${setup.symbol}: limit emir dolmadı, iptal edildi"))
+                }
+                ask != null && ask > 0 && ask <= setup.stopPrice -> {
+                    iterator.remove()
+                    changed = true
+                    log(Decision(now(), setup.symbol, setup.strategy, DecisionOutcome.INFO, "${setup.symbol}: fiyat stopun altına indi, limit emir iptal edildi"))
+                }
+                ask != null && ask > 0 && ask < setup.entryPrice -> {
+                    iterator.remove()
+                    changed = true
+                    val updated = PaperAccount.open(
+                        _portfolio.value, setup, pending.decision.sizing.quantity, setup.entryPrice, costsFor(setup.symbol),
+                        pending.decision.sizing.riskAmount, pending.decision.report.qualityScore, pending.decision.rationale,
+                        pending.decision.report, now(), maker = true,
+                    )
+                    publish(updated)
+                    updated.positions.lastOrNull()?.let { _events.tryEmit(EngineEvent.Opened(it)) }
+                }
+            }
+        }
+        if (changed) publishPending()
     }
 
     private suspend fun checkInvalidations() {

@@ -1,0 +1,67 @@
+Veri: 15 coin · 2025-11-15 → 2026-11-08 · bölme 2026-05-13
+İlk yarı / ikinci yarı tamamlandı (23 sn)
+
+Seçenek                                  │ İlk yarı (in-sample)                                                     │ İkinci yarı (out-of-sample)
+V0 Mevcut: A+B, piyasa emri              │  98 işlem · net  -8.67% · PF 0.68 · -0.250R/işlem · kazanma %24 · maks. düşüş 10.5% │  98 işlem · net -12.54% · PF 0.58 · -0.311R/işlem · kazanma %21 · maks. düşüş 12.8%
+V1 Yalnız B, piyasa emri                 │  81 işlem · net  -5.63% · PF 0.75 · -0.187R/işlem · kazanma %27 · maks. düşüş 9.1% │  65 işlem · net  -7.15% · PF 0.65 · -0.281R/işlem · kazanma %23 · maks. düşüş 8.7%
+V2 A+B, limit giriş/hedef (maker)        │ 175 işlem · net -20.65% · PF 0.51 · -0.381R/işlem · kazanma %19 · maks. düşüş 20.9% │ 150 işlem · net -10.01% · PF 0.74 · -0.183R/işlem · kazanma %26 · maks. düşüş 10.9%
+V3 V2 + başa baş 1R                      │ 188 işlem · net -16.30% · PF 0.53 · -0.277R/işlem · kazanma %15 · maks. düşüş 16.8% │ 162 işlem · net -11.87% · PF 0.65 · -0.211R/işlem · kazanma %20 · maks. düşüş 12.2%
+V4 V2 + %50 kısmi kâr 1R + başa baş      │ 189 işlem · net -13.55% · PF 0.60 · -0.222R/işlem · kazanma %43 · maks. düşüş 13.9% │ 162 işlem · net -11.25% · PF 0.65 · -0.187R/işlem · kazanma %43 · maks. düşüş 11.6%
+V5 V2 + 48 saat süre sınırı              │ 175 işlem · net -20.65% · PF 0.51 · -0.381R/işlem · kazanma %19 · maks. düşüş 20.9% │ 152 işlem · net -10.39% · PF 0.73 · -0.186R/işlem · kazanma %26 · maks. düşüş 11.6%
+V6 V4 + coin dinlenmesi                  │ 180 işlem · net -12.51% · PF 0.61 · -0.209R/işlem · kazanma %44 · maks. düşüş 12.9% │ 160 işlem · net -12.32% · PF 0.62 · -0.207R/işlem · kazanma %42 · maks. düşüş 12.7%
+V7 Yalnız B + V4                         │ 157 işlem · net  -9.84% · PF 0.65 · -0.206R/işlem · kazanma %44 · maks. düşüş 11.1% │ 113 işlem · net  -9.57% · PF 0.61 · -0.202R/işlem · kazanma %40 · maks. düşüş 9.9%
+
+── İleri yürüyen test (3 ay seçim → sonraki 2 ay görülmemiş dönem) ──
+  2026-02-13 → 2026-04-14  seçilen: V1 Yalnız B, piyasa emri                IS +0.14R  →  OOS  38 işlem, -4.63%, PF 0.60, -0.36R
+  2026-04-14 → 2026-06-13  seçilen: V6 V4 + coin dinlenmesi                 IS -0.25R  →  OOS  59 işlem, -7.20%, PF 0.44, -0.22R
+  2026-06-13 → 2026-08-12  seçilen: V6 V4 + coin dinlenmesi                 IS -0.27R  →  OOS  57 işlem, -3.49%, PF 0.68, -0.23R
+  2026-08-12 → 2026-10-11  seçilen: V2 A+B, limit giriş/hedef (maker)       IS -0.21R  →  OOS  75 işlem, -3.74%, PF 0.82, -0.06R
+  2026-10-11 → 2026-11-08  seçilen: V2 A+B, limit giriş/hedef (maker)       IS -0.10R  →  OOS   6 işlem, -2.23%, PF 0.00, -0.93R
+  Görülmemiş dönemlerin toplamı: 235 işlem · net -21.29% · PF 0.63 · -0.211R/işlem · kazanma %34 · maks. düşüş 22.4%
+
+── Monte Carlo (5000 yeniden örnekleme) ──
+  Ileri yuruyen test (gorulmemis donemler) getiri %5: -32.7%  ortanca: -21.4%  %95: -9.2% · maks. düşüş ortanca 23.1%, %95 33.8% · zarar olasılığı %100
+  V0 Mevcut: A+B, piyasa emri              getiri %5: -31.8%  ortanca: -20.2%  %95: -8.3% · maks. düşüş ortanca 21.9%, %95 32.8% · zarar olasılığı %100
+  V2 A+B, limit giriş/hedef (maker)        getiri %5: -39.6%  ortanca: -27.8%  %95: -15.6% · maks. düşüş ortanca 29.2%, %95 40.6% · zarar olasılığı %100
+
+── Gölge işlemler: V0 Mevcut: A+B, piyasa emri ──
+  2388 kurulum simüle edildi · ortalama -0.214R · kazanma %49 · kabul edilen 119 (-0.243R) · reddedilen 2269 (-0.213R) · limit dolmayan 0
+  Strateji: B -0.232R, A -0.181R
+  Kalite puanı → sonuç: 0–25: 51 kurulum, -0.458R, kazanma %31, 25–50: 977 kurulum, -0.215R, kazanma %49, 50–75: 1294 kurulum, -0.208R, kazanma %49, 75–100: 66 kurulum, -0.154R, kazanma %53
+  Kural katkısı (geçince ort. R − kalmayınca ort. R):
+    +0.116R  Z07  En az 2 bağımsız teyit (tek göstergeyle işlem yok)      geçti 2006 (-0.196R) · kaldı  382 (-0.312R)
+    +0.076R  K06  Fiyat 1H VWAP üzerinde                                  geçti 1567 (-0.188R) · kaldı  821 (-0.264R)
+    +0.057R  K08  BTC 4H trendi yükselişte                                geçti  977 (-0.181R) · kaldı 1411 (-0.238R)
+    +0.056R  K03  Tetik mumunda hacim teyidi                              geçti  628 (-0.173R) · kaldı 1760 (-0.229R)
+    +0.040R  K10  BTC'ye göre göreceli güç (7 gün)                        geçti 1849 (-0.205R) · kaldı  539 (-0.245R)
+    +0.017R  K04  15M RSI sağlıklı bölgede (45–70)                        geçti 1748 (-0.210R) · kaldı  640 (-0.227R)
+    +0.004R  K11  1H piyasa yapısı yükselişte (HH/HL)                     geçti 1807 (-0.214R) · kaldı  581 (-0.217R)
+    -0.003R  K05  15M MACD histogramı yükseliyor                          geçti 1946 (-0.215R) · kaldı  442 (-0.212R)
+    -0.010R  K02  4H trend gücü yüksek (ADX ≥ 25)                         geçti 1506 (-0.218R) · kaldı  882 (-0.208R)
+    -0.011R  K09  Spread çok düşük (< %0,05)                              geçti  439 (-0.223R) · kaldı 1949 (-0.212R)
+    -0.026R  K07  Giriş bölgesinde çoklu yapısal uyum                     geçti 1817 (-0.221R) · kaldı  571 (-0.195R)
+    -0.033R  Z03  Net risk/getiri en az asgari oran                       geçti  236 (-0.244R) · kaldı 2152 (-0.211R)
+    -0.042R  K01  Net R:R tercih edilen seviyede (2+)                     geçti  128 (-0.254R) · kaldı 2260 (-0.212R)
+    -0.100R  Z10  BTC / genel piyasa filtresi alıma izin veriyor          geçti 2142 (-0.225R) · kaldı  246 (-0.125R)
+
+── Gölge işlemler: V2 A+B, limit giriş/hedef (maker) ──
+  2325 kurulum simüle edildi · ortalama -0.111R · kazanma %51 · kabul edilen 191 (-0.312R) · reddedilen 2134 (-0.093R) · limit dolmayan 127
+  Strateji: B -0.129R, A -0.076R
+  Kalite puanı → sonuç: 0–25: 47 kurulum, -0.385R, kazanma %36, 25–50: 905 kurulum, -0.081R, kazanma %54, 50–75: 1302 kurulum, -0.123R, kazanma %49, 75–100: 71 kurulum, -0.069R, kazanma %51
+  Kural katkısı (geçince ort. R − kalmayınca ort. R):
+    +0.097R  Z07  En az 2 bağımsız teyit (tek göstergeyle işlem yok)      geçti 1956 (-0.095R) · kaldı  369 (-0.192R)
+    +0.074R  K06  Fiyat 1H VWAP üzerinde                                  geçti 1528 (-0.085R) · kaldı  797 (-0.160R)
+    +0.071R  K08  BTC 4H trendi yükselişte                                geçti  964 (-0.069R) · kaldı 1361 (-0.140R)
+    +0.019R  K03  Tetik mumunda hacim teyidi                              geçti  602 (-0.097R) · kaldı 1723 (-0.115R)
+    +0.003R  K04  15M RSI sağlıklı bölgede (45–70)                        geçti 1701 (-0.110R) · kaldı  624 (-0.113R)
+    -0.000R  K11  1H piyasa yapısı yükselişte (HH/HL)                     geçti 1763 (-0.111R) · kaldı  562 (-0.110R)
+    -0.007R  K10  BTC'ye göre göreceli güç (7 gün)                        geçti 1799 (-0.112R) · kaldı  526 (-0.106R)
+    -0.029R  K09  Spread çok düşük (< %0,05)                              geçti  441 (-0.134R) · kaldı 1884 (-0.105R)
+    -0.030R  K07  Giriş bölgesinde çoklu yapısal uyum                     geçti 1761 (-0.118R) · kaldı  564 (-0.088R)
+    -0.035R  K05  15M MACD histogramı yükseliyor                          geçti 1901 (-0.117R) · kaldı  424 (-0.082R)
+    -0.037R  K02  4H trend gücü yüksek (ADX ≥ 25)                         geçti 1470 (-0.124R) · kaldı  855 (-0.087R)
+    -0.122R  K01  Net R:R tercih edilen seviyede (2+)                     geçti  211 (-0.221R) · kaldı 2114 (-0.100R)
+    -0.122R  Z10  BTC / genel piyasa filtresi alıma izin veriyor          geçti 2091 (-0.123R) · kaldı  234 (-0.001R)
+    -0.143R  Z03  Net risk/getiri en az asgari oran                       geçti  375 (-0.230R) · kaldı 1950 (-0.088R)
+
+Rapor: /home/user/research-full.json

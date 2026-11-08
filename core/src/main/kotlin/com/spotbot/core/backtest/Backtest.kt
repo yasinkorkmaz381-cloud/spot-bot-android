@@ -28,7 +28,11 @@ import com.spotbot.core.trading.ExitReason
 import com.spotbot.core.trading.ExitRules
 import com.spotbot.core.trading.PaperAccount
 import com.spotbot.core.trading.PortfolioState
-import com.spotbot.core.trading.TradeRationale
+import com.spotbot.core.trading.asPendingPosition
+import com.spotbot.core.trading.EntryMode
+import com.spotbot.core.trading.ExecutionConfig
+import com.spotbot.core.trading.ExitManager
+import com.spotbot.core.rules.BuiltInRules
 import kotlinx.serialization.Serializable
 import kotlin.math.max
 
@@ -49,6 +53,9 @@ data class BacktestConfig(
     val defaultTakerFee: Double = 0.0005,
     /** Göstergelerin ısınması için başlangıçtan önce yüklenecek gün sayısı. */
     val warmupDays: Int = 45,
+    val execution: ExecutionConfig = ExecutionConfig(),
+    /** Gölge işlem analizi (her kurulumun bağımsız sonucu ve kural katkısı). */
+    val shadowAnalysis: Boolean = false,
 )
 
 /** Bir paritenin backtest için tarihsel mumları. */
@@ -95,6 +102,9 @@ data class BacktestReport(
     val closedTrades: List<ClosedTrade>,
     val equityCurve: List<Pair<Long, Double>>,
     val warnings: List<String>,
+    /** Limit giriş emri verilip dolmayan kurulum sayısı. */
+    val limitOrdersNotFilled: Int = 0,
+    val shadow: ShadowReport? = null,
 )
 
 /** Tarihsel veriyi MEXC'den indirir (15M, 1H, 4H; BTCUSDT her zaman eklenir). */
@@ -130,14 +140,20 @@ class BacktestDataLoader(private val api: MarketDataApi) {
  */
 class BacktestEngine(private val config: BacktestConfig, private val ruleConfig: RuleConfig = RuleConfig.default()) {
 
-    private class Pending(val decision: CandidateDecision.Enter, val costs: CostModel)
+    private class Pending(val decision: CandidateDecision.Enter, val costs: CostModel, var barsLeft: Int)
 
     fun run(
         data: Map<String, HistoricalDataset>,
         symbolInfo: Map<String, SymbolInfo>,
         onProgress: (Double) -> Unit = {},
     ): BacktestReport {
-        val pipeline = DecisionPipeline(RuleEngine(ruleConfig), config.risk, config.enabledStrategies, config.strategyParams)
+        val pipeline = DecisionPipeline(RuleEngine(ruleConfig), config.risk, config.enabledStrategies, config.strategyParams, config.execution)
+        val execution = config.execution
+        val maker = execution.entryMode == EntryMode.LIMIT
+        var limitNotFilled = 0
+        val shadows = ArrayList<ShadowTrade>()
+        val shadowBusyUntil = HashMap<String, Long>()
+        var shadowNotFilled = 0
         val series = data.mapValues { (symbol, d) ->
             Triple(
                 Series(symbol, Timeframe.M15, d.m15, config.analysis),
@@ -166,34 +182,33 @@ class BacktestEngine(private val config: BacktestConfig, private val ruleConfig:
         timeline.forEachIndexed { step, t ->
             val bars = tradable.associateWith { s -> series.getValue(s).first.let { m15 -> m15.indexAtOrBefore(t).takeIf { it >= 0 && m15.candles[it].closeTime == t }?.let(m15.candles::get) } }
 
-            // 1) Bir önceki adımdaki sinyalleri bu mumun açılışında doldur.
+            // 1) Bekleyen girişler: piyasa emri bu mumun açılışında; limit emir fiyat limitin altına inerse dolar.
+            val stillPending = mutableListOf<Pending>()
             for (p in pending) {
                 val bar = bars[p.decision.symbol] ?: continue
                 val setup = p.decision.setup
-                if (bar.open <= setup.stopPrice) continue
-                val qty = minOf(p.decision.sizing.quantity, state.cash / (p.costs.buyPrice(bar.open) * (1 + p.costs.takerFee)))
+                if (bar.open <= setup.stopPrice || state.positions.any { it.symbol == setup.symbol }) continue
+                val reference = if (maker) setup.entryPrice else bar.open
+                val filled = !maker || bar.low < setup.entryPrice
+                if (!filled) {
+                    p.barsLeft--
+                    if (p.barsLeft > 0) stillPending += p else limitNotFilled++
+                    continue
+                }
+                val unitCost = if (maker) reference * (1 + p.costs.makerFee) else p.costs.buyPrice(reference) * (1 + p.costs.takerFee)
+                val qty = minOf(p.decision.sizing.quantity, state.cash / unitCost)
                 if (qty <= 0) continue
                 state = PaperAccount.open(
-                    state, setup, qty, bar.open, p.costs, p.decision.sizing.riskAmount * qty / p.decision.sizing.quantity,
-                    p.decision.report.qualityScore, p.decision.rationale, null, bar.openTime,
+                    state, setup, qty, reference, p.costs, p.decision.sizing.riskAmount * qty / p.decision.sizing.quantity,
+                    p.decision.report.qualityScore, p.decision.rationale, null, bar.openTime, maker,
                 )
             }
-            pending = emptyList()
+            pending = stillPending
 
-            // 2) Açık pozisyonlarda mum içi stop / hedef kontrolü.
+            // 2) Açık pozisyonlarda mum içi stop / hedef / kısmi kâr / başa baş / süre kontrolü (ihtiyatlı sıra).
             for (position in state.positions.toList()) {
                 val bar = bars[position.symbol] ?: continue
-                val costs = costsBySymbol.getValue(position.symbol)
-                val exit: Pair<Double, ExitReason>? = when {
-                    bar.open <= position.stopPrice -> bar.open to ExitReason.STOP_LOSS
-                    bar.low <= position.stopPrice -> position.stopPrice to ExitReason.STOP_LOSS
-                    bar.open >= position.targetPrice -> bar.open to ExitReason.TAKE_PROFIT
-                    bar.high >= position.targetPrice -> position.targetPrice to ExitReason.TAKE_PROFIT
-                    else -> null
-                }
-                if (exit != null) {
-                    state = PaperAccount.close(state, position.id, exit.first, exit.second, "Backtest mum içi çıkış", costs, t)
-                }
+                state = ExitManager.apply(state, position.id, ExitManager.onBar(position, bar, execution), costsBySymbol.getValue(position.symbol), t)
             }
 
             // 3) 1H kapanışında yapısal bozulma kontrolü.
@@ -246,22 +261,45 @@ class BacktestEngine(private val config: BacktestConfig, private val ruleConfig:
                     now = t,
                     equity = equity,
                     availableQuote = state.cash - pendingAsPositions.sumOf { it.sizing.notional * (1 + costs.takerFee) },
-                    openPositions = state.positions + pendingAsPositions.map { placeholder(it, t) },
+                    openPositions = state.positions + (pendingAsPositions + pending.map { it.decision }).map { it.asPendingPosition(t) },
                     dailyPnlPercent = (equity - state.dayStartEquity) / state.dayStartEquity * 100,
                     market = report.market,
                     btc = btc,
                     hourlyCloses = hourlyCloses,
+                    closedTrades = state.closedTrades,
                 )
-                when (val decision = pipeline.evaluate(Candidate(mtf, report.coins.firstOrNull { it.symbol == symbol }, symbolInfo[symbol], costs), context)) {
+                val decision = pipeline.evaluate(Candidate(mtf, report.coins.firstOrNull { it.symbol == symbol }, symbolInfo[symbol], costs), context)
+                when (decision) {
                     is CandidateDecision.Enter -> {
                         setupsFound++
-                        newEntries += Pending(decision, costs)
+                        newEntries += Pending(decision, costs, if (maker) execution.limitEntryMaxBars else 1)
                     }
                     is CandidateDecision.Reject -> {
                         setupsFound++
                         decision.report.mandatoryFailures.forEach { blocked.merge("${it.id} ${it.title}", 1, Int::plus) }
                     }
                     is CandidateDecision.NoSetup -> Unit
+                }
+                if (config.shadowAnalysis) {
+                    val (setup, ruleReport) = when (decision) {
+                        is CandidateDecision.Enter -> decision.setup to decision.report
+                        is CandidateDecision.Reject -> decision.setup to decision.report
+                        is CandidateDecision.NoSetup -> null to null
+                    }
+                    val key = "$symbol/${setup?.strategy}"
+                    if (setup != null && ruleReport != null && t >= (shadowBusyUntil[key] ?: Long.MIN_VALUE)) {
+                        val (m15s, h1s, _) = series.getValue(symbol)
+                        val outcome = ShadowSimulator.simulate(setup, m15s, h1s, costs, execution)
+                        if (outcome == null) {
+                            shadowNotFilled++
+                        } else {
+                            shadowBusyUntil[key] = outcome.second
+                            shadows += ShadowTrade(
+                                symbol, setup.strategy.code, setup.signalTime, decision is CandidateDecision.Enter,
+                                ruleReport.qualityScore, ShadowSimulator.outcomes(ruleReport), outcome.first, outcome.second,
+                            )
+                        }
+                    }
                 }
             }
             pending = newEntries
@@ -277,7 +315,11 @@ class BacktestEngine(private val config: BacktestConfig, private val ruleConfig:
         }
         curve += last to state.cash
         onProgress(1.0)
+        val titles = BuiltInRules.all.associate { it.id to (it.title to it.group) } +
+            ruleConfig.custom.associate { it.id to (it.title to it.group) }
+        val shadowReport = if (config.shadowAnalysis) ShadowSimulator.report(shadows, titles, shadowNotFilled) else null
         return report(state, maxDrawdown, exposedSteps, timeline.size, setupsFound, blocked, curve, series["BTCUSDT"]?.first)
+            .copy(limitOrdersNotFilled = limitNotFilled, shadow = shadowReport)
     }
 
     private fun multiTimeframe(symbol: String, s: Triple<Series, Series, Series>, t: Long): MultiTimeframe? {
@@ -297,14 +339,6 @@ class BacktestEngine(private val config: BacktestConfig, private val ruleConfig:
     private fun syntheticBook(symbol: String, price: Double?, t: Long): BookTicker? = price?.let {
         BookTicker(symbol, it * (1 - config.halfSpread), 0.0, it * (1 + config.halfSpread), 0.0, t)
     }
-
-    private fun placeholder(entry: CandidateDecision.Enter, t: Long) = com.spotbot.core.trading.Position(
-        id = "pending", symbol = entry.symbol, strategy = entry.setup.strategy, openedAt = t,
-        entryPrice = entry.setup.entryPrice, quantity = entry.sizing.quantity, entryFee = 0.0,
-        stopPrice = entry.setup.stopPrice, targetPrice = entry.setup.targetPrice, invalidationPrice = entry.setup.invalidationPrice,
-        riskAmount = entry.sizing.riskAmount, qualityScore = entry.report.qualityScore, setup = entry.setup,
-        rationale = TradeRationale("", "", "", "", "", ""),
-    )
 
     private fun report(
         state: PortfolioState,

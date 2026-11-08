@@ -42,6 +42,7 @@ class BacktestRunner(private val api: MarketDataApi, private val scope: Coroutin
                     symbols = symbols, startTime = start, endTime = end, initialCapital = capital,
                     risk = engine.risk, scanner = engine.scanner, strategyParams = engine.strategyParams,
                     analysis = engine.analysis, enabledStrategies = strategies, slippage = engine.slippage,
+                    execution = engine.execution, shadowAnalysis = true,
                 )
                 val loadStart = start - config.warmupDays * DAY
                 val all = (symbols + "BTCUSDT").distinct()

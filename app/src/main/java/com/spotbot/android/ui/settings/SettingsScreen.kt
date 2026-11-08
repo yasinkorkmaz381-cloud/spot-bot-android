@@ -50,6 +50,8 @@ import com.spotbot.core.engine.TradingEngine
 import com.spotbot.core.rules.BuiltInRules
 import com.spotbot.core.rules.RuleGroup
 import com.spotbot.core.strategy.StrategyId
+import com.spotbot.core.trading.EntryMode
+import com.spotbot.core.trading.ExecutionConfig
 
 class SettingsViewModel(private val engine: TradingEngine, private val repository: SettingsRepository) : ViewModel() {
     val settings = repository.settings
@@ -99,6 +101,11 @@ class SettingsViewModel(private val engine: TradingEngine, private val repositor
         engine.updateConfig(repository.settings.value.engine)
     }
 
+    fun setExecution(transform: (ExecutionConfig) -> ExecutionConfig) {
+        repository.update { it.copy(engine = it.engine.copy(execution = transform(it.engine.execution))) }
+        engine.updateConfig(repository.settings.value.engine)
+    }
+
     fun resetPaper() {
         val value = parseDecimal(capital)?.takeIf { it >= 10 } ?: run {
             message = "Sermaye en az 10 USDT olmalı."
@@ -144,6 +151,21 @@ fun SettingsScreen(modifier: Modifier = Modifier, viewModel: SettingsViewModel =
                 }
             }
             Text("Strateji seçimi 4H piyasa rejimine göre otomatik yapılır; burada yalnızca hangi stratejilerin kullanılabileceği belirlenir.", style = MaterialTheme.typography.bodySmall)
+        }
+        SectionCard("Emir ve çıkış yönetimi (deneysel)") {
+            val e = settings.engine.execution
+            Text(
+                "Bir yıllık testte bu seçeneklerin hiçbiri görülmemiş dönemde kâra geçmedi; varsayılanlar kapalıdır. Backtest sekmesinde deneyebilirsiniz.",
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.tertiary,
+            )
+            ToggleRow("Limit giriş (maker, %0 komisyon)", e.entryMode == EntryMode.LIMIT) { on ->
+                viewModel.setExecution { it.copy(entryMode = if (on) EntryMode.LIMIT else EntryMode.MARKET) }
+            }
+            ToggleRow("Hedefe limit emirle çıkış", e.limitTakeProfit) { on -> viewModel.setExecution { it.copy(limitTakeProfit = on) } }
+            ToggleRow("+1R'de stopu girişe çek (başa baş)", e.breakEvenAtR != null) { on -> viewModel.setExecution { it.copy(breakEvenAtR = if (on) 1.0 else null) } }
+            ToggleRow("+1R'de %50 kısmi kâr", e.partialTakeProfitAtR != null) { on -> viewModel.setExecution { it.copy(partialTakeProfitAtR = if (on) 1.0 else null) } }
+            ToggleRow("48 saat süre sınırı", e.maxHoldingHours != null) { on -> viewModel.setExecution { it.copy(maxHoldingHours = if (on) 48 else null) } }
+            ToggleRow("Üst üste 3 zararda coini 7 gün dinlendir", e.cooldownTrades != null) { on -> viewModel.setExecution { it.copy(cooldownTrades = if (on) 3 else null) } }
         }
         SectionCard("Kurallar") {
             val engine = viewModel.ruleEngine
@@ -210,6 +232,14 @@ fun SettingsScreen(modifier: Modifier = Modifier, viewModel: SettingsViewModel =
 @SuppressLint("BatteryLife")
 private fun requestBatteryExemption(context: Context) {
     context.startActivity(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, "package:${context.packageName}".toUri()))
+}
+
+@Composable
+private fun ToggleRow(label: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+        Switch(checked = checked, onCheckedChange = onChange)
+    }
 }
 
 @Composable

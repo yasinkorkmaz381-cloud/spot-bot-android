@@ -115,6 +115,7 @@ fun BacktestReportContent(r: BacktestReport) {
         KeyValueRow("Komisyon", "${formatMoney(r.totalFees)} USDT")
         KeyValueRow("Spread + kayma", "${formatMoney(r.spreadAndSlippageCost)} USDT")
         KeyValueRow("Piyasada kalma süresi", formatPercent(r.exposurePercent, minFractionDigits = 1))
+        if (r.limitOrdersNotFilled > 0) KeyValueRow("Dolmayan limit giriş emri", "${r.limitOrdersNotFilled}")
         if (r.equityCurve.size >= 2) LineChart(r.equityCurve.map { it.second })
     }
     if (r.perStrategy.isNotEmpty()) {
@@ -132,6 +133,27 @@ fun BacktestReportContent(r: BacktestReport) {
         r.exitReasons.forEach { (k, v) -> KeyValueRow("Çıkış: $k", "$v") }
         r.blockedByRule.entries.take(6).forEach { (k, v) -> KeyValueRow("Engelleyen: $k", "$v") }
         r.warnings.forEach { Text("⚠ $it", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.tertiary) }
+    }
+    r.shadow?.let { sh ->
+        SectionCard("Kural katkısı (gölge işlemler)") {
+            Text(
+                "Bulunan ${sh.trades} kurulumun her biri (alınsın ya da reddedilsin) tek başına simüle edildi. Pozitif katkı: kural geçtiğinde sonuç daha iyi.",
+                style = MaterialTheme.typography.bodySmall,
+            )
+            if (sh.trades < 300) {
+                Text(
+                    "⚠ Örneklem küçük (${sh.trades} kurulum): kural katkıları rastlantıya çok açık. Güvenilir ölçüm için daha uzun dönem ve daha çok coin seçin.",
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.tertiary,
+                )
+            }
+            KeyValueRow("Kurulum başına ortalama", "%+.3fR · kazanma %s".format(sh.avgR, formatPercent(sh.winRatePercent)))
+            KeyValueRow("Kabul / ret", "${sh.acceptedCount} (${sh.acceptedAvgR?.let { "%+.3fR".format(it) } ?: "—"}) / ${sh.rejectedCount} (${sh.rejectedAvgR?.let { "%+.3fR".format(it) } ?: "—"})")
+            if (sh.limitNotFilled > 0) KeyValueRow("Dolmayan limit emir", "${sh.limitNotFilled}")
+            sh.rules.forEach { rule ->
+                KeyValueRow("${rule.id} ${rule.title}", "%+.3fR".format(rule.lift), gainLossColor(rule.lift.compareTo(0.0)))
+            }
+            sh.scoreBuckets.forEach { b -> KeyValueRow("Kalite puanı ${b.label}", "${b.count} kurulum · %+.3fR".format(b.avgR)) }
+        }
     }
     SectionCard("Son işlemler") {
         r.closedTrades.takeLast(15).reversed().forEach { t ->

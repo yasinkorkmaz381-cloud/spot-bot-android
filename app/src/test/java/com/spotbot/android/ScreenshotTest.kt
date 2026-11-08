@@ -98,7 +98,7 @@ class ScreenshotTest {
         val data = listOf("NEARUSDT", "BTCUSDT").associateWith { s ->
             HistoricalDataset(s, candles("/fixtures/${s}_m15.csv.gz"), candles("/fixtures/${s}_h1.csv.gz"), candles("/fixtures/${s}_h4.csv.gz"))
         }
-        val config = BacktestConfig(listOf("NEARUSDT"), 1_789_689_600_000L, data.getValue("NEARUSDT").m15.last().closeTime, scanner = ScannerConfig(minQuoteVolume24h = 100_000.0))
+        val config = BacktestConfig(listOf("NEARUSDT"), 1_789_689_600_000L, data.getValue("NEARUSDT").m15.last().closeTime, scanner = ScannerConfig(minQuoteVolume24h = 100_000.0), shadowAnalysis = true)
         BacktestEngine(config).run(data, data.keys.associateWith { info(it) })
     }
 

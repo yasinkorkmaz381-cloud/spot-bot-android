@@ -61,10 +61,10 @@ Net R:R kaç? Ne zaman geçersiz olur?*
 | 5. Stratejiler | ✅ A Breakout+Retest, B Trend Pullback; C Yatay piyasa **varsayılan kapalı** (ayrı backtest gerekli). Seçim 4H rejimine göre. |
 | 6. Kural sistemi | ✅ Motor + JSON yapılandırma. ⏳ **60 kuralın metni henüz eklenmedi** (varsayımla doldurulmadı) |
 | 7. Risk | ✅ Tablodaki tüm değerler; ayarlanabilir |
-| 8. Emir yönetimi | ✅ Sanal. ⚠ Gerçek emir V2'de; aşağıdaki MEXC bulgusuna bakın |
+| 8. Emir yönetimi | ✅ Sanal; piyasa ya da limit (maker) giriş, limit hedef, başa baş, kısmi kâr, süre sınırı, coin dinlenmesi (deneysel). ⚠ Gerçek emir V2'de; aşağıdaki MEXC bulgusuna bakın |
 | 9. Yapay zekâ | ⏳ V3 |
 | 10. Kontrol paneli | ✅ Android (Türkçe). ⏳ Telegram bildirimi |
-| 11. Test | ✅ Backtest (Aşama 1) ve canlı veriyle sanal işlem (Aşama 2) |
+| 11. Test | ✅ Backtest (Aşama 1), canlı veriyle sanal işlem (Aşama 2), ileri yürüyen test, Monte Carlo, gölge işlem ile kural katkısı |
 
 ## MEXC ile ilgili doğrulanmış bulgular (Kasım 2026)
 
@@ -99,6 +99,46 @@ Ayarlar varsayılan (risk %0,5, asgari net R:R 1,5, A+B etkin), 7 coinlik izleme
 Sonuç: Mevcut parametrelerle **kanıtlanmış bir avantaj yok**; gerçek paraya geçilmemeli. Sonraki adım 60 kuralın
 eklenmesi ve stratejilerin farklı dönemlerde (aşırı uyum yapmadan, ileri test ile) iyileştirilmesi.
 Backtest'i Android'de *Backtest* sekmesinden ya da `cryptoscan backtest` ile yeniden çalıştırabilirsiniz.
+
+## Bir yıllık araştırma (Kasım 2026)
+
+Ayrıntılı çıktı: [`docs/research/2026-11-08-bir-yillik-arastirma.txt`](docs/research/2026-11-08-bir-yillik-arastirma.txt).
+Tekrar üretmek için: `cryptoscan research --data <klasör>` (veri: MEXC 15M/1H/4H, coin başına bir JSON).
+
+**Veri:** 15 coin (izleme listesi + MEXC'nin en likit 8 coini), 15 Kas 2025 → 8 Kas 2026. MEXC 15 dakikalık
+mumları yalnız **13 Kasım 2025'ten** itibaren veriyor; bu yüzden en fazla ~1 yıl test edilebiliyor.
+
+**Yöntem:** 8 seçenek sonuçlar görülmeden önce sabitlendi (`PRE_REGISTERED_VARIANTS`). Her biri yılın ilk ve ikinci
+yarısında ayrı ayrı; ayrıca ileri yürüyen testte (3 ay seçim → sonraki 2 ay görülmemiş dönem) çalıştırıldı.
+Monte Carlo ile 5.000 yeniden örnekleme yapıldı. Gölge işlemlerde bulunan her kurulum (alınsın ya da reddedilsin)
+portföyden bağımsız simüle edilip her kuralın sonuca katkısı ölçüldü.
+
+| Seçenek | İlk yarı | İkinci yarı |
+| --- | --- | --- |
+| V0 Mevcut (A+B, piyasa emri) | −8,7 % · PF 0,68 | −12,5 % · PF 0,58 |
+| V1 Yalnız B | −5,6 % · PF 0,75 | −7,2 % · PF 0,65 |
+| V2 Limit giriş/hedef (maker) | −20,7 % · PF 0,51 | −10,0 % · PF 0,74 |
+| V4 V2 + %50 kısmi kâr 1R + başa baş | −13,6 % · PF 0,60 | −11,3 % · PF 0,65 |
+| V7 Yalnız B + V4 | −9,8 % · PF 0,65 | −9,6 % · PF 0,61 |
+| **İleri yürüyen test (görülmemiş dönemler)** | | **−21,3 %, 235 işlem, PF 0,63** |
+
+**Sonuçlar:**
+
+1. **Hiçbir seçenek kâra geçmedi**; Monte Carlo'ya göre zarar olasılığı ~%100. Emir/çıkış ayarları, sinyalin
+   kendisi negatif beklentili olduğu için sonucu kurtaramıyor. Bu yüzden varsayılanlar değiştirilmedi; seçenekler
+   Ayarlar'da "deneysel" olarak duruyor.
+2. **Maker (limit) emir maliyeti gerçekten düşürüyor:** kurulum başına ortalama sonuç −0,21R'den −0,11R'ye çıktı.
+   Kâr eden bir sinyal bulunduğunda kullanılmalı.
+3. **Kural sistemi şu an yanlış işlemleri seçiyor:** kurallarca kabul edilen kurulumlar reddedilenlerden kötü.
+   En büyük etken "net R:R ≥ 1,5" kuralı (geçenler −0,23R, kalanlar −0,09R): yakın yapısal hedefe göre yüksek
+   R:R çıkan kurulumlar genellikle oynaklığa göre çok dar stoplu ve gürültüyle stop oluyor (hipotez).
+4. **Sonucu iyileştiren kurallar:** en az 2 teyit (+0,10–0,12R), fiyat 1H VWAP üzerinde (+0,07R), BTC 4H
+   yükselişte (+0,06–0,07R), hacim teyidi (+0,02–0,06R). Kalite puanı ise sonucu zayıf öngörüyor (yalnız en düşük
+   dilim belirgin kötü).
+
+**Sonraki adım:** Stratejilerin sinyal mantığı değişmeli (ör. oynaklığa göre asgari stop mesafesi, hedef seçimi).
+Yeni fikirler bu yılın verisinde değil, **başka coinlerde** (aynı dönem) ya da ileriye dönük sanal işlemle
+doğrulanmalı; aksi halde aşırı uyum olur. 60 kural eklendiğinde her birinin katkısı aynı araçla ölçülecek.
 
 ## 60 kuralı ekleme
 
@@ -151,12 +191,13 @@ takibi de durdurur.
 cli/build/install/cryptoscan/bin/cryptoscan scan
 cli/build/install/cryptoscan/bin/cryptoscan backtest --days 90 --symbols BTC,ETH,SOL --strategies A,B --out rapor.json
 cli/build/install/cryptoscan/bin/cryptoscan paper --data ./cryptoscan-data   # 7/24 sanal işlem
+cli/build/install/cryptoscan/bin/cryptoscan research --data ./veri --out arastirma.json   # deney paketi
 ```
 
 ## Derleme ve testler
 
 ```bash
-./gradlew :core:test                  # 62 çekirdek testi
+./gradlew :core:test                  # 71 çekirdek testi
 ./gradlew :core:test -Plive           # + gerçek MEXC'ye bağlanan duman testleri
 ./gradlew :app:testDebugUnitTest      # 7 ekran çizim testi (Robolectric) + biçimlendirme testleri
 ./gradlew :app:testDebugUnitTest -Pscreenshots   # ekran görüntülerini app/build/outputs/roborazzi'ye kaydeder

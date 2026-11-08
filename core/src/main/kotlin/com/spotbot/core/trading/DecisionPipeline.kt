@@ -42,6 +42,8 @@ class DecisionContext(
     val btc: MultiTimeframe?,
     /** Korelasyon için 1H kapanış dizileri (sembol → kapanışlar). */
     val hourlyCloses: Map<String, DoubleArray>,
+    /** Kapanmış işlemler (coin dinlenmesi için). */
+    val closedTrades: List<ClosedTrade> = emptyList(),
 )
 
 sealed interface CandidateDecision {
@@ -70,7 +72,10 @@ class DecisionPipeline(
     val riskConfig: RiskConfig = RiskConfig(),
     val enabledStrategies: Set<StrategyId> = setOf(StrategyId.BREAKOUT_RETEST, StrategyId.TREND_PULLBACK),
     strategyParams: StrategyParams = StrategyParams(),
+    val execution: ExecutionConfig = ExecutionConfig(),
 ) {
+    private val makerEntry get() = execution.entryMode == EntryMode.LIMIT
+
     val strategies: List<Strategy> = listOf(
         BreakoutRetestStrategy(strategyParams),
         TrendPullbackStrategy(strategyParams),
@@ -100,10 +105,10 @@ class DecisionPipeline(
     }
 
     private fun assess(strategy: Strategy, setup: TradeSetup, candidate: Candidate, context: DecisionContext): CandidateDecision {
-        val rr = netRiskReward(setup.entryPrice, setup.stopPrice, setup.targetPrice, candidate.costs)
+        val rr = netRiskReward(setup.entryPrice, setup.stopPrice, setup.targetPrice, candidate.costs, makerEntry, execution.limitTakeProfit)
         val sizing = PositionSizer.size(
             context.equity, context.availableQuote, setup.entryPrice, setup.stopPrice, setup.targetPrice,
-            candidate.info, candidate.costs, riskConfig,
+            candidate.info, candidate.costs, riskConfig, makerEntry, execution.limitTakeProfit,
         )
         val newRiskPercent = (sizing as? SizingResult.Sized)?.riskPercent ?: riskConfig.riskPerTradePercent
         val ruleContext = RuleContext(
@@ -122,6 +127,7 @@ class DecisionPipeline(
             openPositionCount = context.openPositions.size,
             dailyPnlPercent = context.dailyPnlPercent,
             correlatedRiskPercent = correlatedRisk(setup.symbol, context) + newRiskPercent,
+            cooldownReason = Cooldown.reason(context.closedTrades, setup.symbol, context.now, execution),
         )
         val report = ruleEngine.evaluate(ruleContext)
         if (!report.allowed || sizing !is SizingResult.Sized) return CandidateDecision.Reject(setup.symbol, setup, report)
@@ -162,8 +168,9 @@ class DecisionPipeline(
                 structure.lastHighLabel ?: "-", structure.lastLowLabel ?: "-", context.btc?.h4?.regime ?: "-",
             ),
             stopReason = "Stop ${setup.stopPrice.fmt()}: ${setup.stopReason}",
-            riskReward = "Net R:R %.2f (komisyon %%%.3f, spread ve kayma dahil); hedef %s (%s); risk %.2f USDT (%%%.2f)".format(
-                rr.ratio, candidate.costs.takerFee * 100, setup.targetPrice.fmt(), setup.targetReason, sizing.riskAmount, sizing.riskPercent,
+            riskReward = "Net R:R %.2f (%s giriş, komisyon ve %s dahil); hedef %s (%s); risk %.2f USDT (%%%.2f)".format(
+                rr.ratio, if (makerEntry) "limit (maker)" else "piyasa", if (makerEntry) "stopta kayma" else "spread ve kayma",
+                setup.targetPrice.fmt(), setup.targetReason, sizing.riskAmount, sizing.riskPercent,
             ),
             invalidation = setup.invalidationReason,
         )
@@ -171,3 +178,12 @@ class DecisionPipeline(
 
     private fun Double.fmt() = if (this >= 100) "%.2f".format(this) else if (this >= 1) "%.4f".format(this) else "%.6f".format(this)
 }
+
+/** Henüz dolmamış (bekleyen) bir girişi, karar bağlamında açık pozisyon gibi saymak için yer tutucu. */
+fun CandidateDecision.Enter.asPendingPosition(now: Long): Position = Position(
+    id = "pending-$symbol", symbol = symbol, strategy = setup.strategy, openedAt = now,
+    entryPrice = setup.entryPrice, quantity = sizing.quantity, entryFee = 0.0,
+    stopPrice = setup.stopPrice, targetPrice = setup.targetPrice, invalidationPrice = setup.invalidationPrice,
+    riskAmount = sizing.riskAmount, qualityScore = report.qualityScore, setup = setup,
+    rationale = rationale,
+)

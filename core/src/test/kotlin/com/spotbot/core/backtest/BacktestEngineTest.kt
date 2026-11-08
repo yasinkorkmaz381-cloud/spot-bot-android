@@ -55,6 +55,20 @@ class BacktestEngineTest {
     }
 
     @Test
+    fun `limit entries fill exactly at the signal price and shadow analysis measures rules`() {
+        val limitConfig = config.copy(execution = com.spotbot.core.trading.ExecutionConfig(entryMode = com.spotbot.core.trading.EntryMode.LIMIT), shadowAnalysis = true)
+        val limit = BacktestEngine(limitConfig).run(data, info)
+        limit.closedTrades.forEach { t ->
+            assertEquals(t.position.setup.entryPrice, t.position.entryPrice, 0.0)
+            assertEquals(0.0, t.position.entryFee, 0.0)
+        }
+        val shadow = limit.shadow!!
+        assertTrue("Gölge işlem bekleniyor", shadow.trades > 0)
+        assertTrue(shadow.rules.none { it.id in com.spotbot.core.backtest.ShadowSimulator.portfolioRules })
+        assertEquals(shadow.trades, shadow.scoreBuckets.sumOf { it.count })
+    }
+
+    @Test
     fun `risk per trade stays at or below the configured share of equity`() {
         report.closedTrades.forEach { t ->
             assertTrue(t.position.riskAmount <= config.initialCapital * 1.2 * config.risk.riskPerTradePercent / 100)

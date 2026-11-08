@@ -128,6 +128,7 @@ private fun BotCard(state: PanelUiState, actions: PanelActions) {
         health.lastScanAt?.let { KeyValueRow("Son tarama", formatTime(it)) }
         health.feed.lastMaxDeviationPercent?.let { KeyValueRow("WS/REST fiyat sapması", formatPercent(it, minFractionDigits = 3)) }
         if (health.universe.isNotEmpty()) KeyValueRow("İzlenen coin", "${health.universe.size}")
+        if (health.pendingOrders.isNotEmpty()) KeyValueRow("Bekleyen limit emir", health.pendingOrders.joinToString())
         health.lastError?.let { Text("Son hata: $it", style = MaterialTheme.typography.bodySmall, color = colors.loss) }
         if (state.isActive) {
             Row(verticalAlignment = Alignment.CenterVertically) {

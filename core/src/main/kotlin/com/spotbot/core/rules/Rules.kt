@@ -56,6 +56,8 @@ class RuleContext(
     val dailyPnlPercent: Double,
     /** Bu coinle ilişkili açık pozisyonların riski + yeni işlemin riski, özsermayenin %'si. */
     val correlatedRiskPercent: Double,
+    /** Coin dinlenmedeyse nedeni (dinlenme kapalıysa ya da koşul yoksa null). */
+    val cooldownReason: String? = null,
 )
 
 class BuiltInRule(
@@ -128,6 +130,9 @@ object BuiltInRules {
                 is SizingResult.Sized -> true to "Miktar ${s.quantity}, tutar %.2f USDT, risk %%%.2f".format(s.notional, s.riskPercent)
                 is SizingResult.Rejected -> false to s.reason
             }
+        },
+        mandatory("Z16", "Coin üst üste zarar nedeniyle dinlenmede değil") { c ->
+            (c.cooldownReason == null) to (c.cooldownReason ?: "Dinlenme yok")
         },
         quality("K01", "Net R:R tercih edilen seviyede (2+)", 3.0) { c ->
             (c.riskReward.ratio >= c.riskConfig.preferredRiskReward) to "Net R:R %.2f".format(c.riskReward.ratio)
