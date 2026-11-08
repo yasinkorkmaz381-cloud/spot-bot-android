@@ -1,78 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">SpotBot</string>
+    <string name="app_name">CryptoScan Pro</string>
 
-    <!-- Gezinme -->
-    <string name="nav_dashboard">Panel</string>
-    <string name="nav_markets">Piyasalar</string>
-    <string name="nav_strategy">Strateji</string>
-    <string name="nav_settings">Ayarlar</string>
+    <string name="channel_status">Bot durumu</string>
+    <string name="channel_trades">İşlem bildirimleri</string>
+    <string name="channel_alerts">Kritik uyarılar</string>
 
-    <!-- Ortak -->
-    <string name="amount_with_asset">%1$s %2$s</string>
-    <string name="value_unknown">—</string>
-    <string name="label_current_price">Güncel fiyat</string>
-    <string name="label_order_amount">Emir tutarı</string>
-    <string name="label_take_profit">Kâr al</string>
-    <string name="label_stop_loss">Zarar durdur</string>
-
-    <!-- Panel -->
-    <string name="simulation_banner">Simülasyon modu: fiyatlar simüle edilir, gerçek para kullanılmaz.</string>
-    <string name="bot_status_running">Bot çalışıyor</string>
-    <string name="bot_status_stopped">Bot durduruldu</string>
-    <string name="bot_start">Botu başlat</string>
-    <string name="bot_stop">Botu durdur</string>
-    <string name="portfolio_title">Portföy</string>
-    <string name="portfolio_total_value">Toplam değer</string>
-    <string name="portfolio_pnl">Kâr / Zarar</string>
-    <string name="pnl_format">%1$s %2$s (%3$s)</string>
-    <string name="portfolio_cash">Nakit</string>
-    <string name="portfolio_position">Açık pozisyon</string>
-    <string name="portfolio_no_position">Yok</string>
-    <string name="position_format">%1$s %2$s @ %3$s</string>
-    <string name="recent_trades">Son işlemler</string>
-    <string name="trades_empty">Henüz işlem yok. Botu başlattığınızda işlemler burada görünecek.</string>
-    <string name="trade_side_buy">AL</string>
-    <string name="trade_side_sell">SAT</string>
-    <string name="trade_reason_entry">Giriş</string>
-    <string name="trade_reason_take_profit">Kâr al</string>
-    <string name="trade_reason_stop_loss">Zarar durdur</string>
-    <string name="trade_details">%1$s %2$s @ %3$s · %4$s</string>
-
-    <!-- Piyasalar -->
-    <string name="markets_search">Parite ara (örn. BTC)</string>
-    <string name="markets_simulated_note">Fiyatlar simüle edilmektedir; değişim, uygulama açılışındaki fiyata göredir.</string>
-    <string name="markets_empty">Eşleşen parite bulunamadı.</string>
-
-    <!-- Strateji -->
-    <string name="strategy_description">Bot, açık pozisyon yoksa belirlediğiniz tutarda alım yapar. Fiyat giriş fiyatının kâr al oranı kadar üzerine çıkınca satarak kârı realize eder, zarar durdur oranı kadar altına düşünce pozisyonu kapatır. Ardından yeni bir giriş yapar.</string>
-    <string name="strategy_pair">Parite</string>
-    <string name="strategy_running_info">Ayarları değiştirmek için önce botu durdurun.</string>
-    <string name="strategy_fee_note">Her alım ve satımda %1$s işlem ücreti uygulanır.</string>
-    <string name="strategy_save">Kaydet</string>
-    <string name="strategy_saved">Strateji kaydedildi.</string>
-    <string name="strategy_error_bot_running">Bot çalışırken strateji değiştirilemez.</string>
-    <string name="strategy_error_position_open">Açık pozisyon varken parite değiştirilemez.</string>
-    <string name="error_order_amount">Geçerli bir tutar girin (en az %1$s).</string>
-    <string name="error_take_profit">0\'dan büyük ve en fazla 100 olmalı.</string>
-    <string name="error_stop_loss">0\'dan büyük ve 100\'den küçük olmalı.</string>
-
-    <!-- Ayarlar -->
-    <string name="settings_section_mode">İşlem modu</string>
-    <string name="settings_mode_simulation">Simülasyon (sanal işlem)</string>
-    <string name="settings_mode_simulation_desc">Gerçek para kullanılmaz; fiyatlar uygulama içinde simüle edilir.</string>
-    <string name="settings_section_exchange">Borsa bağlantısı</string>
-    <string name="settings_exchange_not_connected">Binance: bağlı değil</string>
-    <string name="settings_exchange_desc">Gerçek borsa bağlantısı ve API anahtarı yönetimi sonraki adımda eklenecek.</string>
-    <string name="settings_section_account">Simülasyon hesabı</string>
-    <string name="settings_initial_balance">Başlangıç bakiyesi</string>
-    <string name="settings_fee">İşlem ücreti</string>
-    <string name="settings_reset">Simülasyonu sıfırla</string>
-    <string name="settings_reset_confirm_title">Simülasyon sıfırlansın mı?</string>
-    <string name="settings_reset_confirm_text">Bot durdurulur, bakiye başlangıç değerine döner ve işlem geçmişi silinir. Strateji ayarlarınız korunur.</string>
-    <string name="settings_reset_confirm">Sıfırla</string>
-    <string name="settings_cancel">Vazgeç</string>
-    <string name="settings_reset_done">Simülasyon sıfırlandı.</string>
-    <string name="settings_section_about">Uygulama</string>
-    <string name="settings_version">Sürüm</string>
+    <string name="status_running">Çalışıyor</string>
+    <string name="status_paused">Yeni işlemler duraklatıldı</string>
+    <string name="status_starting">Başlatılıyor</string>
+    <string name="status_error">Hata</string>
+    <string name="notif_status_text">Sermaye %1$s USDT · Açık işlem: %2$d (sanal)</string>
+    <string name="notif_opened">%1$s alındı (sanal)</string>
+    <string name="notif_opened_text">%1$s · giriş %2$s · stop %3$s</string>
+    <string name="notif_closed">%1$s kapandı (sanal)</string>
+    <string name="notif_closed_text">%1$s · net %2$s USDT</string>
+    <string name="notif_problem">Bot uyarısı</string>
+    <string name="action_pause_entries">Yeni işlemleri durdur</string>
+    <string name="action_resume_entries">Yeni işlemlere izin ver</string>
+    <string name="action_stop_bot">Botu kapat</string>
 </resources>

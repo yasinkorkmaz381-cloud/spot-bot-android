@@ -2,7 +2,6 @@ package com.spotbot.android.ui.common
 
 import java.math.BigDecimal
 import java.math.RoundingMode
-import java.text.DecimalFormatSymbols
 import java.text.NumberFormat
 import java.time.Instant
 import java.time.ZoneId
@@ -10,79 +9,86 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlin.math.abs
 
-private val HUNDRED = BigDecimal(100)
-private val TIME_FORMATTER: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm:ss")
+private val TIME = DateTimeFormatter.ofPattern("HH:mm")
+private val DATE_TIME = DateTimeFormatter.ofPattern("dd.MM HH:mm")
 
-/** Fiyatı büyüklüğüne göre uygun ondalık hassasiyetle biçimlendirir. */
-fun formatPrice(value: BigDecimal, locale: Locale = Locale.getDefault()): String {
-    val abs = value.abs()
+/** Fiyatı büyüklüğüne göre uygun ondalıkla biçimlendirir (BTC 2, 1–1000 arası 4, altı 6 ondalık). */
+fun formatPrice(value: Double, locale: Locale = Locale.getDefault()): String {
+    if (value.isNaN()) return "—"
+    val a = abs(value)
     val digits = when {
-        abs >= HUNDRED -> 2
-        abs >= BigDecimal.ONE -> 4
+        a >= 1_000 -> 2
+        a >= 1 -> 4
         else -> 6
     }
-    return numberFormat(locale, digits, digits).format(value)
+    return number(locale, digits, digits).format(BigDecimal.valueOf(value))
 }
 
-/** Kote tutarı (örn. USDT) iki ondalıkla biçimlendirir. */
-fun formatMoney(value: BigDecimal, locale: Locale = Locale.getDefault()): String =
-    numberFormat(locale, 2, 2).format(value)
+fun formatMoney(value: Double, locale: Locale = Locale.getDefault()): String =
+    if (value.isNaN()) "—" else number(locale, 2, 2).format(BigDecimal.valueOf(value))
 
-/** Tutarı işaretiyle (+/-) biçimlendirir. */
-fun formatSignedMoney(value: BigDecimal, locale: Locale = Locale.getDefault()): String {
-    val sign = signPrefix(value.setScale(2, RoundingMode.HALF_UP).signum())
-    return sign + formatMoney(value.abs(), locale)
+fun formatSignedMoney(value: Double, locale: Locale = Locale.getDefault()): String {
+    if (value.isNaN()) return "—"
+    val sign = sign(BigDecimal.valueOf(value).setScale(2, RoundingMode.HALF_UP).signum())
+    return sign + formatMoney(abs(value), locale)
 }
 
-/** Kripto miktarını en fazla 8 ondalıkla biçimlendirir. */
-fun formatQuantity(value: BigDecimal, locale: Locale = Locale.getDefault()): String =
-    numberFormat(locale, 0, 8).format(value)
+fun formatQuantity(value: Double, locale: Locale = Locale.getDefault()): String =
+    number(locale, 0, 8).format(BigDecimal.valueOf(value))
 
-/**
- * Yüzde değeri yerel kurallara göre biçimlendirir (tr: "%1,5", en: "1.5%").
- * [value] yüzde cinsindendir (1.5 → %1,5).
- */
-fun formatPercent(
-    value: Double,
-    locale: Locale = Locale.getDefault(),
-    signed: Boolean = false,
-    minFractionDigits: Int = 0,
-): String {
+/** [value] yüzde cinsindendir (1.5 → tr: "%1,5"). */
+fun formatPercent(value: Double, locale: Locale = Locale.getDefault(), signed: Boolean = false, minFractionDigits: Int = 0): String {
+    if (value.isNaN() || value.isInfinite()) return "—"
     val formatter = NumberFormat.getPercentInstance(locale).apply {
         minimumFractionDigits = minFractionDigits
         maximumFractionDigits = 2
         roundingMode = RoundingMode.HALF_UP
     }
-    val roundedSign = BigDecimal.valueOf(value).setScale(2, RoundingMode.HALF_UP).signum()
+    val rounded = BigDecimal.valueOf(value).setScale(2, RoundingMode.HALF_UP).signum()
     val body = formatter.format(abs(value) / 100)
     return when {
-        signed -> signPrefix(roundedSign) + body
-        roundedSign < 0 -> "-$body"
+        signed -> sign(rounded) + body
+        rounded < 0 -> "-$body"
         else -> body
     }
 }
 
-fun formatTime(instant: Instant, zone: ZoneId = ZoneId.systemDefault()): String =
-    TIME_FORMATTER.withZone(zone).format(instant)
-
-/** Form alanlarında gösterilecek sade ondalık metin (örn. tr için "1,5"). */
-fun formatEditableDecimal(value: BigDecimal, locale: Locale = Locale.getDefault()): String {
-    val separator = DecimalFormatSymbols.getInstance(locale).decimalSeparator
-    return value.stripTrailingZeros().toPlainString().replace('.', separator)
+/** Büyük tutarları kısaltır: 1.250.000 → "1,25 M". */
+fun formatCompact(value: Double, locale: Locale = Locale.getDefault()): String = when {
+    abs(value) >= 1e9 -> number(locale, 0, 2).format(value / 1e9) + " Mr"
+    abs(value) >= 1e6 -> number(locale, 0, 2).format(value / 1e6) + " M"
+    abs(value) >= 1e3 -> number(locale, 0, 1).format(value / 1e3) + " B"
+    else -> number(locale, 0, 2).format(value)
 }
 
-/** Kullanıcının girdiği ondalık metni ayrıştırır; virgül ve nokta ayırıcıyı kabul eder. */
-fun parseDecimal(text: String): BigDecimal? = text.trim().replace(',', '.').toBigDecimalOrNull()
+fun formatRatio(value: Double, locale: Locale = Locale.getDefault()): String = when {
+    value.isNaN() -> "—"
+    value.isInfinite() -> "∞"
+    else -> number(locale, 2, 2).format(value)
+}
 
-private fun signPrefix(signum: Int): String = when {
+fun formatTime(epochMillis: Long, zone: ZoneId = ZoneId.systemDefault()): String =
+    TIME.withZone(zone).format(Instant.ofEpochMilli(epochMillis))
+
+fun formatDateTime(epochMillis: Long, zone: ZoneId = ZoneId.systemDefault()): String =
+    DATE_TIME.withZone(zone).format(Instant.ofEpochMilli(epochMillis))
+
+/** Kullanıcının girdiği ondalık metni ayrıştırır; virgül ve nokta kabul edilir. */
+fun parseDecimal(text: String): Double? = text.trim().replace(',', '.').toDoubleOrNull()
+
+fun formatEditable(value: Double, locale: Locale = Locale.getDefault()): String {
+    val separator = java.text.DecimalFormatSymbols.getInstance(locale).decimalSeparator
+    return BigDecimal.valueOf(value).stripTrailingZeros().toPlainString().replace('.', separator)
+}
+
+private fun sign(signum: Int) = when {
     signum > 0 -> "+"
     signum < 0 -> "-"
     else -> ""
 }
 
-private fun numberFormat(locale: Locale, minDigits: Int, maxDigits: Int): NumberFormat =
-    NumberFormat.getNumberInstance(locale).apply {
-        minimumFractionDigits = minDigits
-        maximumFractionDigits = maxDigits
-        roundingMode = RoundingMode.HALF_UP
-    }
+private fun number(locale: Locale, min: Int, max: Int): NumberFormat = NumberFormat.getNumberInstance(locale).apply {
+    minimumFractionDigits = min
+    maximumFractionDigits = max
+    roundingMode = RoundingMode.HALF_UP
+}

@@ -12,8 +12,8 @@ android {
         applicationId = "com.spotbot.android"
         minSdk = 26
         targetSdk = 37
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 2
+        versionName = "1.0.0-paper"
     }
 
     buildTypes {
@@ -35,9 +35,29 @@ android {
         compose = true
         buildConfig = true
     }
+
+    testOptions {
+        unitTests.isIncludeAndroidResources = true
+    }
+}
+
+tasks.withType<Test>().configureEach {
+    // Ekran görüntüleri yalnızca istendiğinde kaydedilir: ./gradlew :app:testDebugUnitTest -Pscreenshots
+    systemProperty("roborazzi.test.record", project.hasProperty("screenshots").toString())
+    systemProperty("robolectric.pixelCopyRenderMode", "hardware")
+    // Robolectric, JDK 17+ üzerinde FileDescriptor iç alanlarına erişmek için bu izinlere ihtiyaç duyar.
+    jvmArgs(
+        "--add-opens=java.base/java.io=ALL-UNNAMED",
+        "--add-opens=java.base/java.lang=ALL-UNNAMED",
+        "--add-exports=java.base/jdk.internal.access=ALL-UNNAMED",
+        "--add-opens=java.base/jdk.internal.access=ALL-UNNAMED",
+    )
+    // Robolectric'in Android çalışma ortamını indirdiği depo (Maven Central erişimi kısıtlı ortamlar için).
+    providers.environmentVariable("ROBOLECTRIC_REPO_URL").orNull?.let { systemProperty("robolectric.dependency.repo.url", it) }
 }
 
 dependencies {
+    implementation(project(":core"))
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)
@@ -55,4 +75,10 @@ dependencies {
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.robolectric)
+    testImplementation(libs.roborazzi)
+    testImplementation(libs.roborazzi.compose)
+    testImplementation(platform(libs.androidx.compose.bom))
+    testImplementation(libs.androidx.compose.ui.test.junit4)
+    debugImplementation(libs.androidx.compose.ui.test.manifest)
 }

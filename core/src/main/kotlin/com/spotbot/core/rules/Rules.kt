@@ -73,7 +73,7 @@ class BuiltInRule(
 object BuiltInRules {
     val all: List<BuiltInRule> = listOf(
         mandatory("Z01", "Sinyal kapanmış mumdan üretildi") { c ->
-            (c.setup.signalTime <= c.now && c.mtf.m15.candle.closeTime <= c.now) to "Tetik mumu kapanışı: ${c.setup.signalTime}"
+            (c.setup.signalTime <= c.now && c.mtf.m15.candle.closeTime <= c.now) to "Tetik mumu kapanışı: ${utc(c.setup.signalTime)}"
         },
         mandatory("Z02", "Stop-loss tanımlı ve girişin altında") { c ->
             (c.setup.stopPrice > 0 && c.setup.stopPrice < c.setup.entryPrice) to "Stop ${c.setup.stopPrice.short()} / giriş ${c.setup.entryPrice.short()}"
@@ -94,10 +94,18 @@ object BuiltInRules {
             (c.setup.confirmations.size >= 2) to "${c.setup.confirmations.size} teyit: ${c.setup.confirmations.joinToString()}"
         },
         mandatory("Z08", "Likidite ve işlem koşulları uygun") { c ->
-            (c.scan != null && c.scan.status != CoinStatus.ELIMINATED) to (c.scan?.reasons?.joinToString().takeUnless { it.isNullOrEmpty() } ?: "Tarama filtrelerini geçti")
+            when {
+                c.scan == null -> false to "Tarama verisi yok"
+                c.scan.status == CoinStatus.ELIMINATED -> false to c.scan.reasons.joinToString()
+                else -> true to "Tarama filtrelerini geçti"
+            }
         },
         mandatory("Z09", "Manipülasyon riski işareti yok") { c ->
-            (c.scan != null && c.scan.status != CoinStatus.FLAGGED) to (c.scan?.reasons?.joinToString().takeUnless { it.isNullOrEmpty() } ?: "İşaret yok")
+            when {
+                c.scan == null -> false to "Tarama verisi yok"
+                c.scan.status == CoinStatus.FLAGGED -> false to c.scan.reasons.joinToString()
+                else -> true to "İşaret yok"
+            }
         },
         mandatory("Z10", "BTC / genel piyasa filtresi alıma izin veriyor") { c ->
             c.market.allowsLongs to c.market.reasons.joinToString()
@@ -169,5 +177,9 @@ object BuiltInRules {
     private fun quality(id: String, title: String, weight: Double, check: (RuleContext) -> Pair<Boolean, String>) =
         BuiltInRule(id, title, RuleGroup.QUALITY, weight, check)
 }
+
+private val UTC_TIME = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm 'UTC'").withZone(java.time.ZoneOffset.UTC)
+
+internal fun utc(epochMillis: Long): String = UTC_TIME.format(java.time.Instant.ofEpochMilli(epochMillis))
 
 internal fun Double.short(): String = if (this >= 100) "%.2f".format(this) else if (this >= 1) "%.4f".format(this) else "%.6f".format(this)

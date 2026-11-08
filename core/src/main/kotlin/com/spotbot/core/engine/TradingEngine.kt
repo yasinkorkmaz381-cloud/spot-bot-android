@@ -216,38 +216,50 @@ class TradingEngine(
     private fun now() = timeSource.now() + serverOffset
 
     private suspend fun runMain() {
-        try {
-            syncServerTime()
-            refreshUniverse()
-            _health.update { it.copy(status = EngineStatus.RUNNING, message = "Çalışıyor") }
-            val first = Timeframe.M15.lastCloseAtOrBefore(now())
-            process(first, allowEntries = false)
-            var lastProcessed = first
-            var lastTimeSync = timeSource.now()
-            var lastEquityUpdate = 0L
-            while (scope.isActive) {
-                val settled = Timeframe.M15.lastCloseAtOrBefore(now() - config.candleSettleMillis)
-                if (settled > lastProcessed) {
-                    runCatching { process(settled, allowEntries = true) }.onFailure { problem("Tarama hatası: ${it.message}", it) }
-                    lastProcessed = settled
+        // Başlangıç (sunucu saati, borsa bilgisi, geçmiş mumlar) ağ yokken başarısız olabilir — ör. cihaz açılışında.
+        // 7/24 çalışma için motor durmaz; artan aralıklarla yeniden dener.
+        var attempt = 0
+        while (true) {
+            try {
+                syncServerTime()
+                refreshUniverse()
+                break
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                val wait = minOf(5_000L shl minOf(attempt, 6), 5 * 60_000L)
+                attempt++
+                _health.update {
+                    it.copy(status = EngineStatus.ERROR, lastError = e.message, message = "Bağlantı bekleniyor; ${wait / 1000} sn sonra tekrar denenecek")
                 }
-                if (timeSource.now() - lastTimeSync > 10 * 60_000L) {
-                    runCatching { syncServerTime() }
-                    lastTimeSync = timeSource.now()
-                }
-                if (timeSource.now() - lastEquityUpdate > 10_000L) {
-                    updateEquity()
-                    lastEquityUpdate = timeSource.now()
-                }
-                delay(1_000)
+                if (attempt == 1) problem("Başlatılamadı, yeniden denenecek: ${e.message}", e)
+                delay(wait)
             }
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            _health.update { it.copy(status = EngineStatus.ERROR, lastError = e.message, message = "Başlatılamadı") }
-            problem("Motor durdu: ${e.message}", e)
-            jobs.forEach { if (it != kotlin.coroutines.coroutineContext[Job]) it.cancel() }
-            jobs = emptyList()
+        }
+        _health.update { it.copy(status = EngineStatus.RUNNING, message = "Çalışıyor", lastError = null) }
+        val first = Timeframe.M15.lastCloseAtOrBefore(now())
+        runCatching { process(first, allowEntries = false) }.onFailure { problem("İlk tarama hatası: ${it.message}", it) }
+        var lastProcessed = first
+        var lastTimeSync = timeSource.now()
+        var lastEquityUpdate = 0L
+        while (scope.isActive) {
+            val settled = Timeframe.M15.lastCloseAtOrBefore(now() - config.candleSettleMillis)
+            if (settled > lastProcessed) {
+                runCatching { process(settled, allowEntries = true) }.onFailure {
+                    if (it is CancellationException) throw it
+                    problem("Tarama hatası: ${it.message}", it)
+                }
+                lastProcessed = settled
+            }
+            if (timeSource.now() - lastTimeSync > 10 * 60_000L) {
+                runCatching { syncServerTime() }
+                lastTimeSync = timeSource.now()
+            }
+            if (timeSource.now() - lastEquityUpdate > 10_000L) {
+                updateEquity()
+                lastEquityUpdate = timeSource.now()
+            }
+            delay(1_000)
         }
     }
 

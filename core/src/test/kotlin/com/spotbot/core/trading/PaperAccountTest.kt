@@ -70,3 +70,31 @@ class PaperAccountTest {
         assertEquals((PaperAccount.MAX_DECISIONS + 19).toLong(), state.decisions.last().time)
     }
 }
+
+class PerformanceTest {
+    private val costs = CostModel(takerFee = 0.0, slippage = 0.0, halfSpread = 0.0)
+    private val rationale = TradeRationale("", "", "", "", "", "")
+    private val day = 24 * 60 * 60_000L
+
+    private fun trade(state: PortfolioState, exit: Double, at: Long): PortfolioState {
+        val opened = PaperAccount.open(state, TestData.setup(), 1.0, 100.0, costs, 2.0, 50.0, rationale, null, at - 1)
+        return PaperAccount.close(opened, opened.positions.last().id, exit, ExitReason.TAKE_PROFIT, "", costs, at)
+    }
+
+    @Test
+    fun `groups realized results by period`() {
+        val now = 40 * day + 1_000
+        var state = PortfolioState.create(1_000.0)
+        state = trade(state, 110.0, now - 20 * day) // +10, yalnızca 30 günde
+        state = trade(state, 95.0, now - 3 * day) // -5, 7 ve 30 günde
+        state = trade(state, 102.0, now - 500) // +2, bugün
+
+        val summary = Performance.summarize(state, now)
+        assertEquals(2.0, summary.today.netPnl, 1e-9)
+        assertEquals(-3.0, summary.week.netPnl, 1e-9)
+        assertEquals(7.0, summary.month.netPnl, 1e-9)
+        assertEquals(0.7, summary.month.percentOfCapital, 1e-9)
+        assertEquals(3, summary.allTime.trades)
+        assertEquals(12.0 / 5.0, summary.profitFactor, 1e-9)
+    }
+}
