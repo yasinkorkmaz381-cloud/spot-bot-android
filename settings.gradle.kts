@@ -20,5 +20,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "SpotBot"
-include(":app")
+rootProject.name = "CryptoScanPro"
+include(":app", ":core", ":cli")
