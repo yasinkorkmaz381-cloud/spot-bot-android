@@ -121,7 +121,7 @@ class DecisionPipeline(
     val ruleEngine: RuleEngine = RuleEngine(),
     val riskConfig: RiskConfig = RiskConfig(),
     val enabledStrategies: Set<StrategyId> = setOf(StrategyId.BREAKOUT_RETEST, StrategyId.TREND_PULLBACK),
-    strategyParams: StrategyParams = StrategyParams(),
+    private val strategyParams: StrategyParams = StrategyParams(),
     val execution: ExecutionConfig = ExecutionConfig(),
     val profile: StrategyProfile = StrategyProfile.ADAPTIVE,
 ) {
@@ -217,6 +217,8 @@ class DecisionPipeline(
             dataIssue = candidate.dataIssue,
             openRiskPercent = (context.openPositions.sumOf { it.openRisk } + context.pendingRiskAmount) / context.equity * 100,
             newRiskPercent = newRiskPercent,
+            marketRegime = com.spotbot.core.analysis.RegimeClassifier.classify(context.btc?.h4),
+            regimePolicy = strategyParams.regimePolicy,
         )
         val report = withProfileGates(ruleEngine.evaluate(ruleContext), rr)
         if (!report.allowed || sizing !is SizingResult.Sized) return CandidateDecision.Reject(setup.symbol, setup, report)

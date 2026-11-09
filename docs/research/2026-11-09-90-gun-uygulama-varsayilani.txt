@@ -1,0 +1,83 @@
+Uygulama varsayılanı ile 90 günlük backtest (7 coin, 1000 USDT), dönem 2026-08-11 08:00 → 2026-11-09 08:00 UTC
+Komut: cryptoscan backtest --days 90 --end 1794211200000
+Düzeltmelerden sonra (toz kalıntısı hatası giderildi):
+
+
+
+── Backtest raporu ─────────────────────────────
+Dönem          : 2026-08-11 08:00 → 2026-11-09 08:00 UTC
+Coinler        : BTCUSDT, ETHUSDT, SOLUSDT, NEARUSDT, ZECUSDT, INJUSDT, AVAXUSDT
+Sermaye        : 1000.00 → 973.02 USDT  (net -26.98 USDT, -2.70%; BTC al-tut: +15.21%)
+İşlem sayısı   : 44  (12 kazançlı / 32 zararlı; bulunan kurulum: 1805)
+Kazanma oranı  : 27.3%
+Brüt kâr/zarar : +109.62 / 136.59 USDT (net kâr/zararlara göre, ücretler dahil)
+Ort. kazanç    : +9.13 USDT   Ort. kayıp: -4.27 USDT
+Profit factor  : 0.80
+Beklenen değer : -0.613 USDT/işlem (-0.15R ortalama)
+Maks. düşüş    : 7.24% (piyasa değerli özsermaye)
+Komisyon       : 10.69 USDT   Spread+kayma: 16.04 USDT
+Piyasada kalma : 19.2%
+Strateji bazında (aynı çalıştırma; düşüş yalnız o stratejinin işlem sırasına göre):
+  A Breakout + Retest      18 işlem    2 K /  16 Z  kazanma % 11.1  ort.kazanç   +9.71  ort.kayıp   -4.13  PF  0.29  beklenen -2.592 USDT (-0.51R)  maks.düşüş %5.79  net   -46.65 (%-4.66)  ücret 4.65
+  B Trend Pullback         26 işlem   10 K /  16 Z  kazanma % 38.5  ort.kazanç   +9.02  ort.kayıp   -4.41  PF  1.28  beklenen +0.757 USDT (+0.10R)  maks.düşüş %3.60  net   +19.67 (%+1.97)  ücret 6.04
+Aynı 15M mumda stop+hedef: 0 (5M ile hedef önce 0, stop önce 0; belirsiz: 5M yok 0, aynı 5M mum 0)
+Aylık özsermaye değişimi:
+  2026-08    1000.00 →   1021.05  % +2.11  (17 işlem kapandı, net +21.05)
+  2026-09    1021.05 →    983.06  % -3.72  (24 işlem kapandı, net -37.99)
+  2026-10     983.06 →    973.02  % -1.02  (3 işlem kapandı, net -10.04)
+  2026-11     973.02 →    973.02  % +0.00  (0 işlem kapandı, net +0.00)
+Çıkış nedenleri: Kâr hedefi=12, Yapısal bozulma=4, Stop-loss=28
+Kurulumları en çok engelleyen zorunlu kurallar:
+  1673× Z03 Net risk/getiri en az asgari oran
+  263× Z11 Aynı coinde açık pozisyon yok (zararda ek alım yasak)
+  197× Z10 BTC / genel piyasa filtresi alıma izin veriyor
+  196× Z07 En az 2 bağımsız teyit (tek göstergeyle işlem yok)
+  146× Z14 İlişkili coinlerde toplam risk sınır içinde
+  36× Z18 Toplam açık risk sınır içinde
+İşlemler (giriş zamanına göre):
+  #   Coin      S Giriş (UTC)      Çıkış (UTC)              Alış   Satış(ort)  Net USDT       R  Çıkış nedeni
+  1   ETHUSDT   A 2026-08-19 14:45 2026-08-19 15:15      1941.12      1978.51     +5.48   +1.78  Kâr hedefi
+  2   ZECUSDT   B 2026-08-19 23:15 2026-08-20 03:00      563.492      556.672     -3.95   -0.89  Yapısal bozulma
+  3   BTCUSDT   A 2026-08-19 23:15 2026-08-20 15:45      69403.3      72683.6    +13.95   +4.59  Kâr hedefi
+  4   ETHUSDT   B 2026-08-20 03:45 2026-08-20 16:00      2251.86      2328.25     +7.82   +1.56  Kâr hedefi
+  5   SOLUSDT   B 2026-08-20 04:15 2026-08-20 08:15      84.6835      87.1546     +8.46   +1.77  Kâr hedefi
+  6   SOLUSDT   A 2026-08-20 11:00 2026-08-20 12:15      87.5256      86.6515     -3.37   -1.00  Stop-loss
+  7   SOLUSDT   A 2026-08-20 13:15 2026-08-20 13:45      87.3555      86.2660     -4.13   -1.00  Stop-loss
+  8   ETHUSDT   B 2026-08-21 12:15 2026-08-21 20:30      2380.51      2445.92     +8.13   +1.79  Kâr hedefi
+  9   BTCUSDT   B 2026-08-21 12:15 2026-08-23 05:15      77007.7      75972.5     -4.44   -1.00  Stop-loss
+  10  SOLUSDT   B 2026-08-22 19:45 2026-08-25 01:00      94.8111      102.583     +9.85   +1.91  Kâr hedefi
+  11  ZECUSDT   B 2026-08-22 22:30 2026-08-23 03:45      808.386      783.269     -5.15   -1.00  Stop-loss
+  12  INJUSDT   B 2026-08-24 20:15 2026-08-25 05:00      5.69026      5.99550     +9.28   +1.81  Kâr hedefi
+  13  SOLUSDT   B 2026-08-25 15:00 2026-08-25 21:15      98.2536      95.7873     -5.21   -1.00  Stop-loss
+  14  SOLUSDT   A 2026-08-27 11:15 2026-08-30 23:30      104.478      102.180     -5.18   -1.00  Stop-loss
+  15  ZECUSDT   A 2026-08-27 19:30 2026-08-27 22:15      821.025      808.533     -3.21   -0.61  Yapısal bozulma
+  16  ZECUSDT   A 2026-08-29 17:45 2026-08-30 04:15      836.257      827.012     -3.74   -1.00  Stop-loss
+  17  ZECUSDT   B 2026-08-30 20:15 2026-08-30 20:45      865.759      856.729     -3.54   -1.00  Stop-loss
+  18  NEARUSDT  A 2026-09-01 05:30 2026-09-01 18:30      1.96727      1.90831     -5.10   -1.00  Stop-loss
+  19  ETHUSDT   A 2026-09-04 10:45 2026-09-04 12:45      2529.65      2512.39     -2.38   -1.00  Stop-loss
+  20  NEARUSDT  A 2026-09-05 03:15 2026-09-05 21:00      2.22597      2.16448     -4.36   -0.86  Yapısal bozulma
+  21  NEARUSDT  B 2026-09-05 22:15 2026-09-06 07:45      2.19044      2.27329     +8.47   +1.68  Kâr hedefi
+  22  SOLUSDT   B 2026-09-06 14:00 2026-09-06 14:30      107.120      105.644     -4.51   -1.00  Stop-loss
+  23  NEARUSDT  B 2026-09-07 02:15 2026-09-07 07:45      2.38008      2.32431     -5.07   -1.00  Stop-loss
+  24  INJUSDT   B 2026-09-08 06:00 2026-09-08 06:30      6.41981      6.30860     -5.04   -1.00  Stop-loss
+  25  INJUSDT   B 2026-09-08 10:00 2026-09-08 21:45      6.34576      6.13082     -5.01   -1.00  Stop-loss
+  26  INJUSDT   B 2026-09-09 07:00 2026-09-09 14:00      6.30673      6.17529     -4.99   -1.00  Stop-loss
+  27  ZECUSDT   A 2026-09-09 13:00 2026-09-09 20:00      1265.85      1248.07     -4.49   -1.00  Stop-loss
+  28  ZECUSDT   B 2026-09-09 20:15 2026-09-09 20:30      1253.52      1240.11     -3.47   -1.00  Stop-loss
+  29  ETHUSDT   A 2026-09-14 20:15 2026-09-14 23:15      2567.62      2523.96     -4.93   -1.00  Stop-loss
+  30  NEARUSDT  B 2026-09-15 04:45 2026-09-15 06:45      2.44573      2.40403     -4.90   -1.00  Stop-loss
+  31  NEARUSDT  B 2026-09-18 21:30 2026-09-19 01:45      3.67676      3.82983     +8.00   +1.64  Kâr hedefi
+  32  ZECUSDT   B 2026-09-19 03:15 2026-09-19 03:30      1553.52      1537.97     -3.25   -1.00  Stop-loss
+  33  NEARUSDT  B 2026-09-19 11:45 2026-09-19 13:00      3.68816      3.62328     -3.70   -0.76  Yapısal bozulma
+  34  INJUSDT   B 2026-09-20 07:00 2026-09-24 14:45      7.65974      8.33874    +10.21   +2.09  Kâr hedefi
+  35  NEARUSDT  B 2026-09-21 15:00 2026-09-21 15:30      4.12549      4.03647     -4.89   -1.00  Stop-loss
+  36  NEARUSDT  B 2026-09-21 18:45 2026-09-21 23:00      4.01281      4.29678    +10.30   +2.11  Kâr hedefi
+  37  ZECUSDT   A 2026-09-25 10:30 2026-09-25 14:45      1590.82      1560.98     -4.96   -1.00  Stop-loss
+  38  AVAXUSDT  A 2026-09-26 16:30 2026-09-26 17:45      10.9882      10.8625     -3.68   -1.00  Stop-loss
+  39  NEARUSDT  B 2026-09-27 16:30 2026-09-27 21:15      5.21061      5.49148     +9.68   +1.97  Kâr hedefi
+  40  AVAXUSDT  A 2026-09-29 14:30 2026-09-29 15:30      11.6367      11.1358     -4.96   -1.00  Stop-loss
+  41  INJUSDT   A 2026-09-29 18:00 2026-09-30 13:45      7.60970      7.48167     -4.94   -1.00  Stop-loss
+  42  ETHUSDT   A 2026-10-02 10:45 2026-10-02 14:15      2751.73      2735.82     -2.00   -1.00  Stop-loss
+  43  NEARUSDT  B 2026-10-06 13:45 2026-10-06 14:15      5.17188      5.11708     -3.41   -1.00  Stop-loss
+  44  NEARUSDT  A 2026-10-17 11:00 2026-10-17 12:15      5.17047      5.09405     -4.63   -1.00  Stop-loss
+⚠ Spread sabit (%0.050) modellendi; geçmiş emir defteri derinliği test edilmedi.

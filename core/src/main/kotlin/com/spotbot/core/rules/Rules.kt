@@ -64,7 +64,25 @@ class RuleContext(
     val openRiskPercent: Double = 0.0,
     /** Yeni işlemin riski, özsermayenin %'si. */
     val newRiskPercent: Double = 0.0,
+    /** BTC 4H'e göre 5 sınıflı piyasa rejimi (veri yoksa null). */
+    val marketRegime: com.spotbot.core.analysis.MarketRegime? = null,
+    val regimePolicy: com.spotbot.core.analysis.RegimePolicy = com.spotbot.core.analysis.RegimePolicy.OFF,
 )
+
+/** Kural kategorileri (tasarım notundaki 10 başlık). */
+@kotlinx.serialization.Serializable
+enum class RuleCategory(val title: String) {
+    DATA("Veri doğrulama"),
+    REGIME("Piyasa rejimi"),
+    TREND("Trend"),
+    STRUCTURE("Yapı"),
+    LIQUIDITY("Likidite"),
+    MOMENTUM("Momentum"),
+    VOLUME("Hacim"),
+    ENTRY("Giriş teyidi"),
+    RISK("Risk"),
+    CANCELLATION("İptal / bekleme"),
+}
 
 class BuiltInRule(
     val id: String,
@@ -148,6 +166,14 @@ object BuiltInRules {
             (total <= c.riskConfig.maxTotalOpenRiskPercent + 1e-6) to
                 "Açık %%%.2f + yeni %%%.2f = %%%.2f (sınır %%%.1f)".format(c.openRiskPercent, c.newRiskPercent, total, c.riskConfig.maxTotalOpenRiskPercent)
         },
+        mandatory("Z19", "Piyasa rejimi (BTC 4H) stratejiye izin veriyor") { c ->
+            val regime = c.marketRegime?.title ?: "veri yok"
+            if (c.regimePolicy == com.spotbot.core.analysis.RegimePolicy.OFF) {
+                true to "Rejim filtresi kapalı (bilgi: $regime)"
+            } else {
+                c.regimePolicy.allows(c.marketRegime, c.setup.strategy) to "Rejim: $regime · politika: ${c.regimePolicy.title}"
+            }
+        },
         quality("K01", "Net R:R tercih edilen seviyede (2+)", 3.0) { c ->
             (c.riskReward.ratio >= c.riskConfig.preferredRiskReward) to "Net R:R %.2f".format(c.riskReward.ratio)
         },
@@ -188,6 +214,23 @@ object BuiltInRules {
         quality("K11", "1H piyasa yapısı yükselişte (HH/HL)", 2.0) { c ->
             (c.mtf.h1.structure.trend == Trend.UP) to "1H yapı: ${c.mtf.h1.structure.trend}"
         },
+    )
+
+    /**
+     * Kuralların sınıflandırması (yalnız mevcut kurallar; yeni kural eklenmedi). Zorunlu kurallar kritik
+     * kurallardır: biri bile geçmezse kalite puanı ne olursa olsun işlem açılmaz.
+     */
+    val categories: Map<String, RuleCategory> = mapOf(
+        "Z01" to RuleCategory.DATA, "Z17" to RuleCategory.DATA,
+        "Z04" to RuleCategory.TREND, "Z05" to RuleCategory.REGIME, "Z10" to RuleCategory.REGIME, "Z19" to RuleCategory.REGIME,
+        "Z06" to RuleCategory.ENTRY, "Z07" to RuleCategory.ENTRY,
+        "Z08" to RuleCategory.LIQUIDITY, "Z09" to RuleCategory.LIQUIDITY,
+        "Z02" to RuleCategory.RISK, "Z03" to RuleCategory.RISK, "Z11" to RuleCategory.RISK, "Z12" to RuleCategory.RISK,
+        "Z13" to RuleCategory.RISK, "Z14" to RuleCategory.RISK, "Z15" to RuleCategory.RISK, "Z18" to RuleCategory.RISK,
+        "Z16" to RuleCategory.CANCELLATION,
+        "K01" to RuleCategory.RISK, "K02" to RuleCategory.TREND, "K03" to RuleCategory.VOLUME, "K04" to RuleCategory.MOMENTUM,
+        "K05" to RuleCategory.MOMENTUM, "K06" to RuleCategory.TREND, "K07" to RuleCategory.STRUCTURE, "K08" to RuleCategory.REGIME,
+        "K09" to RuleCategory.LIQUIDITY, "K10" to RuleCategory.MOMENTUM, "K11" to RuleCategory.STRUCTURE,
     )
 
     private fun mandatory(id: String, title: String, check: (RuleContext) -> Pair<Boolean, String>) =

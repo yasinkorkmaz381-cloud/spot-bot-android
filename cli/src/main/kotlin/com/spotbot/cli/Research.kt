@@ -13,6 +13,7 @@ import com.spotbot.core.backtest.WalkForward
 import com.spotbot.core.backtest.WalkForwardReport
 import com.spotbot.core.backtest.summary
 import com.spotbot.core.backtest.with
+import com.spotbot.core.exchange.klinesBetween
 import com.spotbot.core.exchange.mexc.MexcRestClient
 import com.spotbot.core.model.SymbolInfo
 import com.spotbot.core.scanner.ScannerConfig
@@ -179,4 +180,128 @@ suspend fun compare(options: Map<String, String>) {
         println("  Kısmi gerçekleşme: ${r.partialFills} · gerçekleşmeyen emir: ${r.rejectedOrders}")
     }
     options["out"]?.let { File(it).writeText(researchJson.encodeToString(kotlinx.serialization.builtins.ListSerializer(com.spotbot.core.backtest.ProfileComparison.serializer()), results)); println("\nRapor: $it") }
+}
+
+@kotlinx.serialization.Serializable
+private data class SubBarCache(
+    val candles: Map<String, List<com.spotbot.core.model.Candle>> = emptyMap(),
+    /** 5M verisi istenip MEXC'den boş dönen pencereler (tekrar istenmez). */
+    val unavailable: Set<String> = emptySet(),
+)
+
+@kotlinx.serialization.Serializable
+private data class AnalyzeReport(
+    val symbols: List<String>,
+    val start: Long,
+    val split: Long,
+    val end: Long,
+    val runs: List<com.spotbot.core.backtest.IsolatedRun>,
+    val baselineMonthly: List<com.spotbot.core.backtest.PeriodReturn>,
+    val regimeShare: Map<String, Double>,
+    val losses: com.spotbot.core.backtest.LossAnalysisReport,
+)
+
+/**
+ * Kayıp analizi ve rejim filtresi deneyi: A+B, yalnız A, yalnız B ve rejim politikaları aynı koşullarda (tüm dönem,
+ * ilk ve ikinci yarı); belirsiz mumlar 5M veriyle çözülür; varsayılan çalıştırmanın işlemleri giriş özellikleriyle
+ * eşleştirilip dilimlere ayrılır ve önceden tanımlı filtreler iki yarıda ayrı ölçülür.
+ */
+suspend fun analyze(options: Map<String, String>) {
+    val dir = File(options["data"] ?: error("--data klasörü gerekli"))
+    val api = MexcRestClient()
+    var data = dir.listFiles { f -> f.name.endsWith("USDT.json") }!!.sorted().associate { f ->
+        val d = researchJson.decodeFromString(HistoricalDataset.serializer(), f.readText())
+        d.symbol to d
+    }
+    val cacheFile = File(dir, "m5-cache.json")
+    var cache = if (cacheFile.exists()) researchJson.decodeFromString(SubBarCache.serializer(), cacheFile.readText()) else SubBarCache()
+    fun withCache(d: Map<String, HistoricalDataset>) = d.mapValues { (s, ds) -> ds.copy(m5 = cache.candles[s].orEmpty()) }
+    data = withCache(data)
+    val info: Map<String, SymbolInfo> = runCatching { api.exchangeInfo().associateBy { it.symbol } }.getOrDefault(emptyMap())
+    val start = data.values.maxOf { it.m15.first().openTime } + 2 * 24 * 3_600_000L
+    val end = data.values.minOf { it.m15.last().closeTime }
+    val split = start + (end - start) / 2
+    val base = BacktestConfig(data.keys.toList(), start, end, scanner = ScannerConfig(extraCoins = 0))
+    val settings = com.spotbot.core.backtest.StrategyIsolation.defaultSettings + listOf(
+        com.spotbot.core.backtest.StrategyIsolation.Setting("A + B · rejim: Koruyucu", base.enabledStrategies, com.spotbot.core.analysis.RegimePolicy.PROTECTIVE),
+        com.spotbot.core.backtest.StrategyIsolation.Setting("A + B · rejim: Tam", base.enabledStrategies, com.spotbot.core.analysis.RegimePolicy.FULL),
+        // F4'ün (stop ≥ 1 ATR) gerçek yeniden testi: mevcut ATR stop tabanı seçeneği aynı eşikle (1,0 × ATR 1H).
+        com.spotbot.core.backtest.StrategyIsolation.Setting(
+            "A + B · ATR stop tabanı 1,0", base.enabledStrategies,
+            risk = base.risk.copy(atrStopMode = com.spotbot.core.risk.AtrStopMode.FLOOR, atrStopMultiple = 1.0),
+        ),
+    )
+    val configs = settings.flatMap { com.spotbot.core.backtest.StrategyIsolation.configs(base, it) }
+    val pool = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors())
+    var reports: List<BacktestReport> = emptyList()
+    for (pass in 1..4) {
+        val current = data
+        print("\rGeçiş $pass: ${configs.size} backtest çalışıyor…")
+        reports = configs.map { c -> pool.submit<BacktestReport> { BacktestEngine(c).run(current, info) } }.map { it.get() }
+        val missing = reports.flatMap { it.missingSubBars }.distinct()
+            .filter { "${it.symbol}@${it.openTime}" !in cache.unavailable && cache.candles[it.symbol].orEmpty().none { c -> c.openTime == it.openTime } }
+        println(" belirsiz ve 5M verisi eksik mum: ${missing.size}")
+        if (missing.isEmpty()) break
+        val fetched = HashMap(cache.candles)
+        val unavailable = HashSet(cache.unavailable)
+        missing.forEach { w ->
+            val bars = api.klinesBetween(w.symbol, com.spotbot.core.model.Timeframe.M5, w.openTime, w.openTime + com.spotbot.core.model.Timeframe.M15.millis)
+                .filter { it.openTime >= w.openTime && it.openTime < w.openTime + com.spotbot.core.model.Timeframe.M15.millis }
+            if (bars.size < 3) unavailable += "${w.symbol}@${w.openTime}"
+            else fetched[w.symbol] = (fetched[w.symbol].orEmpty() + bars).distinctBy { it.openTime }.sortedBy { it.openTime }
+        }
+        cache = SubBarCache(fetched, unavailable)
+        cacheFile.writeText(researchJson.encodeToString(SubBarCache.serializer(), cache))
+        data = withCache(data)
+    }
+    pool.shutdown()
+    val runs = settings.mapIndexed { i, s -> com.spotbot.core.backtest.StrategyIsolation.summarize(s, reports.subList(3 * i, 3 * i + 3)) }
+    val baseline = reports[0]
+    val losses = com.spotbot.core.backtest.LossAnalysis.run(baseline, split)
+    val btc4h = com.spotbot.core.analysis.Series("BTCUSDT", com.spotbot.core.model.Timeframe.H4, data.getValue("BTCUSDT").h4)
+    val regimes = (0 until btc4h.size).filter { btc4h.candles[it].closeTime in start..end }.mapNotNull { com.spotbot.core.analysis.RegimeClassifier.classify(btc4h.analyze(it)) }
+    val regimeShare = regimes.groupingBy { it.title }.eachCount().mapValues { it.value * 100.0 / regimes.size }
+
+    fun stats(s: com.spotbot.core.backtest.PerformanceStats) =
+        "%4d işlem %3dK/%3dZ kazanma %%%5.1f PF %5.2f ort %+.3fR beklenen %+6.3f net %%%+6.2f maks.düşüş %%%5.2f ücret %6.2f".format(
+            s.trades, s.wins, s.losses, s.winRatePercent, s.profitFactor, s.averageR, s.expectancy, s.netReturnPercent, s.maxDrawdownPercent, s.fees,
+        )
+    println("\nAynı koşullar · ${data.size - 1} işlem coini + BTC · ${day.format(Instant.ofEpochMilli(start))} → ${day.format(Instant.ofEpochMilli(end))} · bölme ${day.format(Instant.ofEpochMilli(split))}")
+    println("Maliyet: taker ücreti (MEXC parite bilgisi), kayma %0,05, yarım spread %0,025, mum hacminin %10'u; sermaye 1000 USDT; risk %0,5")
+    runs.forEach { r ->
+        println("\n${r.label}")
+        println("  Tüm dönem  : ${stats(r.full)}")
+        println("  İlk yarı   : ${stats(r.firstHalf)}")
+        println("  İkinci yarı: ${stats(r.secondHalf)}")
+        val ib = r.intrabar
+        println("  Aynı mumda stop+hedef: ${ib.ambiguousBars} (5M: hedef önce ${ib.resolvedTargetFirst}, stop önce ${ib.resolvedStopFirst}; belirsiz: 5M yok ${ib.unresolvedNoData}, aynı 5M ${ib.unresolvedSameSubBar})")
+    }
+    println("\nBTC 4H rejim dağılımı (dönem içi 4H mumların %'si): " + regimeShare.entries.sortedByDescending { it.value }.joinToString { "%s %%%.1f".format(it.key, it.value) })
+    println("\nVarsayılan (A + B) aylık özsermaye değişimi:")
+    baseline.monthlyReturns.forEach { m -> println("  %s  %%%+6.2f  (%d işlem, net %+.2f)".format(m.label, m.changePercent, m.tradesClosed, m.realizedPnl)) }
+    println("\nZararlı işlemlerin profili (varsayılan çalıştırma):")
+    losses.lossProfiles.forEach { p ->
+        println("  %-20s zararlı %3d · anında başarısız (lehte < 0,3R) %3d · önce ≥1R lehte gidip zarar %3d · stop %3d · yapısal bozulma %3d · medyan süre %d mum · medyan lehte hareket %.2fR".format(
+            p.strategy, p.losers, p.immediateFailures, p.gaveBackAfterOneR, p.stopLosses, p.invalidations, p.medianBarsHeld, p.medianMfeR))
+    }
+    println("\nÖzellik dilimleri (ort. R; ilk yarı / ikinci yarı):")
+    losses.buckets.groupBy { it.feature }.forEach { (feature, rows) ->
+        println("  $feature")
+        rows.forEach { b ->
+            println("    %-20s %-26s %4d işlem kazanma %%%5.1f ort %+.2fR  | %3d: %s / %3d: %s".format(
+                b.strategy, b.bucket, b.trades, b.winRatePercent, b.averageR,
+                b.firstHalfTrades, b.firstHalfAverageR?.let { "%+.2fR".format(it) } ?: "-", b.secondHalfTrades, b.secondHalfAverageR?.let { "%+.2fR".format(it) } ?: "-"))
+        }
+    }
+    println("\nÖnceden tanımlı filtreler (sonradan alt küme; aday = iki yarıda da ort. R artıyor ve her yarıda ≥ ${com.spotbot.core.backtest.LossAnalysis.MIN_TRADES_PER_HALF} işlem):")
+    losses.filters.forEach { f ->
+        println("  %s %-44s %-20s kalan %3d/%3d ort %+.2fR (temel %+.2fR, çıkarılan %s) · ilk yarı %s (%d) · ikinci yarı %s (%d)%s".format(
+            f.id, f.description, f.strategy, f.keptTrades, f.baselineTrades, f.keptAverageR, f.baselineAverageR, f.removedAverageR?.let { "%+.2fR".format(it) } ?: "-",
+            f.firstHalfDeltaR?.let { "%+.2fR".format(it) } ?: "-", f.firstHalfKept, f.secondHalfDeltaR?.let { "%+.2fR".format(it) } ?: "-", f.secondHalfKept,
+            if (f.candidate) "  ← aday" else ""))
+    }
+    options["out"]?.let {
+        File(it).writeText(researchJson.encodeToString(AnalyzeReport.serializer(), AnalyzeReport(data.keys.toList(), start, split, end, runs, baseline.monthlyReturns, regimeShare, losses)))
+        println("\nRapor: $it")
+    }
 }

@@ -62,6 +62,8 @@ data class StrategyParams(
     val retestToleranceAtr: Double = 0.3,
     val rangeMinWidthAtr: Double = 3.0,
     val rangeMinTouches: Int = 2,
+    /** Piyasa (BTC 4H) rejim filtresi; varsayılan kapalı (yalnız bilgi). */
+    val regimePolicy: com.spotbot.core.analysis.RegimePolicy = com.spotbot.core.analysis.RegimePolicy.OFF,
 )
 
 /** 15M tetik mumu ve teyit kontrolleri; tüm stratejilerde ortak. */

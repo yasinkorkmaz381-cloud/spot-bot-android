@@ -12,12 +12,31 @@ enum class OrderType { MARKET, LIMIT }
 
 /** MEXC spot emir kurallarına uygunluk denetimi. Uygun değilse emir gönderilmez (sanalda da doldurulmaz). */
 object OrderRules {
-    fun roundQuantity(qty: Double, info: SymbolInfo?): Double =
-        BigDecimal.valueOf(qty).setScale((info?.quantityPrecision ?: 8).coerceAtLeast(0), RoundingMode.DOWN).toDouble()
+    /**
+     * Miktarı borsa adımına aşağı yuvarlar. Çıkarma işlemlerinden kalan kayan nokta gürültüsü (ör. 0.2413909999…
+     * ya da 9.99999e-7) bir alt adıma düşmesin diye değer önce 6 ek basamağa en yakın yuvarlanır.
+     */
+    fun roundQuantity(qty: Double, info: SymbolInfo?): Double = roundDown(qty, info?.quantityPrecision ?: 8, RoundingMode.DOWN)
 
     /** Limit fiyatını borsa adımına yuvarlar: alışta aşağı, satışta yukarı (daha kötü fiyata kaymamak için). */
     fun roundPrice(price: Double, side: OrderSide, info: SymbolInfo?): Double =
-        BigDecimal.valueOf(price).setScale((info?.pricePrecision ?: 8).coerceAtLeast(0), if (side == OrderSide.BUY) RoundingMode.DOWN else RoundingMode.UP).toDouble()
+        roundDown(price, info?.pricePrecision ?: 8, if (side == OrderSide.BUY) RoundingMode.DOWN else RoundingMode.UP)
+
+    private fun roundDown(value: Double, precision: Int, mode: RoundingMode): Double {
+        val scale = precision.coerceAtLeast(0)
+        return BigDecimal.valueOf(value).setScale(scale + 6, RoundingMode.HALF_UP).setScale(scale, mode).toDouble()
+    }
+
+    /**
+     * Borsada tek başına satılamayacak kadar küçük miktar ("toz"): adıma yuvarlanınca sıfır, asgari miktarın ya da
+     * asgari piyasa emri tutarının altında. Pozisyonun son kalanı tozsa pozisyon açık bırakılmaz.
+     */
+    fun isDust(quantity: Double, price: Double, info: SymbolInfo?): Boolean {
+        val q = roundQuantity(quantity, info)
+        if (q <= 0) return true
+        info ?: return false
+        return q < info.minQuantity || q * price < maxOf(info.minNotional, info.minMarketNotional)
+    }
 
     /** Uygunsa null, değilse Türkçe gerekçe döner. [marketPrice] fiyat bandı denetimi içindir. */
     fun validate(side: OrderSide, type: OrderType, quantity: Double, price: Double, info: SymbolInfo?, marketPrice: Double? = null): String? {
@@ -110,6 +129,26 @@ object FillModel {
         OrderRules.validate(side, OrderType.LIMIT, filled, limitPrice, info)?.let { return FillResult.Rejected(it) }
         val note = if (filled < quantity) "Kısmi gerçekleşme: mum hacminin %%%.0f sınırı".format(participation * 100) else ""
         return FillResult.Filled(Fill(filled, limitPrice, limitPrice * filled * costs.makerFee, true, quantity, note))
+    }
+
+    /**
+     * Pozisyonun satılamayan son kalanı (toz): aynı fiyattan ve ücretle kapanmış sayılır. Gerçek hesapta bu miktar
+     * cüzdanda kalır; değeri ihmal edilebilir ama pozisyon ve işlem sınırı boşuna meşgul edilmez.
+     */
+    fun dustExit(quantity: Double, price: Double, maker: Boolean, costs: CostModel): Fill =
+        Fill(quantity, price, price * quantity * (if (maker) costs.makerFee else costs.takerFee), maker, quantity, "Satılamayan küçük kalan (toz) aynı fiyattan değerlendirildi")
+
+    /** Tam kapanış emrinden sonra kalan miktar toz olacaksa onu da bu dolumun içine katar. */
+    fun absorbDust(fill: Fill, positionQuantity: Double, info: SymbolInfo?): Fill {
+        if (fill.requestedQuantity < positionQuantity * (1 - 1e-9) || fill.quantity >= positionQuantity) return fill
+        val rest = positionQuantity - fill.quantity
+        if (!OrderRules.isDust(rest, fill.averagePrice, info)) return fill
+        return fill.copy(
+            quantity = positionQuantity,
+            fee = fill.fee * positionQuantity / fill.quantity,
+            requestedQuantity = positionQuantity,
+            note = listOf(fill.note, "kalan toz miktar aynı fiyattan eklendi").filter { it.isNotEmpty() }.joinToString(" · "),
+        )
     }
 
     /** Defter yoksa: en iyi fiyat + kayma (eski davranış), en iyi seviyedeki miktarla sınırlı değil. */

@@ -5,6 +5,7 @@ import com.spotbot.core.backtest.BacktestDataLoader
 import com.spotbot.core.backtest.BacktestEngine
 import com.spotbot.core.backtest.BacktestReport
 import com.spotbot.core.backtest.HistoricalDataset
+import com.spotbot.core.backtest.runResolvingIntrabar
 import com.spotbot.core.engine.EngineConfig
 import com.spotbot.core.engine.EngineEvent
 import com.spotbot.core.engine.StateStore
@@ -40,6 +41,7 @@ fun main(args: Array<String>) = runBlocking {
         "paper" -> paper(options)
         "research" -> research(options)
         "compare" -> compare(options)
+        "analyze" -> analyze(options)
         else -> println(
             """
             CryptoScan Pro — MEXC spot botu (sanal işlem)
@@ -52,10 +54,14 @@ fun main(args: Array<String>) = runBlocking {
                   --capital 1000           Başlangıç sermayesi (USDT)
                   --strategies A,B         Etkin stratejiler (C yalnızca açıkça istenirse)
                   --out rapor.json         Raporu JSON olarak kaydet
+                  --end 2026-11-09         Dönem sonu (UTC gün sonu; varsayılan: son 4H kapanışı)
+                  --warmup 45              Gösterge ısınması için ek gün
               paper [--data klasör]        7/24 sanal işlem motorunu çalıştırır (Ctrl+C ile durur)
               research --data klasör       Önceden tanımlı seçenekleri ilk/ikinci yarıda, ileri yürüyen testte,
                        [--out rapor.json]  Monte Carlo ve gölge işlemlerle karşılaştırır
               compare --data klasör        Adaptif / Trend / Seçici profillerini aynı koşullarda karşılaştırır
+              analyze --data klasör        A ve B ayrı, rejim filtresi açık/kapalı, kayıp analizi ve önceden
+                      [--out rapor.json]   tanımlı filtreler (ilk/ikinci yarı ayrı)
             """.trimIndent(),
         )
     }
@@ -113,9 +119,13 @@ private suspend fun backtest(options: Map<String, String>) {
     val symbols = (options["symbols"]?.split(",") ?: scannerConfig.watchlist).map { it.trim().uppercase().let { s -> if (s.endsWith("USDT")) s else s + "USDT" } }
     val strategies = (options["strategies"] ?: "A,B").split(",").mapNotNull { code -> StrategyId.entries.firstOrNull { it.code == code.trim().uppercase() } }.toSet()
     val api = MexcRestClient()
-    val end = Timeframe.H4.lastCloseAtOrBefore(api.serverTime())
+    // --end 2026-11-09 (UTC gün sonu) ile aynı dönem tekrar üretilebilir; verilmezse son kapanmış 4H mum.
+    val end = options["end"]?.let { e -> e.toLongOrNull() ?: java.time.LocalDate.parse(e).plusDays(1).atStartOfDay(java.time.ZoneOffset.UTC).toInstant().toEpochMilli() }
+        ?.let { minOf(it, Timeframe.H4.lastCloseAtOrBefore(api.serverTime())) }
+        ?: Timeframe.H4.lastCloseAtOrBefore(api.serverTime())
     val start = end - days * 24 * 60 * 60_000L
     val config = BacktestConfig(symbols, start, end, capital, enabledStrategies = strategies)
+        .let { c -> options["warmup"]?.toInt()?.let { c.copy(warmupDays = it) } ?: c }
     val loadStart = start - config.warmupDays * 24 * 60 * 60_000L
 
     val cacheDir = File(System.getProperty("user.home"), ".cryptoscan/cache").apply { mkdirs() }
@@ -132,50 +142,68 @@ private suspend fun backtest(options: Map<String, String>) {
     println("\rVeri hazır: ${data.map { "${it.key}=${it.value.m15.size}" }.joinToString()}")
     val info = api.exchangeInfo().associateBy { it.symbol }
     val started = System.currentTimeMillis()
-    val report = BacktestEngine(config).run(data, info) { print("\rBacktest %%%.0f".format(it * 100)) }
+    val (report, resolved) = BacktestEngine(config).runResolvingIntrabar(data, info, BacktestDataLoader(api)) { print("\rBacktest %%%.0f".format(it * 100)) }
+    // İndirilen 5M mumlar önbelleğe yazılır (sonraki çalıştırmada yeniden indirilmez).
+    resolved.forEach { (symbol, d) -> if (d.m5.size != data.getValue(symbol).m5.size) File(cacheDir, "$symbol-$loadStart-$end.json").writeText(json.encodeToString(HistoricalDataset.serializer(), d)) }
     println("\rBacktest tamamlandı (${(System.currentTimeMillis() - started) / 1000} sn)")
     printReport(report)
     options["out"]?.let { File(it).writeText(json.encodeToString(BacktestReport.serializer(), report)); println("Rapor: $it") }
 }
 
+private fun statsLine(label: String, s: com.spotbot.core.backtest.PerformanceStats) =
+    "  %-22s %4d işlem  %3d K / %3d Z  kazanma %%%5.1f  ort.kazanç %+7.2f  ort.kayıp %+7.2f  PF %5.2f  beklenen %+6.3f USDT (%+.2fR)  maks.düşüş %%%.2f  net %+8.2f (%%%+.2f)  ücret %.2f".format(
+        label, s.trades, s.wins, s.losses, s.winRatePercent, s.averageWin, s.averageLoss, s.profitFactor, s.expectancy, s.averageR,
+        s.maxDrawdownPercent, s.netPnl, s.netReturnPercent, s.fees,
+    )
+
 private fun printReport(r: BacktestReport) {
+    val o = r.overall
     println(
         """
         ── Backtest raporu ─────────────────────────────
         Dönem          : ${time.format(Instant.ofEpochMilli(r.startTime))} → ${time.format(Instant.ofEpochMilli(r.endTime))} UTC
         Coinler        : ${r.symbols.joinToString()}
-        Sermaye        : %.2f → %.2f USDT
-        Net getiri     : %+.2f%%   (BTC al-tut: %s)
-        Maks. düşüş    : %.2f%%
-        İşlem sayısı   : %d   (bulunan kurulum: %d)
+        Sermaye        : %.2f → %.2f USDT  (net %+.2f USDT, %+.2f%%; BTC al-tut: %s)
+        İşlem sayısı   : %d  (%d kazançlı / %d zararlı; bulunan kurulum: %d)
         Kazanma oranı  : %.1f%%
+        Brüt kâr/zarar : %+.2f / %.2f USDT (net kâr/zararlara göre, ücretler dahil)
         Ort. kazanç    : %+.2f USDT   Ort. kayıp: %+.2f USDT
         Profit factor  : %.2f
-        Beklenen değer : %+.3f USDT/işlem (%+.2fR)
+        Beklenen değer : %+.3f USDT/işlem (%+.2fR ortalama)
+        Maks. düşüş    : %.2f%% (piyasa değerli özsermaye)
         Komisyon       : %.2f USDT   Spread+kayma: %.2f USDT
         Piyasada kalma : %.1f%%
         """.trimIndent().format(
-            r.initialCapital, r.finalEquity, r.netReturnPercent, r.btcBuyAndHoldPercent?.let { "%+.2f%%".format(it) } ?: "-",
-            r.maxDrawdownPercent, r.trades, r.setupsFound, r.winRatePercent, r.averageWin, r.averageLoss, r.profitFactor,
-            r.expectancy, r.expectancyR, r.totalFees, r.spreadAndSlippageCost, r.exposurePercent,
+            r.initialCapital, r.finalEquity, r.finalEquity - r.initialCapital, r.netReturnPercent, r.btcBuyAndHoldPercent?.let { "%+.2f%%".format(it) } ?: "-",
+            r.trades, o.wins, o.losses, r.setupsFound, r.winRatePercent, o.grossProfit, o.grossLoss, r.averageWin, r.averageLoss, r.profitFactor,
+            r.expectancy, r.expectancyR, r.maxDrawdownPercent, r.totalFees, r.spreadAndSlippageCost, r.exposurePercent,
         ),
     )
     if (r.perStrategy.isNotEmpty()) {
-        println("Strateji bazında:")
-        r.perStrategy.forEach { s ->
-            println("  %s %-18s %3d işlem, kazanma %%%.0f, net %+.2f, PF %.2f, ort %+.2fR".format(s.strategy.code, s.strategy.title, s.trades, s.winRatePercent, s.netPnl, s.profitFactor, s.averageR))
-        }
+        println("Strateji bazında (aynı çalıştırma; düşüş yalnız o stratejinin işlem sırasına göre):")
+        r.perStrategy.forEach { s -> println(statsLine("${s.strategy.code} ${s.strategy.title}", s.stats)) }
+    }
+    val ib = r.intrabar
+    println("Aynı 15M mumda stop+hedef: %d (5M ile hedef önce %d, stop önce %d; belirsiz: 5M yok %d, aynı 5M mum %d)".format(
+        ib.ambiguousBars, ib.resolvedTargetFirst, ib.resolvedStopFirst, ib.unresolvedNoData, ib.unresolvedSameSubBar))
+    if (r.entriesSkippedForDrift > 0) println("Fiyat kayması nedeniyle gönderilmeyen giriş: ${r.entriesSkippedForDrift}")
+    if (r.monthlyReturns.isNotEmpty()) {
+        println("Aylık özsermaye değişimi:")
+        r.monthlyReturns.forEach { m -> println("  %s  %9.2f → %9.2f  %%%+6.2f  (%d işlem kapandı, net %+.2f)".format(m.label, m.startEquity, m.endEquity, m.changePercent, m.tradesClosed, m.realizedPnl)) }
     }
     if (r.exitReasons.isNotEmpty()) println("Çıkış nedenleri: ${r.exitReasons.entries.joinToString { "${it.key}=${it.value}" }}")
     if (r.blockedByRule.isNotEmpty()) {
         println("Kurulumları en çok engelleyen zorunlu kurallar:")
         r.blockedByRule.entries.take(6).forEach { println("  ${it.value}× ${it.key}") }
     }
-    r.closedTrades.takeLast(10).forEach { t ->
+    println("İşlemler (giriş zamanına göre):")
+    println("  %-3s %-9s %s %-16s %-16s %12s %12s %9s %7s  %s".format("#", "Coin", "S", "Giriş (UTC)", "Çıkış (UTC)", "Alış", "Satış(ort)", "Net USDT", "R", "Çıkış nedeni"))
+    r.closedTrades.sortedBy { it.position.openedAt }.forEachIndexed { k, t ->
         println(
-            "  %s %-9s %s giriş %.6g çıkış %.6g %+.2f USDT (%+.2fR) %s".format(
-                time.format(Instant.ofEpochMilli(t.position.openedAt)), t.position.symbol, t.position.strategy.code,
-                t.position.entryPrice, t.exitPrice, t.netPnl, t.rMultiple, t.reason.title,
+            "  %-3d %-9s %s %-16s %-16s %12.6g %12.6g %+9.2f %+7.2f  %s%s".format(
+                k + 1, t.position.symbol, t.position.strategy.code, time.format(Instant.ofEpochMilli(t.position.openedAt)),
+                time.format(Instant.ofEpochMilli(t.closedAt)), t.position.entryPrice, t.averageExitPrice, t.netPnl, t.rMultiple, t.reason.title,
+                if (t.note.contains("BELİRSİZ")) " [belirsiz]" else if (t.note.contains("5M")) " [5M doğrulandı]" else "",
             ),
         )
     }

@@ -130,4 +130,36 @@ class OrdersTest {
         assertTrue(RiskStatus.of(state, 1_000.0, risk, StrategyProfile.ADAPTIVE, true, true, emptyList()).entriesBlockedReason!!.contains("duraklatıldı"))
         assertTrue(RiskStatus.of(state, 1_000.0, risk, StrategyProfile.ADAPTIVE, false, false, emptyList()).entriesBlockedReason!!.contains("BTC"))
     }
+
+    @Test
+    fun `float residue of partial exits never leaves an unsellable position open`() {
+        // Gerçek olay (90 günlük backtest, ZECUSDT): 0.241391 adetin 0.24139'u satıldı, kalan 9.99999999871e-7 adet
+        // sıfıra yuvarlandığı için hiç satılamadı ve pozisyon 2,5 ay açık kaldı.
+        val zec = info.copy(quantityPrecision = 6, minQuantity = 0.001, minNotional = 1.0, minMarketNotional = 1.0)
+        val residue = 0.241391 - 0.24139
+        assertEquals(0.000001, OrderRules.roundQuantity(residue, zec), 0.0)
+        assertEquals(0.241391, OrderRules.roundQuantity(0.2413909999999, zec), 0.0)
+        assertTrue(OrderRules.isDust(residue, 808.0, zec))
+        assertTrue(!OrderRules.isDust(0.1, 808.0, zec))
+        assertTrue(FillModel.marketFromBar(OrderSide.SELL, residue, 808.0, 1_000.0, 0.1, costs, zec) is FillResult.Rejected)
+
+        // Tam kapanış emrinden sonra toz kalacaksa dolum onu da kapsar.
+        val fill = Fill(0.24139, 808.0, 0.1, false, 0.241391)
+        val absorbed = FillModel.absorbDust(fill, 0.241391, zec)
+        assertEquals(0.241391, absorbed.quantity, 0.0)
+        assertEquals(0.1 * 0.241391 / 0.24139, absorbed.fee, 1e-12)
+        // Gerçek kısmi dolum (kalan satılabilir) olduğu gibi kalır.
+        assertEquals(0.1, FillModel.absorbDust(Fill(0.1, 808.0, 0.04, false, 0.241391), 0.241391, zec).quantity, 0.0)
+
+        // Hesap düzeyinde: toz kalan pozisyon kapanır, kalan miktar satılabilir değilse dustExit ile kapatılır.
+        val setup = com.spotbot.core.support.TestData.setup(symbol = "ZECUSDT", entry = 821.0, stop = 800.0, target = 855.0)
+        val rationale = TradeRationale("", "", "", "", "", "")
+        var state = PaperAccount.open(PortfolioState.create(1_000.0), setup, 0.241391, 821.0, costs, 5.0, 50.0, rationale, null, 0L)
+        val id = state.positions.single().id
+        state = ExitManager.applyWithFills(state, id, listOf(ExitAction.Close(808.0, ExitReason.INVALIDATION, false, "")), 1L) { p, _, requested ->
+            Fill(0.24139, 808.0, 0.1, false, requested).let { FillModel.absorbDust(it, p.quantity, zec) }
+        }
+        assertTrue(state.positions.isEmpty())
+        assertEquals(1, state.closedTrades.size)
+    }
 }

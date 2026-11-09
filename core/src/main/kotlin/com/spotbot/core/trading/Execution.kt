@@ -85,6 +85,10 @@ object ExitManager {
     fun onBar(p: Position, bar: Candle, cfg: ExecutionConfig): List<ExitAction> {
         p.closingReason?.let { return listOf(ExitAction.Close(bar.open, it, false, "Önceki çıkışın kalan miktarı satılıyor")) }
         if (bar.open <= p.stopPrice) return listOf(ExitAction.Close(bar.open, stopReason(p), false, "Fiyat stopun altında açıldı (boşluk)"))
+        // Açılış hedefin üzerindeyse hedef mumun ilk işleminde görülmüştür; sonradan gelen dip bunu değiştirmez.
+        if (bar.open >= p.targetPrice) {
+            return listOf(ExitAction.Close(if (cfg.limitTakeProfit) p.targetPrice else bar.open, ExitReason.TAKE_PROFIT, cfg.limitTakeProfit, "Mum hedefin üzerinde açıldı"))
+        }
         if (bar.low <= p.stopPrice) return listOf(ExitAction.Close(p.stopPrice, stopReason(p), false, "Mum içinde stop"))
         val actions = mutableListOf<ExitAction>()
         val r = riskDistance(p)

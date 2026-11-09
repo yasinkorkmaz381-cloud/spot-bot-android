@@ -62,22 +62,26 @@ data class BacktestConfig(
      * Geçmiş emir defteri olmadığından likidite bu yolla sınırlanır.
      */
     val participationRate: Double = 0.1,
+    /**
+     * Canlı motordaki gibi: piyasa girişinde dolum fiyatı sinyal kapanışından bu yüzdeden fazla yukarıdaysa emir
+     * gönderilmez (EngineConfig.maxEntryDriftPercent ile aynı varsayılan).
+     */
+    val maxEntryDriftPercent: Double = 0.3,
 )
 
 /** Bir paritenin backtest için tarihsel mumları. */
 @Serializable
-data class HistoricalDataset(val symbol: String, val m15: List<Candle>, val h1: List<Candle>, val h4: List<Candle>)
+data class HistoricalDataset(
+    val symbol: String,
+    val m15: List<Candle>,
+    val h1: List<Candle>,
+    val h4: List<Candle>,
+    /** İsteğe bağlı 5M mumlar: yalnız aynı 15M mumda stop ve hedefin birlikte görüldüğü durumları çözmek için. */
+    val m5: List<Candle> = emptyList(),
+)
 
 @Serializable
-data class StrategyStats(
-    val strategy: StrategyId,
-    val trades: Int,
-    val winRatePercent: Double,
-    val netPnl: Double,
-    val profitFactor: Double,
-    val expectancy: Double,
-    val averageR: Double,
-)
+data class StrategyStats(val strategy: StrategyId, val stats: PerformanceStats)
 
 @Serializable
 data class BacktestReport(
@@ -116,10 +120,27 @@ data class BacktestReport(
     /** Borsa kuralları ya da likidite nedeniyle gerçekleşmeyen emirler (neden → sayı). */
     val rejectedOrders: Map<String, Int> = emptyMap(),
     val profile: com.spotbot.core.trading.StrategyProfile = com.spotbot.core.trading.StrategyProfile.ADAPTIVE,
+    /** Tüm işlemlerin ölçüleri (kazanç/kayıp sayısı, brüt kâr/zarar, ortalama R, ücretler). */
+    val overall: PerformanceStats = PerformanceStats.of(emptyList(), initialCapital),
+    /** Gün ve ay sonu özsermayesine göre değişim (açık pozisyonlar piyasa değeriyle). */
+    val dailyReturns: List<PeriodReturn> = emptyList(),
+    val monthlyReturns: List<PeriodReturn> = emptyList(),
+    val intrabar: IntrabarStats = IntrabarStats(),
+    /** 5M verisi olmadığı için ihtiyatlı kuralla çözülen mumlar (uygulama bunları indirip yeniden çalıştırır). */
+    val missingSubBars: List<SubBarRequest> = emptyList(),
+    /** Her işlemin giriş anındaki özellikleri (sembol + sinyal zamanıyla eşleşir). */
+    val entryFeatures: List<TradeFeatures> = emptyList(),
+    /** Pozisyon kimliği → işlem süresince en iyi/en kötü hareket. */
+    val excursions: Map<String, Excursion> = emptyMap(),
+    /** Dolum fiyatı sinyalden çok uzaklaştığı için gönderilmeyen giriş emirleri (canlı motorla aynı kural). */
+    val entriesSkippedForDrift: Int = 0,
+    val regimePolicy: com.spotbot.core.analysis.RegimePolicy = com.spotbot.core.analysis.RegimePolicy.OFF,
 )
 
 /** Tarihsel veriyi MEXC'den indirir (15M, 1H, 4H; BTCUSDT her zaman eklenir). */
 class BacktestDataLoader(private val api: MarketDataApi) {
+    suspend fun fetch(symbol: String, timeframe: Timeframe, start: Long, end: Long): List<Candle> = api.klinesBetween(symbol, timeframe, start, end)
+
     suspend fun load(
         symbols: List<String>,
         start: Long,
@@ -139,12 +160,52 @@ class BacktestDataLoader(private val api: MarketDataApi) {
     }
 }
 
+/** Belirsiz 15M mumlar için 5M mumları indirip veri setine ekler (yalnız gereken pencereler). */
+suspend fun BacktestDataLoader.addSubBars(data: Map<String, HistoricalDataset>, requests: Collection<SubBarRequest>): Map<String, HistoricalDataset> {
+    if (requests.isEmpty()) return data
+    val bySymbol = requests.groupBy { it.symbol }
+    return data.mapValues { (symbol, dataset) ->
+        val windows = bySymbol[symbol] ?: return@mapValues dataset
+        val extra = windows.flatMap { w ->
+            fetch(symbol, Timeframe.M5, w.openTime, w.openTime + Timeframe.M15.millis)
+                .filter { it.openTime >= w.openTime && it.openTime < w.openTime + Timeframe.M15.millis }
+        }
+        dataset.copy(m5 = (dataset.m5 + extra).distinctBy { it.openTime }.sortedBy { it.openTime })
+    }
+}
+
+/**
+ * Backtest'i çalıştırır; aynı 15M mumda stop ve hedefin birlikte görüldüğü her durum için 5M mumları indirir ve
+ * testi yeniden çalıştırır (bir mumun sonucu sonraki kararları etkilediği için tüm test tekrarlanır). 5M verisi
+ * bulunamayan mumlar raporda "belirsiz" olarak kalır ve ihtiyatlı kural (stop önce) uygulanır.
+ */
+suspend fun BacktestEngine.runResolvingIntrabar(
+    data: Map<String, HistoricalDataset>,
+    symbolInfo: Map<String, SymbolInfo>,
+    loader: BacktestDataLoader,
+    maxPasses: Int = 4,
+    onProgress: (Double) -> Unit = {},
+): Pair<BacktestReport, Map<String, HistoricalDataset>> {
+    var current = data
+    val requested = HashSet<SubBarRequest>()
+    repeat(maxPasses) {
+        val report = run(current, symbolInfo, onProgress)
+        val fresh = report.missingSubBars.filter { it !in requested }
+        if (fresh.isEmpty()) return report to current
+        requested += fresh
+        current = loader.addSubBars(current, fresh)
+    }
+    return run(current, symbolInfo, onProgress) to current
+}
+
 /**
  * Olay güdümlü backtest. Canlı motorla aynı tarama, strateji, kural ve risk kodunu kullanır.
  *
  * Gerçekçilik varsayımları:
  * - Sinyal 15M mum kapanışında oluşur, giriş bir sonraki mumun açılışından (spread + kayma ile) yapılır.
- * - Aynı mumda hem stop hem hedef görülürse stopun önce gerçekleştiği kabul edilir (ihtiyatlı).
+ * - Aynı 15M mumda hem stop hem hedef görülürse 5M mumlarla hangisinin önce geldiği doğrulanır; 5M verisi yoksa
+ *   ya da aynı 5M mumda da ikisi birden varsa stopun önce gerçekleştiği kabul edilir (ihtiyatlı) ve işlem
+ *   "belirsiz" olarak işaretlenir.
  * - Fiyat stopun altında açılırsa (boşluk) çıkış açılış fiyatından yapılır.
  * - Geçmiş emir defteri olmadığından spread sabit [BacktestConfig.halfSpread] ile modellenir, derinlik
  *   filtresi uygulanmaz; 24 saatlik hacim 1H mumlardan hesaplanır.
@@ -191,6 +252,13 @@ class BacktestEngine(private val config: BacktestConfig, private val ruleConfig:
         var setupsFound = 0
         val blocked = HashMap<String, Int>()
         val curve = ArrayList<Pair<Long, Double>>()
+        val daily = ArrayList<Pair<Long, Double>>()
+        val subBars = data.mapValues { (_, d) -> d.m5.associateBy { it.openTime } }
+        var intrabar = IntrabarStats()
+        val missingSubBars = LinkedHashSet<SubBarRequest>()
+        var frictionTotal = 0.0
+        var driftSkipped = 0
+        val features = ArrayList<TradeFeatures>()
 
         timeline.forEachIndexed { step, t ->
             val bars = tradable.associateWith { s -> series.getValue(s).first.let { m15 -> m15.indexAtOrBefore(t).takeIf { it >= 0 && m15.candles[it].closeTime == t }?.let(m15.candles::get) } }
@@ -221,7 +289,13 @@ class BacktestEngine(private val config: BacktestConfig, private val ruleConfig:
                         }
                     }
                     is com.spotbot.core.trading.FillResult.Filled -> {
+                        val drift = (result.fill.averagePrice / setup.entryPrice - 1) * 100
+                        if (!maker && drift > config.maxEntryDriftPercent) {
+                            driftSkipped++
+                            continue
+                        }
                         if (result.fill.partial) partialFills++
+                        if (!maker) frictionTotal += (result.fill.averagePrice - bar.open) * result.fill.quantity
                         state = PaperAccount.openWithFill(
                             state, setup, result.fill.copy(requestedQuantity = p.decision.sizing.quantity), p.decision.sizing.riskAmount,
                             p.decision.report.qualityScore, p.decision.rationale, null, bar.openTime,
@@ -233,14 +307,53 @@ class BacktestEngine(private val config: BacktestConfig, private val ruleConfig:
 
             // 2) Açık pozisyonlarda mum içi stop / hedef / kısmi kâr / başa baş / süre kontrolü (ihtiyatlı sıra);
             //    çıkış emirleri de mum hacmiyle sınırlı (yetmezse kalan bir sonraki mumda satılır).
+            //    Aynı mumda stop ve hedef birlikte görülürse sıra 5M mumlarla doğrulanır.
             for (position in state.positions.toList()) {
                 val bar = bars[position.symbol] ?: continue
-                val actions = ExitManager.onBar(position, bar, execution)
-                if (actions.isEmpty()) continue
                 val costs = costsBySymbol.getValue(position.symbol)
-                state = ExitManager.applyWithFills(state, position.id, actions, t) { p, action, requested ->
-                    barExitFill(p, action, requested, bar, costs, symbolInfo[p.symbol])?.also { if (it.partial) partialFills++ }
+                val info = symbolInfo[position.symbol]
+                val fill = { p: com.spotbot.core.trading.Position, action: com.spotbot.core.trading.ExitAction, requested: Double, b: Candle ->
+                    barExitFill(p, action, requested, b, costs, info)?.also {
+                        if (it.partial) partialFills++
+                        if (!it.maker) frictionTotal += (exitReference(action) - it.averagePrice) * it.quantity
+                    }
                 }
+                if (!isAmbiguous(position, bar, execution)) {
+                    val actions = ExitManager.onBar(position, bar, execution)
+                    if (actions.isNotEmpty()) state = ExitManager.applyWithFills(state, position.id, actions, t) { p, a, r -> fill(p, a, r, bar) }
+                    continue
+                }
+                val subs = (0 until 3).mapNotNull { k -> subBars[position.symbol]?.get(bar.openTime + k * Timeframe.M5.millis) }
+                val before = state.closedTrades.size
+                val tag: String
+                if (subs.size < 3) {
+                    missingSubBars += SubBarRequest(position.symbol, bar.openTime)
+                    intrabar = intrabar.copy(ambiguousBars = intrabar.ambiguousBars + 1, unresolvedNoData = intrabar.unresolvedNoData + 1)
+                    state = ExitManager.applyWithFills(state, position.id, ExitManager.onBar(position, bar, execution), t) { p, a, r -> fill(p, a, r, bar) }
+                    tag = "BELİRSİZ: aynı 15M mumda stop ve hedef görüldü, 5M veri yok; ihtiyatlı olarak stop varsayıldı"
+                } else {
+                    var sameSubBar = false
+                    for (sub in subs) {
+                        val current = state.positions.firstOrNull { it.id == position.id } ?: break
+                        if (isAmbiguous(current, sub, execution)) sameSubBar = true
+                        val actions = ExitManager.onBar(current, sub, execution)
+                        if (actions.isNotEmpty()) state = ExitManager.applyWithFills(state, position.id, actions, sub.closeTime) { p, a, r -> fill(p, a, r, sub) }
+                    }
+                    val closed = state.closedTrades.drop(before).lastOrNull { it.position.id == position.id }
+                    intrabar = intrabar.copy(
+                        ambiguousBars = intrabar.ambiguousBars + 1,
+                        unresolvedSameSubBar = intrabar.unresolvedSameSubBar + if (sameSubBar) 1 else 0,
+                        resolvedTargetFirst = intrabar.resolvedTargetFirst + if (!sameSubBar && closed?.reason == ExitReason.TAKE_PROFIT) 1 else 0,
+                        resolvedStopFirst = intrabar.resolvedStopFirst + if (!sameSubBar && closed?.reason != ExitReason.TAKE_PROFIT) 1 else 0,
+                    )
+                    tag = if (sameSubBar) "BELİRSİZ: aynı 5M mumda da stop ve hedef görüldü; ihtiyatlı olarak stop varsayıldı"
+                    else "Aynı 15M mumda stop ve hedef görüldü; sıra 5M mumlarla doğrulandı"
+                }
+                state = state.copy(
+                    closedTrades = state.closedTrades.mapIndexed { k, trade ->
+                        if (k >= before && trade.position.id == position.id) trade.copy(note = trade.note + " · " + tag) else trade
+                    },
+                )
             }
 
             // 3) 1H kapanışında yapısal bozulma kontrolü.
@@ -253,7 +366,10 @@ class BacktestEngine(private val config: BacktestConfig, private val ruleConfig:
                         val action = com.spotbot.core.trading.ExitAction.Close(h1.close[i], ExitReason.INVALIDATION, false, "1H kapanış geçersizlik seviyesinin altında")
                         val costs = costsBySymbol.getValue(position.symbol)
                         state = ExitManager.applyWithFills(state, position.id, listOf(action), t) { p, a, requested ->
-                            barExitFill(p, a, requested, bar, costs, symbolInfo[p.symbol])
+                            barExitFill(p, a, requested, bar, costs, symbolInfo[p.symbol])?.also {
+                                if (it.partial) partialFills++
+                                frictionTotal += (exitReference(a) - it.averagePrice) * it.quantity
+                            }
                         }
                     }
                 }
@@ -269,6 +385,7 @@ class BacktestEngine(private val config: BacktestConfig, private val ruleConfig:
             maxDrawdown = max(maxDrawdown, (peak - equity) / peak * 100)
             if (state.positions.isNotEmpty()) exposedSteps++
             if (step % 96 == 0) curve += t to equity
+            if (t % DAY == 0L) daily += t to equity
 
             // 5) Tarama ve karar (yalnızca 15M kapanışlarında, kapanmış mumlarla).
             val views = tradable.associateWith { s -> multiTimeframe(s, series.getValue(s), t) }
@@ -307,6 +424,7 @@ class BacktestEngine(private val config: BacktestConfig, private val ruleConfig:
                     is CandidateDecision.Enter -> {
                         setupsFound++
                         newEntries += Pending(decision, costs, if (maker) execution.limitEntryMaxBars else 1)
+                        features += FeatureExtractor.extract(mtf, btc, decision.setup, decision.report.qualityScore)
                     }
                     is CandidateDecision.Reject -> {
                         setupsFound++
@@ -345,15 +463,61 @@ class BacktestEngine(private val config: BacktestConfig, private val ruleConfig:
         for (position in state.positions.toList()) {
             val m15 = series.getValue(position.symbol).first
             val i = m15.indexAtOrBefore(last)
-            if (i >= 0) state = PaperAccount.close(state, position.id, m15.close[i], ExitReason.MANUAL, "Backtest dönemi sonu", costsBySymbol.getValue(position.symbol), last)
+            if (i >= 0) {
+                val costs = costsBySymbol.getValue(position.symbol)
+                frictionTotal += (m15.close[i] - costs.sellPrice(m15.close[i])) * position.quantity
+                state = PaperAccount.close(state, position.id, m15.close[i], ExitReason.MANUAL, "Backtest dönemi sonu", costs, last)
+            }
         }
         curve += last to state.cash
+        if (daily.lastOrNull()?.first != last) daily += last to state.cash
         onProgress(1.0)
         val titles = BuiltInRules.all.associate { it.id to (it.title to it.group) } +
             ruleConfig.custom.associate { it.id to (it.title to it.group) }
         val shadowReport = if (config.shadowAnalysis) ShadowSimulator.report(shadows, titles, shadowNotFilled) else null
+        val trades = state.closedTrades
+        val usedFeatures = features.filter { f -> trades.any { it.position.symbol == f.symbol && it.position.setup.signalTime == f.signalTime } }
         return report(state, maxDrawdown, exposedSteps, timeline.size, setupsFound, blocked, curve, series["BTCUSDT"]?.first)
-            .copy(limitOrdersNotFilled = limitNotFilled, shadow = shadowReport, partialFills = partialFills, rejectedOrders = rejectedOrders, profile = config.profile)
+            .copy(
+                limitOrdersNotFilled = limitNotFilled, shadow = shadowReport, partialFills = partialFills, rejectedOrders = rejectedOrders,
+                profile = config.profile,
+                spreadAndSlippageCost = frictionTotal,
+                dailyReturns = PeriodReturns.of(daily, config.initialCapital, trades, monthly = false),
+                monthlyReturns = PeriodReturns.of(daily, config.initialCapital, trades, monthly = true),
+                intrabar = intrabar,
+                missingSubBars = missingSubBars.toList(),
+                entryFeatures = usedFeatures,
+                excursions = trades.associate { it.position.id to excursion(it, series.getValue(it.position.symbol).first) },
+                entriesSkippedForDrift = driftSkipped,
+                regimePolicy = config.strategyParams.regimePolicy,
+            )
+    }
+
+    /** Stop ile hedef (ya da kısmi kâr seviyesi) aynı mumda görüldü mü; açılış stopun altındaysa boşluktur, belirsiz değildir. */
+    private fun isAmbiguous(p: com.spotbot.core.trading.Position, bar: Candle, cfg: ExecutionConfig): Boolean {
+        if (p.closingReason != null || bar.open <= p.stopPrice || bar.open >= p.targetPrice || bar.low > p.stopPrice) return false
+        if (bar.high >= p.targetPrice) return true
+        val partial = cfg.partialTakeProfitAtR?.let { p.entryPrice + it * (p.entryPrice - p.initialStopPrice) }
+        return partial != null && !p.partialTaken && bar.high >= partial
+    }
+
+    private fun exitReference(action: com.spotbot.core.trading.ExitAction): Double = when (action) {
+        is com.spotbot.core.trading.ExitAction.Close -> action.price
+        is com.spotbot.core.trading.ExitAction.PartialClose -> action.price
+        is com.spotbot.core.trading.ExitAction.MoveStop -> 0.0
+    }
+
+    /** İşlem süresince 15M mumların en yüksek/en düşük değerleri, ilk riske (R) oranla. */
+    private fun excursion(trade: ClosedTrade, m15: Series): Excursion {
+        val p = trade.position
+        val risk = (p.entryPrice - p.initialStopPrice).coerceAtLeast(p.entryPrice * 1e-9)
+        val from = m15.indexAtOrBefore(p.openedAt + Timeframe.M15.millis)
+        val to = m15.indexAtOrBefore(trade.closedAt)
+        if (from < 0 || to < from) return Excursion(0.0, 0.0, 0)
+        var high = Double.NEGATIVE_INFINITY
+        var low = Double.POSITIVE_INFINITY
+        for (i in from..to) { high = max(high, m15.high[i]); low = minOf(low, m15.low[i]) }
+        return Excursion((high - p.entryPrice) / risk, (low - p.entryPrice) / risk, to - from + 1)
     }
 
     /** Mum içi çıkış dolumu: piyasa satışı açılış/stop referansından kayma ile, limit satış seviyeden; hacimle sınırlı. */
@@ -376,13 +540,15 @@ class BacktestEngine(private val config: BacktestConfig, private val ruleConfig:
         } else {
             com.spotbot.core.trading.FillModel.marketFromBar(side, requested, price, bar.quoteVolume, config.participationRate, costs, info)
         }
+        val full = requested >= position.quantity * (1 - 1e-9)
         return when (result) {
-            is com.spotbot.core.trading.FillResult.Filled -> result.fill
-            // Kalanın tamamı asgari tutarın altındaysa yine de satılır (aksi halde pozisyon kapanamaz).
-            is com.spotbot.core.trading.FillResult.Rejected -> if (requested >= position.quantity * (1 - 1e-9) && result.reason.contains("asgari")) {
+            is com.spotbot.core.trading.FillResult.Filled -> com.spotbot.core.trading.FillModel.absorbDust(result.fill, position.quantity, info)
+            // Pozisyonun son kalanı borsada satılamayacak kadar küçükse (toz) aynı fiyattan kapanmış sayılır;
+            // aksi halde pozisyon dönem sonuna kadar açık kalır ve işlem sınırını boşuna meşgul eder.
+            is com.spotbot.core.trading.FillResult.Rejected -> {
                 val fillPrice = if (maker) price else costs.sellPrice(price)
-                com.spotbot.core.trading.Fill(requested, fillPrice, fillPrice * requested * (if (maker) costs.makerFee else costs.takerFee), maker, requested, "Asgari tutar altı kalan satıldı")
-            } else null
+                if (full && com.spotbot.core.trading.OrderRules.isDust(requested, fillPrice, info)) com.spotbot.core.trading.FillModel.dustExit(requested, fillPrice, maker, costs) else null
+            }
         }
     }
 
@@ -445,39 +611,21 @@ class BacktestEngine(private val config: BacktestConfig, private val ruleConfig:
             expectancy = if (trades.isEmpty()) 0.0 else trades.sumOf { it.netPnl } / trades.size,
             expectancyR = if (trades.isEmpty()) 0.0 else trades.sumOf { it.rMultiple } / trades.size,
             totalFees = trades.sumOf { it.fees },
-            spreadAndSlippageCost = trades.sumOf { frictionCost(it) },
+            spreadAndSlippageCost = 0.0,
             exposurePercent = if (steps == 0) 0.0 else exposedSteps * 100.0 / steps,
             btcBuyAndHoldPercent = btcReturn,
-            perStrategy = trades.groupBy { it.position.strategy }.map { (strategy, list) -> stats(strategy, list) },
+            perStrategy = trades.groupBy { it.position.strategy }.toSortedMap().map { (strategy, list) -> StrategyStats(strategy, PerformanceStats.of(list, config.initialCapital)) },
             exitReasons = trades.groupingBy { it.reason.title }.eachCount(),
             setupsFound = setupsFound,
             blockedByRule = blocked.entries.sortedByDescending { it.value }.associate { it.key to it.value },
             closedTrades = trades,
             equityCurve = curve,
             warnings = warnings,
+            overall = PerformanceStats.of(trades, config.initialCapital).copy(maxDrawdownPercent = maxDrawdown),
         )
     }
 
-    /** Spread ve kaymanın işlem başına maliyeti: dolum fiyatı ile referans fiyat arasındaki fark. */
-    private fun frictionCost(trade: ClosedTrade): Double {
-        val friction = config.slippage + config.halfSpread
-        val entryReference = trade.position.entryPrice / (1 + friction)
-        val exitReference = trade.exitPrice / (1 - friction)
-        return trade.position.quantity * ((trade.position.entryPrice - entryReference) + (exitReference - trade.exitPrice))
-    }
-
-    private fun stats(strategy: StrategyId, trades: List<ClosedTrade>): StrategyStats {
-        val wins = trades.filter { it.netPnl > 0 }
-        val grossWin = wins.sumOf { it.netPnl }
-        val grossLoss = -trades.filter { it.netPnl <= 0 }.sumOf { it.netPnl }
-        return StrategyStats(
-            strategy = strategy,
-            trades = trades.size,
-            winRatePercent = wins.size * 100.0 / trades.size,
-            netPnl = trades.sumOf { it.netPnl },
-            profitFactor = if (grossLoss > 0) grossWin / grossLoss else if (grossWin > 0) Double.POSITIVE_INFINITY else 0.0,
-            expectancy = trades.sumOf { it.netPnl } / trades.size,
-            averageR = trades.sumOf { it.rMultiple } / trades.size,
-        )
+    companion object {
+        private const val DAY = 24 * 60 * 60_000L
     }
 }

@@ -35,11 +35,15 @@ fun CandleChart(
     lines: List<ChartLine> = emptyList(),
     markers: List<PriceMarker> = emptyList(),
     timeMarkers: List<TimeMarker> = emptyList(),
+    /** Bu zamandan sonraki bölge gölgelenir (ör. "giriş sonrası: karar anında bilinmiyordu"). */
+    shadeFrom: Long? = null,
+    shadeLabel: String = "",
 ) {
     val gain = SpotBotTheme.tradingColors.gain
     val loss = SpotBotTheme.tradingColors.loss
     val axisColor = MaterialTheme.colorScheme.onSurfaceVariant
     val gridColor = MaterialTheme.colorScheme.outlineVariant
+    val surfaceColor = MaterialTheme.colorScheme.surface
     val measurer = rememberTextMeasurer()
     val labelStyle = TextStyle(fontSize = 10.sp, color = axisColor)
 
@@ -61,6 +65,21 @@ fun CandleChart(
             val yy = y(price)
             drawLine(gridColor, Offset(0f, yy), Offset(plotWidth, yy), strokeWidth = 1f)
             drawText(measurer, formatPrice(price), Offset(plotWidth + 4.dp.toPx(), (yy - 6.dp.toPx()).coerceIn(0f, size.height - 14.dp.toPx())), labelStyle)
+        }
+        shadeFrom?.let { from ->
+            val index = candles.indexOfFirst { it.openTime >= from }
+            if (index >= 0) {
+                val left = index * step
+                drawRect(gridColor.copy(alpha = 0.35f), Offset(left, 0f), Size(plotWidth - left, size.height))
+                if (shadeLabel.isNotEmpty()) {
+                    // Etiket gölgeli bölgenin altına, eksen yazılarının soluna sığacak şekilde arka planla çizilir.
+                    val layout = measurer.measure(shadeLabel, labelStyle)
+                    val x = (left + 3.dp.toPx()).coerceAtMost(plotWidth - layout.size.width - 3.dp.toPx()).coerceAtLeast(0f)
+                    val y = size.height - 30.dp.toPx()
+                    drawRect(surfaceColor.copy(alpha = 0.85f), Offset(x - 2.dp.toPx(), y - 1.dp.toPx()), Size(layout.size.width + 4.dp.toPx(), layout.size.height + 2.dp.toPx()))
+                    drawText(layout, topLeft = Offset(x, y))
+                }
+            }
         }
         candles.forEachIndexed { i, c ->
             val x = i * step + step / 2
@@ -89,10 +108,22 @@ fun CandleChart(
             drawLine(m.color, Offset(x, 0f), Offset(x, size.height), strokeWidth = 2f, pathEffect = PathEffect.dashPathEffect(floatArrayOf(4f, 6f)))
             drawText(measurer, m.label, Offset((x + 3.dp.toPx()).coerceAtMost(plotWidth - 40.dp.toPx()), size.height - 14.dp.toPx()), labelStyle.copy(color = m.color))
         }
+        // Yakın fiyatlardaki etiketler üst üste binmesin: her etiket çakışmayan ilk yatay konuma yerleştirilir.
+        val placed = ArrayList<androidx.compose.ui.geometry.Rect>()
         visibleMarkers.forEach { m ->
             val yy = y(m.price)
             drawLine(m.color, Offset(0f, yy), Offset(plotWidth, yy), strokeWidth = 2f, pathEffect = dash)
-            drawText(measurer, m.label, Offset(4.dp.toPx(), (yy - 14.dp.toPx()).coerceAtLeast(0f)), labelStyle.copy(color = m.color))
+            val layout = measurer.measure(m.label, labelStyle.copy(color = m.color))
+            val top = (yy - 14.dp.toPx()).coerceAtLeast(0f)
+            val candidates = listOf(4.dp.toPx(), plotWidth * 0.36f, plotWidth * 0.68f)
+            val x = candidates.firstOrNull { cx ->
+                val rect = androidx.compose.ui.geometry.Rect(cx, top, cx + layout.size.width, top + layout.size.height)
+                placed.none { it.overlaps(rect) }
+            } ?: candidates.first()
+            val rect = androidx.compose.ui.geometry.Rect(x, top, x + layout.size.width, top + layout.size.height)
+            placed += rect
+            drawRect(surfaceColor.copy(alpha = 0.7f), rect.topLeft, rect.size)
+            drawText(layout, topLeft = Offset(x, top))
         }
     }
 }

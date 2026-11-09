@@ -12,8 +12,8 @@ android {
         applicationId = "com.spotbot.android"
         minSdk = 26
         targetSdk = 37
-        versionCode = 4
-        versionName = "2.0.0-paper"
+        versionCode = 5
+        versionName = "2.1.0-paper"
     }
 
     buildTypes {

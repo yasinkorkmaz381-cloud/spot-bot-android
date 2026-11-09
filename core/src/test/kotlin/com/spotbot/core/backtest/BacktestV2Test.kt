@@ -130,4 +130,76 @@ class BacktestV2Test {
         assertTrue(engine.evaluate(context(1.0)).outcomes.single { it.id == "Z18" }.passed)
         assertTrue(!engine.evaluate(context(1.2)).outcomes.single { it.id == "Z18" }.passed)
     }
+
+    /** Bir işlemin çıkış mumunu hem stopa hem hedefe dokunacak şekilde değiştirir; 5M mumlar isteğe bağlı. */
+    private fun ambiguousScenario(targetFirst: Boolean?): Triple<BacktestReport, com.spotbot.core.trading.ClosedTrade, Long> {
+        val original = BacktestEngine(base).run(data, info)
+        val trade = original.closedTrades.first { it.reason == com.spotbot.core.trading.ExitReason.STOP_LOSS || it.reason == com.spotbot.core.trading.ExitReason.TAKE_PROFIT }
+        val p = trade.position
+        val m15 = data.getValue(p.symbol).m15
+        val k = m15.indexOfFirst { it.closeTime == trade.closedAt }
+        val bar = m15[k]
+        val modified = bar.copy(high = maxOf(bar.high, p.targetPrice * 1.001), low = minOf(bar.low, p.stopPrice * 0.999))
+        val m5 = when (targetFirst) {
+            null -> emptyList()
+            else -> {
+                val five = Timeframe.M5.millis
+                val up = com.spotbot.core.model.Candle(bar.openTime, bar.open, p.targetPrice * 1.001, bar.open, p.targetPrice, 1.0, bar.openTime + five, 1e9)
+                val down = com.spotbot.core.model.Candle(bar.openTime + five, p.targetPrice, p.targetPrice, p.stopPrice * 0.999, bar.close, 1.0, bar.openTime + 2 * five, 1e9)
+                val flat = com.spotbot.core.model.Candle(bar.openTime + 2 * five, bar.close, bar.close, bar.close, bar.close, 1.0, bar.closeTime, 1e9)
+                val downFirst = com.spotbot.core.model.Candle(bar.openTime, bar.open, bar.open, p.stopPrice * 0.999, p.stopPrice, 1.0, bar.openTime + five, 1e9)
+                val upLater = com.spotbot.core.model.Candle(bar.openTime + five, p.stopPrice, p.targetPrice * 1.001, p.stopPrice, bar.close, 1.0, bar.openTime + 2 * five, 1e9)
+                if (targetFirst) listOf(up, down, flat) else listOf(downFirst, upLater, flat)
+            }
+        }
+        val changed = data.mapValues { (s, d) -> if (s == p.symbol) d.copy(m15 = d.m15.toMutableList().also { it[k] = modified }, m5 = m5) else d }
+        val report = BacktestEngine(base).run(changed, info)
+        return Triple(report, report.closedTrades.first { it.position.openedAt == p.openedAt && it.position.symbol == p.symbol }, bar.openTime)
+    }
+
+    @Test
+    fun `same bar stop and target without lower timeframe data is conservative and flagged`() {
+        val (report, trade, barOpen) = ambiguousScenario(targetFirst = null)
+        assertEquals(com.spotbot.core.trading.ExitReason.STOP_LOSS, trade.reason)
+        assertTrue(trade.note.contains("BELİRSİZ"))
+        assertTrue(report.intrabar.unresolvedNoData >= 1)
+        assertTrue(report.missingSubBars.contains(SubBarRequest(trade.position.symbol, barOpen)))
+    }
+
+    @Test
+    fun `same bar stop and target is resolved with 5M candles`() {
+        val (targetReport, targetTrade, _) = ambiguousScenario(targetFirst = true)
+        assertEquals(com.spotbot.core.trading.ExitReason.TAKE_PROFIT, targetTrade.reason)
+        assertTrue(targetTrade.note.contains("5M"))
+        assertTrue(targetReport.intrabar.resolvedTargetFirst >= 1)
+
+        val (stopReport, stopTrade, _) = ambiguousScenario(targetFirst = false)
+        assertEquals(com.spotbot.core.trading.ExitReason.STOP_LOSS, stopTrade.reason)
+        assertTrue(stopReport.intrabar.resolvedStopFirst >= 1)
+    }
+
+    @Test
+    fun `entries that drift too far from the signal are skipped like in the live engine`() {
+        val report = BacktestEngine(base.copy(maxEntryDriftPercent = -1.0)).run(data, info)
+        assertEquals(0, report.trades)
+        assertTrue(report.entriesSkippedForDrift > 0)
+    }
+
+    @Test
+    fun `report has consistent totals, monthly equity changes and entry features`() {
+        val r = BacktestEngine(base).run(data, info)
+        val o = r.overall
+        assertEquals(r.trades, o.wins + o.losses)
+        assertEquals(r.finalEquity - r.initialCapital, o.grossProfit - o.grossLoss, 1e-6)
+        assertEquals(r.trades, r.perStrategy.sumOf { it.stats.trades })
+        assertEquals(r.finalEquity, r.monthlyReturns.last().endEquity, 1e-6)
+        assertEquals(r.trades, r.monthlyReturns.sumOf { it.tradesClosed })
+        assertEquals(r.trades, r.entryFeatures.size)
+        assertEquals(r.trades, r.excursions.size)
+        r.closedTrades.forEach { t ->
+            val e = r.excursions.getValue(t.position.id)
+            assertTrue(e.mfeR >= e.maeR)
+            assertTrue(t.averageExitPrice > 0)
+        }
+    }
 }

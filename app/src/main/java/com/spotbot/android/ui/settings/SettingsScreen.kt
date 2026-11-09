@@ -119,6 +119,11 @@ class SettingsViewModel(private val engine: TradingEngine, private val repositor
         engine.updateConfig(repository.settings.value.engine)
     }
 
+    fun setRegimePolicy(policy: com.spotbot.core.analysis.RegimePolicy) {
+        repository.update { it.copy(engine = it.engine.copy(strategyParams = it.engine.strategyParams.copy(regimePolicy = policy))) }
+        engine.updateConfig(repository.settings.value.engine)
+    }
+
     fun setAtrStopMode(mode: AtrStopMode) {
         repository.update { it.copy(engine = it.engine.copy(risk = it.engine.risk.copy(atrStopMode = mode))) }
         engine.updateConfig(repository.settings.value.engine)
@@ -175,7 +180,22 @@ fun SettingsScreen(modifier: Modifier = Modifier, viewModel: SettingsViewModel =
                     androidx.compose.material3.RadioButton(selected = settings.engine.profile == profile, onClick = { viewModel.setProfile(profile) })
                 }
             }
-            Text("Profiller mevcut kuralları değiştirmez. Karşılaştırma için Backtest → Profil karşılaştırma.", style = MaterialTheme.typography.bodySmall)
+            Text("Profiller mevcut kuralları değiştirmez. Karşılaştırma için Backtest → Profiller.", style = MaterialTheme.typography.bodySmall)
+        }
+        SectionCard("Piyasa rejimi filtresi (Z19)") {
+            Text(
+                "BTC 4H'e göre 5 sınıf: güçlü yükseliş, zayıf yükseliş, yatay, güçlü düşüş, aşırı volatilite. 1 yıllık testte filtre beklenen değeri pozitife çevirmedi; bu yüzden varsayılan kapalıdır.",
+                style = MaterialTheme.typography.bodySmall,
+            )
+            com.spotbot.core.analysis.RegimePolicy.entries.forEach { policy ->
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text(policy.title + if (policy == com.spotbot.core.analysis.RegimePolicy.OFF) " (varsayılan)" else "", style = MaterialTheme.typography.bodyLarge)
+                        Text(policy.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    androidx.compose.material3.RadioButton(selected = settings.engine.strategyParams.regimePolicy == policy, onClick = { viewModel.setRegimePolicy(policy) })
+                }
+            }
         }
         SectionCard("Stop yöntemi") {
             AtrStopMode.entries.forEach { mode ->

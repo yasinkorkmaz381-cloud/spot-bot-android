@@ -1,6 +1,15 @@
 package com.spotbot.android.ui.backtest
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.Surface
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import com.spotbot.core.trading.ClosedTrade
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -57,7 +66,7 @@ class BacktestViewModel(private val runner: BacktestRunner, private val settings
         strategies = if (id in strategies) strategies - id else strategies + id
     }
 
-    var compareMode by mutableStateOf(false)
+    var mode by mutableStateOf(BacktestMode.SINGLE)
 
     private fun symbolList() = symbols.split(',', ' ').map { it.trim().uppercase() }.filter { it.isNotEmpty() }
         .map { if (it.endsWith("USDT")) it else it + "USDT" }.distinct()
@@ -65,18 +74,26 @@ class BacktestViewModel(private val runner: BacktestRunner, private val settings
     fun run() {
         val list = symbolList()
         if (list.isEmpty()) return
-        if (compareMode) {
-            runner.compare(list, days, parseDecimal(capital) ?: 1_000.0, settings.settings.value.engine)
-        } else {
-            if (strategies.isEmpty()) return
-            runner.run(list, days, parseDecimal(capital) ?: 1_000.0, strategies, settings.settings.value.engine)
+        val capitalValue = parseDecimal(capital) ?: 1_000.0
+        val engine = settings.settings.value.engine
+        when (mode) {
+            BacktestMode.PROFILES -> runner.compare(list, days, capitalValue, engine)
+            BacktestMode.ISOLATED -> runner.isolate(list, days, capitalValue, engine)
+            BacktestMode.SINGLE -> if (strategies.isNotEmpty()) runner.run(list, days, capitalValue, strategies, engine)
         }
     }
 }
 
+enum class BacktestMode(val title: String) { SINGLE("Tek test"), ISOLATED("A ve B ayrı"), PROFILES("Profiller") }
+
 @Composable
 fun BacktestScreen(modifier: Modifier = Modifier, viewModel: BacktestViewModel = viewModel(factory = AppViewModels.Factory)) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    var selected by remember { mutableStateOf<ClosedTrade?>(null) }
+    val done = state as? BacktestState.Done
+    selected?.let { trade ->
+        if (done != null) TradeDetailDialog(trade, done) { selected = null }
+    }
     Column(modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         InfoBanner("Backtest canlı motorla aynı tarama, strateji, kural ve risk kodunu kullanır. Sinyal 15M kapanışında oluşur, giriş sonraki mumun açılışından yapılır; komisyon, spread ve kayma düşülür.")
         SectionCard("Test ayarları") {
@@ -88,17 +105,19 @@ fun BacktestScreen(modifier: Modifier = Modifier, viewModel: BacktestViewModel =
                 viewModel.capital, { viewModel.capital = it }, label = { Text("Başlangıç sermayesi") }, suffix = { Text("USDT") },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), singleLine = true, modifier = Modifier.fillMaxWidth(),
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilterChip(selected = !viewModel.compareMode, onClick = { viewModel.compareMode = false }, label = { Text("Tek test") })
-                FilterChip(selected = viewModel.compareMode, onClick = { viewModel.compareMode = true }, label = { Text("Profil karşılaştırma") })
+            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                BacktestMode.entries.forEach { m -> FilterChip(selected = viewModel.mode == m, onClick = { viewModel.mode = m }, label = { Text(m.title) }) }
             }
-            if (viewModel.compareMode) {
-                Text(
+            when (viewModel.mode) {
+                BacktestMode.PROFILES -> Text(
                     "Adaptif, Trend ve Seçici profilleri aynı veri, dönem, maliyet, risk ve emir modeliyle çalıştırılır; dönem ikiye bölünerek iki yarıdaki tutarlılık gösterilir.",
                     style = MaterialTheme.typography.bodySmall,
                 )
-            } else {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                BacktestMode.ISOLATED -> Text(
+                    "A+B, yalnız A ve yalnız B aynı veri, ücret, kayma, sermaye ve dönemle ayrı ayrı çalıştırılır (tüm dönem, ilk ve ikinci yarı).",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                BacktestMode.SINGLE -> Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     StrategyId.entries.forEach { id ->
                         FilterChip(selected = id in viewModel.strategies, onClick = { viewModel.toggle(id) }, label = { Text("${id.code} ${id.title}") })
                     }
@@ -113,47 +132,40 @@ fun BacktestScreen(modifier: Modifier = Modifier, viewModel: BacktestViewModel =
                 LinearProgressIndicator(progress = { s.progress ?: 0f }, modifier = Modifier.fillMaxWidth())
             }
             is BacktestState.Failed -> Text("Backtest başarısız: ${s.message}", color = SpotBotTheme.tradingColors.loss)
-            is BacktestState.Done -> BacktestReportContent(s.report)
+            is BacktestState.Done -> BacktestReportContent(s.report) { selected = it }
             is BacktestState.Compared -> ComparisonContent(s.results, s.days, s.symbols)
+            is BacktestState.Isolated -> IsolatedContent(s.results, s.days, s.symbols)
             BacktestState.Idle -> Unit
         }
     }
 }
 
 @Composable
-fun BacktestReportContent(r: BacktestReport) {
-    SectionCard("Sonuç") {
-        KeyValueRow("Dönem", "${formatDateTime(r.startTime)} → ${formatDateTime(r.endTime)}")
-        KeyValueRow("Sermaye", "${formatMoney(r.initialCapital)} → ${formatMoney(r.finalEquity)} USDT")
-        KeyValueRow("Net getiri", formatPercent(r.netReturnPercent, signed = true, minFractionDigits = 2), gainLossColor(r.netReturnPercent.compareTo(0.0)))
-        KeyValueRow("BTC al-tut", r.btcBuyAndHoldPercent?.let { formatPercent(it, signed = true, minFractionDigits = 2) } ?: "—")
-        KeyValueRow("Maksimum düşüş", formatPercent(r.maxDrawdownPercent, minFractionDigits = 2), SpotBotTheme.tradingColors.loss)
-        KeyValueRow("İşlem sayısı", "${r.trades} (bulunan kurulum ${r.setupsFound})")
-        KeyValueRow("Kazanma oranı", formatPercent(r.winRatePercent, minFractionDigits = 1))
-        KeyValueRow("Ort. kazanç / kayıp", "${formatSignedMoney(r.averageWin)} / ${formatSignedMoney(r.averageLoss)}")
-        KeyValueRow("Profit factor", formatRatio(r.profitFactor))
-        KeyValueRow("İşlem başına beklenen değer", "${formatSignedMoney(r.expectancy)} USDT (${"%+.2f".format(r.expectancyR)}R)")
-        KeyValueRow("Komisyon", "${formatMoney(r.totalFees)} USDT")
-        KeyValueRow("Spread + kayma", "${formatMoney(r.spreadAndSlippageCost)} USDT")
-        KeyValueRow("Piyasada kalma süresi", formatPercent(r.exposurePercent, minFractionDigits = 1))
-        if (r.limitOrdersNotFilled > 0) KeyValueRow("Dolmayan limit giriş emri", "${r.limitOrdersNotFilled}")
-        KeyValueRow("Profil", r.profile.title)
-        if (r.partialFills > 0) KeyValueRow("Kısmi gerçekleşen emir (likidite)", "${r.partialFills}")
-        r.rejectedOrders.forEach { (reason, count) -> KeyValueRow("Gerçekleşmeyen emir: $reason", "$count") }
-        if (r.equityCurve.size >= 2) LineChart(r.equityCurve.map { it.second })
-    }
-    if (r.perStrategy.isNotEmpty()) {
-        SectionCard("Strateji bazında") {
-            r.perStrategy.forEach { s ->
-                KeyValueRow(
-                    "${s.strategy.code} ${s.strategy.title}",
-                    "${s.trades} işlem · %s · PF %s · %s".format(formatPercent(s.winRatePercent), formatRatio(s.profitFactor), formatSignedMoney(s.netPnl)),
-                    gainLossColor(s.netPnl.compareTo(0.0)),
-                )
+private fun TradeDetailDialog(trade: ClosedTrade, done: BacktestState.Done, onDismiss: () -> Unit) {
+    val chart = remember(trade) { TradeCharts.build(trade, done.data) }
+    val features = done.report.entryFeatures.firstOrNull { it.symbol == trade.position.symbol && it.signalTime == trade.position.setup.signalTime }
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+            Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("İşlem ayrıntısı", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
+                    TextButton(onClick = onDismiss) { Text("Kapat") }
+                }
+                TradeDetailContent(trade, features, done.report.excursions[trade.position.id], chart)
             }
         }
     }
-    SectionCard("Ayrıntı") {
+}
+
+@Composable
+fun BacktestReportContent(r: BacktestReport, onOpenTrade: (ClosedTrade) -> Unit = {}) {
+    BacktestSummaryCard(r)
+    StrategyCompareCard(r)
+    MonthlyReturnsCard(r)
+    TradeHistoryCard(r, onOpenTrade)
+    SectionCard("Ek ayrıntılar") {
+        if (r.limitOrdersNotFilled > 0) KeyValueRow("Dolmayan limit giriş emri", "${r.limitOrdersNotFilled}")
+        r.rejectedOrders.forEach { (reason, count) -> KeyValueRow("Gerçekleşmeyen emir: $reason", "$count") }
         r.exitReasons.forEach { (k, v) -> KeyValueRow("Çıkış: $k", "$v") }
         r.blockedByRule.entries.take(6).forEach { (k, v) -> KeyValueRow("Engelleyen: $k", "$v") }
         r.warnings.forEach { Text("⚠ $it", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.tertiary) }
@@ -177,15 +189,6 @@ fun BacktestReportContent(r: BacktestReport) {
                 KeyValueRow("${rule.id} ${rule.title}", "%+.3fR".format(rule.lift), gainLossColor(rule.lift.compareTo(0.0)))
             }
             sh.scoreBuckets.forEach { b -> KeyValueRow("Kalite puanı ${b.label}", "${b.count} kurulum · %+.3fR".format(b.avgR)) }
-        }
-    }
-    SectionCard("Son işlemler") {
-        r.closedTrades.takeLast(15).reversed().forEach { t ->
-            KeyValueRow(
-                "${formatDateTime(t.position.openedAt)} ${t.position.symbol.removeSuffix("USDT")} ${t.position.strategy.code}",
-                "${formatPrice(t.position.entryPrice)} → ${formatPrice(t.exitPrice)} ${formatSignedMoney(t.netPnl)} (${t.reason.title})",
-                gainLossColor(t.netPnl.compareTo(0.0)),
-            )
         }
     }
 }

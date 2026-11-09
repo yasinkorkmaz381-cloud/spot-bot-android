@@ -111,4 +111,13 @@ class ExecutionTest {
         assertNull(Cooldown.reason(state.closedTrades, "BTCUSDT", 100, cfg))
         assertNull(Cooldown.reason(state.closedTrades, "ETHUSDT", 100, ExecutionConfig()))
     }
+
+    @Test
+    fun `bar opening above the target is a take profit even if it later falls through the stop`() {
+        val p = opened().positions.single()
+        val actions = ExitManager.onBar(p, bar(open = 107.0, high = 108.0, low = 97.0, close = 97.5), ExecutionConfig())
+        val close = actions.single() as ExitAction.Close
+        assertEquals(ExitReason.TAKE_PROFIT, close.reason)
+        assertEquals(107.0, close.price, 1e-9)
+    }
 }

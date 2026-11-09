@@ -94,13 +94,17 @@ class ScreenshotTest {
 
     private fun info(symbol: String) = SymbolInfo(symbol, symbol.removeSuffix("USDT"), "USDT", 2, 6, 0.0001, 1.0, 0.0, 0.0005, true, true, listOf("LIMIT", "MARKET"), false, 1)
 
-    private val backtest by lazy {
-        val data = listOf("NEARUSDT", "BTCUSDT").associateWith { s ->
+    private val backtestData by lazy {
+        listOf("NEARUSDT", "BTCUSDT").associateWith { s ->
             HistoricalDataset(s, candles("/fixtures/${s}_m15.csv.gz"), candles("/fixtures/${s}_h1.csv.gz"), candles("/fixtures/${s}_h4.csv.gz"))
         }
-        val config = BacktestConfig(listOf("NEARUSDT"), 1_789_689_600_000L, data.getValue("NEARUSDT").m15.last().closeTime, scanner = ScannerConfig(minQuoteVolume24h = 100_000.0), shadowAnalysis = true)
-        BacktestEngine(config).run(data, data.keys.associateWith { info(it) })
     }
+
+    private val backtestConfig by lazy {
+        BacktestConfig(listOf("NEARUSDT"), 1_789_689_600_000L, backtestData.getValue("NEARUSDT").m15.last().closeTime, scanner = ScannerConfig(minQuoteVolume24h = 100_000.0), shadowAnalysis = true)
+    }
+
+    private val backtest by lazy { BacktestEngine(backtestConfig).run(backtestData, backtestData.keys.associateWith { info(it) }) }
 
     private val portfolio: PortfolioState by lazy {
         val last = btc.candles.last()
@@ -262,6 +266,42 @@ class ScreenshotTest {
         capture("6-backtest") {
             Column(Modifier.verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 BacktestReportContent(backtest)
+            }
+        }
+    }
+
+    @Test
+    fun backtestStrategiesAndHistory() {
+        capture("6b-backtest-a-b-ve-gecmis") {
+            Column(Modifier.verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                com.spotbot.android.ui.backtest.StrategyCompareCard(backtest)
+                com.spotbot.android.ui.backtest.TradeHistoryCard(backtest) {}
+            }
+        }
+    }
+
+    @Test
+    fun backtestTradeDetail() {
+        val trade = backtest.closedTrades.first()
+        val chart = com.spotbot.android.ui.backtest.TradeCharts.build(trade, backtestData)
+        assertTrue(chart != null && chart.candles.isNotEmpty())
+        // Grafik giriş anındaki seviyeleri göstermeli; giriş sonrası bölge gölgeli (gelecek veri gerekçe değildir).
+        assertTrue(chart!!.candles.first().openTime < trade.position.openedAt)
+        val features = backtest.entryFeatures.first { it.symbol == trade.position.symbol && it.signalTime == trade.position.setup.signalTime }
+        capture("10-islem-detayi") {
+            Column(Modifier.verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                com.spotbot.android.ui.backtest.TradeDetailContent(trade, features, backtest.excursions[trade.position.id], chart)
+            }
+        }
+    }
+
+    @Test
+    fun backtestIsolated() {
+        val results = com.spotbot.core.backtest.StrategyIsolation.run(backtestConfig.copy(shadowAnalysis = false), backtestData, backtestData.keys.associateWith { info(it) })
+        assertTrue(results.size == 3)
+        capture("11-a-b-ayri") {
+            Column(Modifier.verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                com.spotbot.android.ui.backtest.IsolatedContent(results, 21, listOf("NEARUSDT"))
             }
         }
     }

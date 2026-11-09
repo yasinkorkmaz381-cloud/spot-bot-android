@@ -1,0 +1,218 @@
+
+
+Aynı koşullar · 14 işlem coini + BTC · 2025-11-15 → 2026-11-08 · bölme 2026-05-13
+Maliyet: taker ücreti (MEXC parite bilgisi), kayma %0,05, yarım spread %0,025, mum hacminin %10'u; sermaye 1000 USDT; risk %0,5
+
+A + B (varsayılan)
+  Tüm dönem  :  194 işlem  44K/150Z kazanma % 22.7 PF  0.61 ort -0.288R beklenen -1.082 net %-20.99 maks.düşüş %22.11 ücret  43.43
+  İlk yarı   :   98 işlem  24K/ 74Z kazanma % 24.5 PF  0.67 ort -0.250R beklenen -0.903 net % -8.85 maks.düşüş %10.72 ücret  23.63
+  İkinci yarı:   96 işlem  20K/ 76Z kazanma % 20.8 PF  0.55 ort -0.325R beklenen -1.388 net %-13.33 maks.düşüş %13.59 ücret  21.71
+  Aynı mumda stop+hedef: 0 (5M: hedef önce 0, stop önce 0; belirsiz: 5M yok 0, aynı 5M 0)
+
+Yalnız A
+  Tüm dönem  :   75 işlem  15K/ 60Z kazanma % 20.0 PF  0.51 ort -0.356R beklenen -1.477 net %-11.08 maks.düşüş %11.10 ücret  18.61
+  İlk yarı   :   28 işlem   6K/ 22Z kazanma % 21.4 PF  0.57 ort -0.329R beklenen -1.237 net % -3.46 maks.düşüş % 3.46 ücret   7.56
+  İkinci yarı:   47 işlem   9K/ 38Z kazanma % 19.1 PF  0.47 ort -0.372R beklenen -1.679 net % -7.89 maks.düşüş % 8.80 ücret  11.44
+  Aynı mumda stop+hedef: 0 (5M: hedef önce 0, stop önce 0; belirsiz: 5M yok 0, aynı 5M 0)
+
+Yalnız B
+  Tüm dönem  :  144 işlem  36K/108Z kazanma % 25.0 PF  0.67 ort -0.238R beklenen -0.925 net %-13.32 maks.düşüş %16.97 ücret  32.29
+  İlk yarı   :   81 işlem  22K/ 59Z kazanma % 27.2 PF  0.74 ort -0.187R beklenen -0.718 net % -5.82 maks.düşüş % 9.39 ücret  19.38
+  İkinci yarı:   63 işlem  14K/ 49Z kazanma % 22.2 PF  0.59 ort -0.303R beklenen -1.266 net % -7.98 maks.düşüş % 9.51 ücret  13.71
+  Aynı mumda stop+hedef: 0 (5M: hedef önce 0, stop önce 0; belirsiz: 5M yok 0, aynı 5M 0)
+
+A + B · rejim: Koruyucu
+  Tüm dönem  :  185 işlem  40K/145Z kazanma % 21.6 PF  0.58 ort -0.312R beklenen -1.175 net %-21.73 maks.düşüş %22.84 ücret  41.43
+  İlk yarı   :   97 işlem  23K/ 74Z kazanma % 23.7 PF  0.65 ort -0.269R beklenen -0.976 net % -9.47 maks.düşüş %11.33 ücret  23.27
+  İkinci yarı:   88 işlem  17K/ 71Z kazanma % 19.3 PF  0.50 ort -0.358R beklenen -1.540 net %-13.56 maks.düşüş %13.89 ücret  20.05
+  Aynı mumda stop+hedef: 0 (5M: hedef önce 0, stop önce 0; belirsiz: 5M yok 0, aynı 5M 0)
+
+A + B · rejim: Tam
+  Tüm dönem  :  130 işlem  29K/101Z kazanma % 22.3 PF  0.61 ort -0.300R beklenen -1.097 net %-14.26 maks.düşüş %18.06 ücret  29.75
+  İlk yarı   :   72 işlem  18K/ 54Z kazanma % 25.0 PF  0.71 ort -0.235R beklenen -0.783 net % -5.64 maks.düşüş % 9.79 ücret  17.80
+  İkinci yarı:   58 işlem  11K/ 47Z kazanma % 19.0 PF  0.49 ort -0.381R beklenen -1.577 net % -9.15 maks.düşüş %10.05 ücret  12.65
+  Aynı mumda stop+hedef: 0 (5M: hedef önce 0, stop önce 0; belirsiz: 5M yok 0, aynı 5M 0)
+
+A + B · ATR stop tabanı 1,0
+  Tüm dönem  :  151 işlem  40K/111Z kazanma % 26.5 PF  0.73 ort -0.153R beklenen -0.766 net %-11.57 maks.düşüş %13.18 ücret  32.92
+  İlk yarı   :   75 işlem  20K/ 55Z kazanma % 26.7 PF  0.69 ort -0.183R beklenen -0.917 net % -6.88 maks.düşüş % 8.71 ücret  17.63
+  İkinci yarı:   76 işlem  20K/ 56Z kazanma % 26.3 PF  0.78 ort -0.124R beklenen -0.662 net % -5.03 maks.düşüş % 8.30 ücret  16.42
+  Aynı mumda stop+hedef: 0 (5M: hedef önce 0, stop önce 0; belirsiz: 5M yok 0, aynı 5M 0)
+
+BTC 4H rejim dağılımı (dönem içi 4H mumların %'si): Yatay / belirsiz %34.6, Güçlü düşüş %23.2, Zayıf yükseliş %22.0, Güçlü yükseliş %14.2, Aşırı volatilite %5.9
+
+Varsayılan (A + B) aylık özsermaye değişimi:
+  2025-11  % -1.65  (5 işlem, net -16.49)
+  2025-12  % +0.21  (7 işlem, net +2.06)
+  2026-01  % +1.42  (16 işlem, net +14.04)
+  2026-02  % -1.02  (7 işlem, net -10.20)
+  2026-03  % -1.04  (21 işlem, net -7.78)
+  2026-04  % -5.21  (27 işlem, net -53.53)
+  2026-05  % -4.83  (25 işlem, net -44.86)
+  2026-06  % -0.46  (7 işlem, net -4.08)
+  2026-07  % -0.52  (22 işlem, net -4.60)
+  2026-08  % -0.15  (20 işlem, net -1.34)
+  2026-09  % -8.36  (31 işlem, net -73.03)
+  2026-10  % -1.26  (6 işlem, net -10.06)
+  2026-11  % +0.00  (0 işlem, net +0.00)
+
+Zararlı işlemlerin profili (varsayılan çalıştırma):
+  Tümü                 zararlı 150 · anında başarısız (lehte < 0,3R)  57 · önce ≥1R lehte gidip zarar  40 · stop 124 · yapısal bozulma  26 · medyan süre 15 mum · medyan lehte hareket 0.53R
+  A Breakout + Retest  zararlı  56 · anında başarısız (lehte < 0,3R)  15 · önce ≥1R lehte gidip zarar  18 · stop  46 · yapısal bozulma  10 · medyan süre 21 mum · medyan lehte hareket 0.69R
+  B Trend Pullback     zararlı  94 · anında başarısız (lehte < 0,3R)  42 · önce ≥1R lehte gidip zarar  22 · stop  78 · yapısal bozulma  16 · medyan süre 11 mum · medyan lehte hareket 0.43R
+
+Özellik dilimleri (ort. R; ilk yarı / ikinci yarı):
+  BTC 4H trendi
+    Tümü                 RANGE                        46 işlem kazanma % 23.9 ort -0.32R  |  20: +0.24R /  26: -0.76R
+    Tümü                 TREND_UP                     97 işlem kazanma % 25.8 ort -0.18R  |  54: -0.36R /  43: +0.05R
+    Tümü                 UNCLEAR                      51 işlem kazanma % 15.7 ort -0.47R  |  24: -0.42R /  27: -0.51R
+    A Breakout + Retest  RANGE                        17 işlem kazanma % 17.6 ort -0.50R  |   5: +0.03R /  12: -0.72R
+    A Breakout + Retest  TREND_UP                     34 işlem kazanma % 23.5 ort -0.20R  |  16: -0.53R /  18: +0.10R
+    A Breakout + Retest  UNCLEAR                      17 işlem kazanma %  5.9 ort -0.79R  |   4: -0.89R /  13: -0.76R
+    B Trend Pullback     RANGE                        29 işlem kazanma % 27.6 ort -0.22R  |  15: +0.32R /  14: -0.79R
+    B Trend Pullback     TREND_UP                     63 işlem kazanma % 27.0 ort -0.17R  |  38: -0.28R /  25: +0.01R
+    B Trend Pullback     UNCLEAR                      34 işlem kazanma % 20.6 ort -0.31R  |  20: -0.33R /  14: -0.28R
+  Piyasa rejimi (BTC, 5 sınıf)
+    Tümü                 Aşırı volatilite              5 işlem kazanma % 60.0 ort +0.65R  |   1: +1.57R /   4: +0.42R
+    Tümü                 Güçlü düşüş                   7 işlem kazanma % 14.3 ort -0.58R  |   0: - /   7: -0.58R
+    Tümü                 Güçlü yükseliş               83 işlem kazanma % 22.9 ort -0.24R  |  47: -0.38R /  36: -0.07R
+    Tümü                 Yatay / belirsiz             35 işlem kazanma % 17.1 ort -0.41R  |  16: -0.38R /  19: -0.44R
+    Tümü                 Zayıf yükseliş               64 işlem kazanma % 23.4 ort -0.32R  |  34: -0.07R /  30: -0.60R
+    A Breakout + Retest  Aşırı volatilite              1 işlem kazanma %  0.0 ort -1.00R  |   0: - /   1: -1.00R
+    A Breakout + Retest  Güçlü düşüş                   3 işlem kazanma % 33.3 ort -0.01R  |   0: - /   3: -0.01R
+    A Breakout + Retest  Güçlü yükseliş               29 işlem kazanma % 20.7 ort -0.28R  |  14: -0.48R /  15: -0.09R
+    A Breakout + Retest  Yatay / belirsiz              9 işlem kazanma % 11.1 ort -0.61R  |   2: -1.00R /   7: -0.49R
+    A Breakout + Retest  Zayıf yükseliş               26 işlem kazanma % 15.4 ort -0.54R  |   9: -0.35R /  17: -0.64R
+    B Trend Pullback     Aşırı volatilite              4 işlem kazanma % 75.0 ort +1.07R  |   1: +1.57R /   3: +0.90R
+    B Trend Pullback     Güçlü düşüş                   4 işlem kazanma %  0.0 ort -1.00R  |   0: - /   4: -1.00R
+    B Trend Pullback     Güçlü yükseliş               54 işlem kazanma % 24.1 ort -0.22R  |  33: -0.33R /  21: -0.05R
+    B Trend Pullback     Yatay / belirsiz             26 işlem kazanma % 19.2 ort -0.34R  |  14: -0.29R /  12: -0.41R
+    B Trend Pullback     Zayıf yükseliş               38 işlem kazanma % 28.9 ort -0.17R  |  25: +0.03R /  13: -0.56R
+  Coin 4H rejimi (5 sınıf)
+    Tümü                 Aşırı volatilite             15 işlem kazanma % 20.0 ort -0.40R  |   2: +0.29R /  13: -0.50R
+    Tümü                 Güçlü yükseliş              142 işlem kazanma % 23.2 ort -0.26R  |  82: -0.24R /  60: -0.30R
+    Tümü                 Yatay / belirsiz              5 işlem kazanma % 20.0 ort -0.33R  |   0: - /   5: -0.33R
+    Tümü                 Zayıf yükseliş               32 işlem kazanma % 21.9 ort -0.34R  |  14: -0.40R /  18: -0.29R
+    A Breakout + Retest  Aşırı volatilite              4 işlem kazanma % 25.0 ort -0.24R  |   0: - /   4: -0.24R
+    A Breakout + Retest  Güçlü yükseliş               40 işlem kazanma % 15.0 ort -0.46R  |  20: -0.47R /  20: -0.44R
+    A Breakout + Retest  Yatay / belirsiz              5 işlem kazanma % 20.0 ort -0.33R  |   0: - /   5: -0.33R
+    A Breakout + Retest  Zayıf yükseliş               19 işlem kazanma % 21.1 ort -0.40R  |   5: -0.49R /  14: -0.37R
+    B Trend Pullback     Aşırı volatilite             11 işlem kazanma % 18.2 ort -0.45R  |   2: +0.29R /   9: -0.62R
+    B Trend Pullback     Güçlü yükseliş              102 işlem kazanma % 26.5 ort -0.19R  |  62: -0.16R /  40: -0.23R
+    B Trend Pullback     Zayıf yükseliş               13 işlem kazanma % 23.1 ort -0.23R  |   9: -0.35R /   4: +0.02R
+  4H/1H trend uyumu
+    Tümü                 ikisi de yükseliş           135 işlem kazanma % 25.2 ort -0.22R  |  65: -0.06R /  70: -0.36R
+    Tümü                 uyumsuz                      59 işlem kazanma % 16.9 ort -0.45R  |  33: -0.62R /  26: -0.24R
+    A Breakout + Retest  ikisi de yükseliş            44 işlem kazanma % 15.9 ort -0.45R  |  15: -0.32R /  29: -0.51R
+    A Breakout + Retest  uyumsuz                      24 işlem kazanma % 20.8 ort -0.37R  |  10: -0.71R /  14: -0.13R
+    B Trend Pullback     ikisi de yükseliş            91 işlem kazanma % 29.7 ort -0.11R  |  50: +0.01R /  41: -0.25R
+    B Trend Pullback     uyumsuz                      35 işlem kazanma % 14.3 ort -0.50R  |  23: -0.57R /  12: -0.37R
+  1H ADX
+    Tümü                 20.0–25.0                    25 işlem kazanma % 16.0 ort -0.48R  |  16: -0.57R /   9: -0.31R
+    Tümü                 < 20.0                       22 işlem kazanma % 13.6 ort -0.55R  |  13: -0.48R /   9: -0.65R
+    Tümü                 ≥ 25.0                      147 işlem kazanma % 25.2 ort -0.22R  |  69: -0.13R /  78: -0.29R
+    A Breakout + Retest  20.0–25.0                    10 işlem kazanma % 10.0 ort -0.64R  |   6: -0.45R /   4: -0.94R
+    A Breakout + Retest  < 20.0                       10 işlem kazanma % 10.0 ort -0.67R  |   4: -0.92R /   6: -0.50R
+    A Breakout + Retest  ≥ 25.0                       48 işlem kazanma % 20.8 ort -0.32R  |  15: -0.37R /  33: -0.30R
+    B Trend Pullback     20.0–25.0                    15 işlem kazanma % 20.0 ort -0.37R  |  10: -0.65R /   5: +0.19R
+    B Trend Pullback     < 20.0                       12 işlem kazanma % 16.7 ort -0.46R  |   9: -0.29R /   3: -0.94R
+    B Trend Pullback     ≥ 25.0                       99 işlem kazanma % 27.3 ort -0.16R  |  54: -0.06R /  45: -0.28R
+  15M hacim / ortalama
+    Tümü                 1.2–2.0×                     36 işlem kazanma % 16.7 ort -0.47R  |  24: -0.46R /  12: -0.49R
+    Tümü                 < 1.2×                      141 işlem kazanma % 23.4 ort -0.26R  |  63: -0.28R /  78: -0.25R
+    Tümü                 ≥ 2.0×                       17 işlem kazanma % 29.4 ort -0.10R  |  11: +0.39R /   6: -1.00R
+    A Breakout + Retest  1.2–2.0×                     12 işlem kazanma % 16.7 ort -0.47R  |   6: -0.43R /   6: -0.50R
+    A Breakout + Retest  < 1.2×                       54 işlem kazanma % 18.5 ort -0.39R  |  19: -0.49R /  35: -0.33R
+    A Breakout + Retest  ≥ 2.0×                        2 işlem kazanma %  0.0 ort -1.00R  |   0: - /   2: -1.00R
+    B Trend Pullback     1.2–2.0×                     24 işlem kazanma % 16.7 ort -0.47R  |  18: -0.47R /   6: -0.49R
+    B Trend Pullback     < 1.2×                       87 işlem kazanma % 26.4 ort -0.19R  |  44: -0.19R /  43: -0.18R
+    B Trend Pullback     ≥ 2.0×                       15 işlem kazanma % 33.3 ort +0.02R  |  11: +0.39R /   4: -1.00R
+  1H RSI negatif uyumsuzluk
+    Tümü                 var                          31 işlem kazanma % 16.1 ort -0.52R  |  17: -0.33R /  14: -0.76R
+    Tümü                 yok                         163 işlem kazanma % 23.9 ort -0.24R  |  81: -0.23R /  82: -0.25R
+    A Breakout + Retest  var                           4 işlem kazanma %  0.0 ort -0.97R  |   1: -0.88R /   3: -1.00R
+    A Breakout + Retest  yok                          64 işlem kazanma % 18.8 ort -0.39R  |  24: -0.46R /  40: -0.34R
+    B Trend Pullback     var                          27 işlem kazanma % 18.5 ort -0.46R  |  16: -0.29R /  11: -0.70R
+    B Trend Pullback     yok                          99 işlem kazanma % 27.3 ort -0.15R  |  57: -0.14R /  42: -0.17R
+  1H MACD histogramı
+    Tümü                 düşüyor                     141 işlem kazanma % 19.9 ort -0.36R  |  71: -0.30R /  70: -0.43R
+    Tümü                 yükseliyor                   53 işlem kazanma % 30.2 ort -0.09R  |  27: -0.12R /  26: -0.06R
+    A Breakout + Retest  düşüyor                      35 işlem kazanma %  8.6 ort -0.66R  |   9: -0.94R /  26: -0.56R
+    A Breakout + Retest  yükseliyor                   33 işlem kazanma % 27.3 ort -0.17R  |  16: -0.22R /  17: -0.12R
+    B Trend Pullback     düşüyor                     106 işlem kazanma % 23.6 ort -0.26R  |  62: -0.21R /  44: -0.35R
+    B Trend Pullback     yükseliyor                   20 işlem kazanma % 35.0 ort +0.04R  |  11: +0.02R /   9: +0.07R
+  Stop mesafesi (1H ATR)
+    Tümü                 0.75–1.5 ATR                114 işlem kazanma % 21.9 ort -0.30R  |  61: -0.30R /  53: -0.29R
+    Tümü                 < 0.75 ATR                   47 işlem kazanma % 12.8 ort -0.57R  |  19: -0.77R /  28: -0.43R
+    Tümü                 ≥ 1.5 ATR                    33 işlem kazanma % 39.4 ort +0.15R  |  18: +0.48R /  15: -0.24R
+    A Breakout + Retest  0.75–1.5 ATR                 45 işlem kazanma % 17.8 ort -0.37R  |  20: -0.47R /  25: -0.28R
+    A Breakout + Retest  < 0.75 ATR                    9 işlem kazanma %  0.0 ort -1.00R  |   1: -1.00R /   8: -1.00R
+    A Breakout + Retest  ≥ 1.5 ATR                    14 işlem kazanma % 28.6 ort -0.22R  |   4: -0.37R /  10: -0.16R
+    B Trend Pullback     0.75–1.5 ATR                 69 işlem kazanma % 24.6 ort -0.26R  |  41: -0.22R /  28: -0.31R
+    B Trend Pullback     < 0.75 ATR                   38 işlem kazanma % 15.8 ort -0.47R  |  18: -0.76R /  20: -0.20R
+    B Trend Pullback     ≥ 1.5 ATR                    19 işlem kazanma % 47.4 ort +0.43R  |  14: +0.72R /   5: -0.40R
+  Volatilite (1H ATR %)
+    Tümü                 0.6–1.2%                     51 işlem kazanma % 13.7 ort -0.51R  |  31: -0.52R /  20: -0.51R
+    Tümü                 < 0.6%                       19 işlem kazanma % 36.8 ort +0.13R  |  11: +0.14R /   8: +0.12R
+    Tümü                 ≥ 1.2%                      124 işlem kazanma % 24.2 ort -0.26R  |  56: -0.18R /  68: -0.32R
+    A Breakout + Retest  0.6–1.2%                     27 işlem kazanma % 11.1 ort -0.55R  |  12: -0.48R /  15: -0.61R
+    A Breakout + Retest  < 0.6%                        9 işlem kazanma % 33.3 ort +0.00R  |   3: -0.91R /   6: +0.46R
+    A Breakout + Retest  ≥ 1.2%                       32 işlem kazanma % 18.8 ort -0.43R  |  10: -0.34R /  22: -0.47R
+    B Trend Pullback     0.6–1.2%                     24 işlem kazanma % 16.7 ort -0.47R  |  19: -0.54R /   5: -0.20R
+    B Trend Pullback     < 0.6%                       10 işlem kazanma % 40.0 ort +0.24R  |   8: +0.53R /   2: -0.92R
+    B Trend Pullback     ≥ 1.2%                       92 işlem kazanma % 26.1 ort -0.20R  |  46: -0.14R /  46: -0.26R
+  Saat (UTC)
+    Tümü                 00–06                        52 işlem kazanma % 19.2 ort -0.44R  |  30: -0.32R /  22: -0.61R
+    Tümü                 06–12                        44 işlem kazanma % 27.3 ort -0.12R  |  24: +0.02R /  20: -0.29R
+    Tümü                 12–18                        47 işlem kazanma % 19.1 ort -0.43R  |  21: -0.44R /  26: -0.41R
+    Tümü                 18–24                        51 işlem kazanma % 25.5 ort -0.14R  |  23: -0.26R /  28: -0.04R
+    A Breakout + Retest  00–06                        11 işlem kazanma % 27.3 ort -0.22R  |   3: +0.84R /   8: -0.62R
+    A Breakout + Retest  06–12                        15 işlem kazanma %  6.7 ort -0.75R  |   7: -0.50R /   8: -0.98R
+    A Breakout + Retest  12–18                        18 işlem kazanma %  5.6 ort -0.82R  |   5: -0.92R /  13: -0.79R
+    A Breakout + Retest  18–24                        24 işlem kazanma % 29.2 ort +0.00R  |  10: -0.63R /  14: +0.46R
+    B Trend Pullback     00–06                        41 işlem kazanma % 17.1 ort -0.50R  |  27: -0.45R /  14: -0.61R
+    B Trend Pullback     06–12                        29 işlem kazanma % 37.9 ort +0.20R  |  17: +0.23R /  12: +0.16R
+    B Trend Pullback     12–18                        29 işlem kazanma % 27.6 ort -0.18R  |  16: -0.29R /  13: -0.04R
+    B Trend Pullback     18–24                        27 işlem kazanma % 22.2 ort -0.27R  |  13: +0.02R /  14: -0.54R
+  Kalite puanı
+    Tümü                 40.0–60.0                    79 işlem kazanma % 21.5 ort -0.37R  |  40: -0.40R /  39: -0.34R
+    Tümü                 < 40.0                       22 işlem kazanma % 31.8 ort -0.08R  |  11: +0.26R /  11: -0.42R
+    Tümü                 ≥ 60.0                       93 işlem kazanma % 21.5 ort -0.27R  |  47: -0.24R /  46: -0.29R
+    A Breakout + Retest  40.0–60.0                    31 işlem kazanma % 12.9 ort -0.59R  |  11: -0.90R /  20: -0.42R
+    A Breakout + Retest  < 40.0                       10 işlem kazanma % 40.0 ort +0.15R  |   3: +0.72R /   7: -0.10R
+    A Breakout + Retest  ≥ 60.0                       27 işlem kazanma % 14.8 ort -0.44R  |  11: -0.38R /  16: -0.47R
+    B Trend Pullback     40.0–60.0                    48 işlem kazanma % 27.1 ort -0.23R  |  29: -0.21R /  19: -0.25R
+    B Trend Pullback     < 40.0                       12 işlem kazanma % 25.0 ort -0.28R  |   8: +0.08R /   4: -1.00R
+    B Trend Pullback     ≥ 60.0                       66 işlem kazanma % 24.2 ort -0.20R  |  36: -0.20R /  30: -0.19R
+  1H yapı
+    Tümü                 HH/HL                       154 işlem kazanma % 20.8 ort -0.34R  |  74: -0.33R /  80: -0.34R
+    Tümü                 yükseliş yapısı yok          40 işlem kazanma % 30.0 ort -0.10R  |  24: -0.00R /  16: -0.26R
+    A Breakout + Retest  HH/HL                        58 işlem kazanma % 13.8 ort -0.52R  |  20: -0.50R /  38: -0.54R
+    A Breakout + Retest  yükseliş yapısı yok          10 işlem kazanma % 40.0 ort +0.17R  |   5: -0.40R /   5: +0.75R
+    B Trend Pullback     HH/HL                        96 işlem kazanma % 25.0 ort -0.22R  |  54: -0.27R /  42: -0.16R
+    B Trend Pullback     yükseliş yapısı yok          30 işlem kazanma % 26.7 ort -0.20R  |  19: +0.10R /  11: -0.72R
+
+Önceden tanımlı filtreler (sonradan alt küme; aday = iki yarıda da ort. R artıyor ve her yarıda ≥ 15 işlem):
+  F1 BTC 4H trendi yükselişte                     Tümü                 kalan  97/194 ort -0.18R (temel -0.29R, çıkarılan -0.40R) · ilk yarı -0.11R (54) · ikinci yarı +0.38R (43)
+  F2 1H ADX ≥ 20                                  Tümü                 kalan 172/194 ort -0.25R (temel -0.29R, çıkarılan -0.55R) · ilk yarı +0.04R (85) · ikinci yarı +0.03R (87)  ← aday
+  F3 15M hacim ≥ 1,5× ortalama                    Tümü                 kalan  35/194 ort -0.12R (temel -0.29R, çıkarılan -0.32R) · ilk yarı +0.37R (22) · ikinci yarı -0.22R (13)
+  F4 Stop mesafesi ≥ 1 ATR (1H)                   Tümü                 kalan  91/194 ort -0.11R (temel -0.29R, çıkarılan -0.45R) · ilk yarı +0.19R (48) · ikinci yarı +0.16R (43)  ← aday
+  F5 4H ve 1H trend uyumlu (ikisi de yükseliş)    Tümü                 kalan 135/194 ort -0.22R (temel -0.29R, çıkarılan -0.45R) · ilk yarı +0.19R (65) · ikinci yarı -0.03R (70)
+  F6 1H RSI negatif uyumsuzluk yok                Tümü                 kalan 163/194 ort -0.24R (temel -0.29R, çıkarılan -0.52R) · ilk yarı +0.02R (81) · ikinci yarı +0.07R (82)  ← aday
+  F7 Piyasa rejimi güçlü ya da zayıf yükseliş     Tümü                 kalan 147/194 ort -0.28R (temel -0.29R, çıkarılan -0.32R) · ilk yarı +0.00R (81) · ikinci yarı +0.01R (66)  ← aday
+  F1 BTC 4H trendi yükselişte                     A Breakout + Retest  kalan  34/ 68 ort -0.20R (temel -0.42R, çıkarılan -0.64R) · ilk yarı -0.06R (16) · ikinci yarı +0.49R (18)
+  F2 1H ADX ≥ 20                                  A Breakout + Retest  kalan  58/ 68 ort -0.38R (temel -0.42R, çıkarılan -0.67R) · ilk yarı +0.08R (21) · ikinci yarı +0.02R (37)  ← aday
+  F3 15M hacim ≥ 1,5× ortalama                    A Breakout + Retest  kalan  10/ 68 ort -0.36R (temel -0.42R, çıkarılan -0.43R) · ilk yarı +0.33R (4) · ikinci yarı -0.12R (6)
+  F4 Stop mesafesi ≥ 1 ATR (1H)                   A Breakout + Retest  kalan  42/ 68 ort -0.22R (temel -0.42R, çıkarılan -0.75R) · ilk yarı +0.17R (18) · ikinci yarı +0.24R (24)  ← aday
+  F5 4H ve 1H trend uyumlu (ikisi de yükseliş)    A Breakout + Retest  kalan  44/ 68 ort -0.45R (temel -0.42R, çıkarılan -0.37R) · ilk yarı +0.16R (15) · ikinci yarı -0.12R (29)
+  F6 1H RSI negatif uyumsuzluk yok                A Breakout + Retest  kalan  64/ 68 ort -0.39R (temel -0.42R, çıkarılan -0.97R) · ilk yarı +0.02R (24) · ikinci yarı +0.05R (40)  ← aday
+  F7 Piyasa rejimi güçlü ya da zayıf yükseliş     A Breakout + Retest  kalan  55/ 68 ort -0.40R (temel -0.42R, çıkarılan -0.50R) · ilk yarı +0.05R (23) · ikinci yarı +0.01R (32)  ← aday
+  F1 BTC 4H trendi yükselişte                     B Trend Pullback     kalan  63/126 ort -0.17R (temel -0.22R, çıkarılan -0.27R) · ilk yarı -0.11R (38) · ikinci yarı +0.29R (25)
+  F2 1H ADX ≥ 20                                  B Trend Pullback     kalan 114/126 ort -0.19R (temel -0.22R, çıkarılan -0.46R) · ilk yarı +0.02R (64) · ikinci yarı +0.04R (50)  ← aday
+  F3 15M hacim ≥ 1,5× ortalama                    B Trend Pullback     kalan  25/126 ort -0.03R (temel -0.22R, çıkarılan -0.26R) · ilk yarı +0.36R (18) · ikinci yarı -0.31R (7)
+  F4 Stop mesafesi ≥ 1 ATR (1H)                   B Trend Pullback     kalan  49/126 ort -0.01R (temel -0.22R, çıkarılan -0.34R) · ilk yarı +0.26R (30) · ikinci yarı +0.10R (19)  ← aday
+  F5 4H ve 1H trend uyumlu (ikisi de yükseliş)    B Trend Pullback     kalan  91/126 ort -0.11R (temel -0.22R, çıkarılan -0.50R) · ilk yarı +0.19R (50) · ikinci yarı +0.03R (41)  ← aday
+  F6 1H RSI negatif uyumsuzluk yok                B Trend Pullback     kalan  99/126 ort -0.15R (temel -0.22R, çıkarılan -0.46R) · ilk yarı +0.03R (57) · ikinci yarı +0.11R (42)  ← aday
+  F7 Piyasa rejimi güçlü ya da zayıf yükseliş     B Trend Pullback     kalan  92/126 ort -0.20R (temel -0.22R, çıkarılan -0.25R) · ilk yarı -0.00R (58) · ikinci yarı +0.03R (34)
+
+Rapor: analyze-1y.json

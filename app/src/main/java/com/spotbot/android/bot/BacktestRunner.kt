@@ -6,6 +6,7 @@ import com.spotbot.core.backtest.BacktestDataLoader
 import com.spotbot.core.backtest.BacktestEngine
 import com.spotbot.core.backtest.BacktestReport
 import com.spotbot.core.backtest.HistoricalDataset
+import com.spotbot.core.backtest.runResolvingIntrabar
 import com.spotbot.core.engine.EngineConfig
 import com.spotbot.core.exchange.MarketDataApi
 import com.spotbot.core.model.Timeframe
@@ -22,7 +23,9 @@ import java.io.File
 sealed interface BacktestState {
     data object Idle : BacktestState
     data class Running(val message: String, val progress: Float?) : BacktestState
-    data class Done(val report: BacktestReport) : BacktestState
+    /** [data]: işlem ayrıntı grafikleri için test verisi (yalnız bellekte). */
+    data class Done(val report: BacktestReport, val data: Map<String, HistoricalDataset> = emptyMap()) : BacktestState
+    data class Isolated(val results: List<com.spotbot.core.backtest.IsolatedRun>, val days: Int, val symbols: List<String>) : BacktestState
     data class Compared(val results: List<com.spotbot.core.backtest.ProfileComparison>, val days: Int, val symbols: List<String>) : BacktestState
     data class Failed(val message: String) : BacktestState
 }
@@ -48,6 +51,21 @@ class BacktestRunner(private val api: MarketDataApi, private val scope: Coroutin
         }
     }
 
+    /** A ve B'yi aynı veri, ücret, sermaye ve dönemde ayrı ayrı çalıştırır (ilk/ikinci yarı ayrımıyla). */
+    fun isolate(symbols: List<String>, days: Int, capital: Double, engine: EngineConfig) {
+        if (job?.isActive == true) return
+        job = scope.launch(Dispatchers.Default) {
+            runCatching {
+                val (config, data, info) = prepare(symbols, days, capital, setOf(StrategyId.BREAKOUT_RETEST, StrategyId.TREND_PULLBACK), engine)
+                _state.value = BacktestState.Running("A ve B aynı koşullarda ayrı çalışıyor", 0.5f)
+                com.spotbot.core.backtest.StrategyIsolation.run(config.copy(shadowAnalysis = false), data, info) { p ->
+                    _state.value = BacktestState.Running("A ve B aynı koşullarda ayrı çalışıyor", 0.5f + p.toFloat() / 2)
+                }
+            }.onSuccess { _state.value = BacktestState.Isolated(it, days, symbols) }
+                .onFailure { _state.value = BacktestState.Failed(it.message ?: it.javaClass.simpleName) }
+        }
+    }
+
     private suspend fun prepare(
         symbols: List<String>,
         days: Int,
@@ -61,7 +79,7 @@ class BacktestRunner(private val api: MarketDataApi, private val scope: Coroutin
             symbols = symbols, startTime = start, endTime = end, initialCapital = capital,
             risk = engine.risk, scanner = engine.scanner, strategyParams = engine.strategyParams,
             analysis = engine.analysis, enabledStrategies = strategies, slippage = engine.slippage,
-            execution = engine.execution, shadowAnalysis = true, profile = engine.profile,
+            execution = engine.execution, shadowAnalysis = true, profile = engine.profile, maxEntryDriftPercent = engine.maxEntryDriftPercent,
         )
         val loadStart = start - config.warmupDays * DAY
         val all = (symbols + "BTCUSDT").distinct()
@@ -76,30 +94,26 @@ class BacktestRunner(private val api: MarketDataApi, private val scope: Coroutin
         if (job?.isActive == true) return
         job = scope.launch(Dispatchers.Default) {
             runCatching {
-                val end = Timeframe.H4.lastCloseAtOrBefore(api.serverTime())
-                val start = end - days * DAY
-                val config = BacktestConfig(
-                    symbols = symbols, startTime = start, endTime = end, initialCapital = capital,
-                    risk = engine.risk, scanner = engine.scanner, strategyParams = engine.strategyParams,
-                    analysis = engine.analysis, enabledStrategies = strategies, slippage = engine.slippage,
-                    execution = engine.execution, shadowAnalysis = true, profile = engine.profile,
-                )
-                val loadStart = start - config.warmupDays * DAY
-                val all = (symbols + "BTCUSDT").distinct()
-                val data = all.mapIndexed { i, symbol ->
-                    _state.value = BacktestState.Running("$symbol verisi hazırlanıyor (${i + 1}/${all.size})", i.toFloat() / all.size * 0.5f)
-                    symbol to load(symbol, loadStart, end)
-                }.toMap()
-                val info = api.exchangeInfo().associateBy { it.symbol }
+                val (config, data, info) = prepare(symbols, days, capital, strategies, engine)
                 _state.value = BacktestState.Running("Backtest çalışıyor", 0.5f)
-                BacktestEngine(config).run(data, info) { p -> _state.value = BacktestState.Running("Backtest çalışıyor", 0.5f + p.toFloat() / 2) }
-            }.onSuccess { _state.value = BacktestState.Done(it) }
+                // Aynı mumda stop ve hedef görülen durumlar için 5M mumlar indirilir ve test yeniden çalıştırılır.
+                val (report, resolved) = BacktestEngine(config).runResolvingIntrabar(data, info, BacktestDataLoader(api)) { p ->
+                    _state.value = BacktestState.Running("Backtest çalışıyor", 0.5f + p.toFloat() / 2)
+                }
+                resolved.forEach { (symbol, d) -> if (d.m5.size != data[symbol]?.m5?.size) save(symbol, config.startTime - config.warmupDays * DAY, config.endTime, d) }
+                BacktestState.Done(report, resolved)
+            }.onSuccess { _state.value = it }
                 .onFailure { _state.value = BacktestState.Failed(it.message ?: it.javaClass.simpleName) }
         }
     }
 
+    private fun cacheFile(symbol: String, start: Long, end: Long) = File(cacheDir, "bt-$symbol-$start-$end.json")
+
+    private fun save(symbol: String, start: Long, end: Long, dataset: HistoricalDataset) =
+        runCatching { cacheFile(symbol, start, end).writeText(storageJson.encodeToString(HistoricalDataset.serializer(), dataset)) }
+
     private suspend fun load(symbol: String, start: Long, end: Long): HistoricalDataset {
-        val file = File(cacheDir, "bt-$symbol-$start-$end.json")
+        val file = cacheFile(symbol, start, end)
         file.takeIf { it.exists() }?.let { cached ->
             runCatching { return storageJson.decodeFromString(HistoricalDataset.serializer(), cached.readText()) }
         }

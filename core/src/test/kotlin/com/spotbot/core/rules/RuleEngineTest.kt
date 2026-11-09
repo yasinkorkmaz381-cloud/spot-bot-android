@@ -27,6 +27,8 @@ class RuleEngineTest {
         dailyPnl: Double = 0.0,
         correlatedRisk: Double = 0.5,
         now: Long = mtf.m15.candle.closeTime,
+        marketRegime: com.spotbot.core.analysis.MarketRegime? = null,
+        regimePolicy: com.spotbot.core.analysis.RegimePolicy = com.spotbot.core.analysis.RegimePolicy.OFF,
     ) = RuleContext(
         setup = setup.copy(signalTime = mtf.m15.candle.closeTime),
         mtf = mtf, btc = mtf, scan = TestData.scan(status = scanStatus), market = market, riskConfig = RiskConfig(),
@@ -34,6 +36,7 @@ class RuleEngineTest {
         sizing = PositionSizer.size(1_000.0, 1_000.0, setup.entryPrice, setup.stopPrice, setup.targetPrice, TestData.symbolInfo(), costs, RiskConfig()),
         strategyEnabled = true, strategySuitableRegimes = Regime.entries.toSet(), now = now,
         openSymbols = openSymbols, openPositionCount = openCount, dailyPnlPercent = dailyPnl, correlatedRiskPercent = correlatedRisk,
+        marketRegime = marketRegime, regimePolicy = regimePolicy,
     )
 
     private val engine = RuleEngine(RuleConfig.default())
@@ -102,5 +105,35 @@ class RuleEngineTest {
     fun `unknown variables never pass`() {
         val (passed, _) = RuleExpression.parse("h4.olmayan > 1").evaluate(context())
         assertFalse(passed)
+    }
+
+    @Test
+    fun `a perfect quality score never overrides a failed mandatory rule`() {
+        // Ağırlığı çok yüksek, her zaman geçen bir kalite kuralı puanı ~100'e çıkarır; zorunlu Z12 yine de engeller.
+        val config = RuleConfig(custom = listOf(CustomRule("R90", "Her zaman", RuleGroup.QUALITY, "h1.rsi > 0", weight = 1_000.0)))
+        val report = RuleEngine(config).evaluate(context(openCount = 3))
+        assertTrue(report.qualityScore > 95)
+        assertFalse(report.allowed)
+        assertEquals(listOf("Z12"), report.mandatoryFailures.map { it.id })
+    }
+
+    @Test
+    fun `regime rule passes when the filter is off and follows the policy otherwise`() {
+        fun z19(regime: com.spotbot.core.analysis.MarketRegime?, policy: com.spotbot.core.analysis.RegimePolicy, setup: com.spotbot.core.strategy.TradeSetup = TestData.setup(entry = 100.0, stop = 98.0, target = 106.0)) =
+            engine.evaluate(context(setup = setup, marketRegime = regime, regimePolicy = policy)).outcomes.single { it.id == "Z19" }.passed
+        val down = com.spotbot.core.analysis.MarketRegime.STRONG_DOWN
+        val weakUp = com.spotbot.core.analysis.MarketRegime.WEAK_UP
+        assertTrue(z19(down, com.spotbot.core.analysis.RegimePolicy.OFF))
+        assertFalse(z19(down, com.spotbot.core.analysis.RegimePolicy.PROTECTIVE))
+        assertTrue(z19(weakUp, com.spotbot.core.analysis.RegimePolicy.PROTECTIVE))
+        // Tam politika: zayıf yükselişte yalnız B (TestData kurulumu B), A engellenir.
+        assertTrue(z19(weakUp, com.spotbot.core.analysis.RegimePolicy.FULL))
+        assertFalse(z19(weakUp, com.spotbot.core.analysis.RegimePolicy.FULL, TestData.setup(entry = 100.0, stop = 98.0, target = 106.0).copy(strategy = com.spotbot.core.strategy.StrategyId.BREAKOUT_RETEST)))
+        assertFalse(z19(com.spotbot.core.analysis.MarketRegime.RANGE, com.spotbot.core.analysis.RegimePolicy.FULL))
+    }
+
+    @Test
+    fun `every built-in rule has a category`() {
+        BuiltInRules.all.forEach { assertTrue("${it.id} kategorisiz", it.id in BuiltInRules.categories) }
     }
 }

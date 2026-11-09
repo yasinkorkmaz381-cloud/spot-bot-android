@@ -3,11 +3,36 @@
 MEXC spot piyasasında (USDT pariteleri) çalışan, **kontrollü risk** ve **sistematik karar** odaklı otomatik
 işlem botu. Android uygulaması (Türkçe kumanda paneli) + platformdan bağımsız Kotlin çekirdeği + komut satırı.
 
-> **Durum: V2 — sanal işlem (paper trading).** MEXC canlı verisi kullanılır, **gerçek emir gönderilmez**,
+> **Durum: V2.1 — sanal işlem (paper trading).** MEXC canlı verisi kullanılır, **gerçek emir gönderilmez**,
 > API anahtarı istenmez. Aşağıdaki backtest sonuçları stratejilerin henüz kâr avantajı göstermediğini
 > söylüyor; bu yüzden gerçek parayla kullanım (V2) için hazır değildir.
 
 **Kalite > İşlem sayısı · Risk kontrolü > Kâr beklentisi · Kanıtlanmış strateji > Tahmin**
+
+## V2.1: profesyonel backtest denetimi (9 Kasım 2026)
+
+Tam rapor: [`docs/BACKTEST-DENETIMI.md`](docs/BACKTEST-DENETIMI.md) · kural envanteri: [`docs/KURALLAR.md`](docs/KURALLAR.md).
+
+- **Her işlem bağımsız olarak yeniden hesaplandı** (MEXC ham mumlarından, ayrı betikle). Bir kritik hata
+  bulundu: kısmi çıkıştan kalan kayan nokta "tozu" satılamıyor, pozisyon aylarca açık kalıp işlem yeri
+  işgal ediyordu (canlı kâğıt işlemde de olabilirdi). Düzeltildi; 90 günlük sonuç bu yüzden daha **kötü**
+  çıktı (38 işlem −%0,39 → 44 işlem −%2,70).
+- Aynı mumda stop + hedef artık 5M mumlarla doğrulanıyor ya da "belirsiz" işaretlenip ihtiyatlı çözülüyor
+  (90 gün ve 1 yılda 0 durum). Hedefin üzerinde açılan mum, gerçek spread/kayma maliyeti, canlıdaki %0,3 giriş
+  kayması sınırı backtest'e eklendi; ısınma süresi doğrulandı (45 ve 120 gün aynı işlemler).
+- **A ve B aynı koşullarda ayrı ayrı (1 yıl):** A 75 işlem PF 0,51 −0,36R; B 144 işlem PF 0,67 −0,24R; ikisi
+  de dönemin iki yarısında negatif.
+- **5 sınıflı piyasa rejimi** (BTC 4H) eklendi; filtre açık/kapalı ölçüldü, beklenen değeri iyileştirmedi →
+  **varsayılan kapalı** (kural Z19 yalnız bilgi verir).
+- Kayıp analizi: zararlıların %38'i lehte 0,3R bile gitmeden kapanıyor; dar stop (< 0,75 ATR), düşük ADX,
+  1H RSI negatif uyumsuzluk ve 4H/1H uyumsuzluğu iki yarıda da daha kötü. Önceden tanımlı hiçbir filtre
+  sonucu pozitife çevirmedi; varsayılanlar değişmedi.
+- Backtest ekranı: özet → A/B tablosu → aylık değişim → süzülebilir işlem geçmişi; işleme dokununca mum
+  grafiği, giriş anındaki seviyeler ve gerekçe.
+
+| Özet | A/B ve işlem geçmişi | İşlem ayrıntısı | A ve B ayrı |
+| --- | --- | --- | --- |
+| ![Özet](docs/screenshots/6-backtest.png) | ![A/B](docs/screenshots/6b-backtest-a-b-ve-gecmis.png) | ![Ayrıntı](docs/screenshots/10-islem-detayi.png) | ![A ve B ayrı](docs/screenshots/11-a-b-ayri.png) |
 
 ## V2'de neler değişti
 
@@ -227,6 +252,7 @@ cli/build/install/cryptoscan/bin/cryptoscan backtest --days 90 --symbols BTC,ETH
 cli/build/install/cryptoscan/bin/cryptoscan paper --data ./cryptoscan-data   # 7/24 sanal işlem
 cli/build/install/cryptoscan/bin/cryptoscan research --data ./veri --out arastirma.json   # deney paketi
 cli/build/install/cryptoscan/bin/cryptoscan compare --data ./veri    # profilleri aynı koşullarda karşılaştır
+cli/build/install/cryptoscan/bin/cryptoscan analyze --data ./veri    # A/B ayrı, rejim açık/kapalı, kayıp analizi
 ```
 
 ## Derleme ve testler

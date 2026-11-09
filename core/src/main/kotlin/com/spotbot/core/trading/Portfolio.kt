@@ -93,6 +93,10 @@ data class ClosedTrade(
     val netPnl: Double get() = proceeds - position.cost + position.realizedPnl
     val rMultiple: Double get() = if (position.riskAmount > 0) netPnl / position.riskAmount else 0.0
     val fees: Double get() = position.entryFee + exitFee + position.partialFees
+
+    /** Tüm satışların (kısmi çıkışlar dahil) ortalama fiyatı: net sonuç + giriş maliyeti + ücretler, ilk miktara bölünür. */
+    val averageExitPrice: Double get() =
+        if (position.initialQuantity > 0) (netPnl + position.entryPrice * position.initialQuantity + fees) / position.initialQuantity else exitPrice
 }
 
 @Serializable

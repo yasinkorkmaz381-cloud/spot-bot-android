@@ -617,13 +617,16 @@ class TradingEngine(
         val updated = ExitManager.applyWithFills(before, position.id, listOf(action), now()) { p, a, requested ->
             val maker = (a as? ExitAction.Close)?.maker ?: (a as? ExitAction.PartialClose)?.maker ?: false
             val price = if (maker) ((a as? ExitAction.Close)?.price ?: (a as ExitAction.PartialClose).price) else quote.bid * (1 - costs.slippage)
+            val full = requested >= p.quantity * (1 - 1e-9)
+            // Son kalan borsada satılamayacak kadar küçükse (toz) pozisyon açık bırakılmaz.
+            if (full && OrderRules.isDust(p.quantity, price, info)) return@applyWithFills FillModel.dustExit(p.quantity, price, maker, costs)
             val available = if (quote.bidQty > 0) quote.bidQty else requested
             val qty = OrderRules.roundQuantity(minOf(requested, available), info).let { if (requested - it < 1e-12 || it >= p.quantity) minOf(requested, p.quantity) else it }
             if (qty <= 0) return@applyWithFills null
             // Kalanın tamamı satılıyorsa asgari tutar engeli uygulanmaz (aksi halde pozisyon kapanamaz).
             if (qty < p.quantity && OrderRules.validate(OrderSide.SELL, OrderType.MARKET, qty, price, info) != null) return@applyWithFills null
             val note = if (qty < requested) "Kısmi gerçekleşme: en iyi alış seviyesinde yalnız $qty adet vardı" else ""
-            Fill(qty, price, price * qty * (if (maker) costs.makerFee else costs.takerFee), maker, requested, note)
+            FillModel.absorbDust(Fill(qty, price, price * qty * (if (maker) costs.makerFee else costs.takerFee), maker, requested, note), p.quantity, info)
         }
         if (updated == before) return
         publish(updated)
