@@ -58,6 +58,12 @@ class RuleContext(
     val correlatedRiskPercent: Double,
     /** Coin dinlenmedeyse nedeni (dinlenme kapalıysa ya da koşul yoksa null). */
     val cooldownReason: String? = null,
+    /** Veri güncel değilse nedeni (mumlar ya da fiyat eski); güncelse null. */
+    val dataIssue: String? = null,
+    /** Açık pozisyonların ve bekleyen emirlerin şu anki riski, özsermayenin %'si. */
+    val openRiskPercent: Double = 0.0,
+    /** Yeni işlemin riski, özsermayenin %'si. */
+    val newRiskPercent: Double = 0.0,
 )
 
 class BuiltInRule(
@@ -133,6 +139,14 @@ object BuiltInRules {
         },
         mandatory("Z16", "Coin üst üste zarar nedeniyle dinlenmede değil") { c ->
             (c.cooldownReason == null) to (c.cooldownReason ?: "Dinlenme yok")
+        },
+        mandatory("Z17", "Veriler güncel (kapanmış son mumlar ve canlı fiyat)") { c ->
+            (c.dataIssue == null) to (c.dataIssue ?: "Mumlar ve fiyat güncel")
+        },
+        mandatory("Z18", "Toplam açık risk sınır içinde") { c ->
+            val total = c.openRiskPercent + c.newRiskPercent
+            (total <= c.riskConfig.maxTotalOpenRiskPercent + 1e-6) to
+                "Açık %%%.2f + yeni %%%.2f = %%%.2f (sınır %%%.1f)".format(c.openRiskPercent, c.newRiskPercent, total, c.riskConfig.maxTotalOpenRiskPercent)
         },
         quality("K01", "Net R:R tercih edilen seviyede (2+)", 3.0) { c ->
             (c.riskReward.ratio >= c.riskConfig.preferredRiskReward) to "Net R:R %.2f".format(c.riskReward.ratio)

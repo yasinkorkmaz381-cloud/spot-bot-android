@@ -70,7 +70,7 @@ data class ShadowReport(
  */
 object ShadowSimulator {
     /** Portföy durumuna bağlı olduğu için kurulum kalitesi hakkında bilgi taşımayan kurallar. */
-    val portfolioRules = setOf("Z01", "Z06", "Z11", "Z12", "Z13", "Z14", "Z15", "Z16")
+    val portfolioRules = setOf("Z01", "Z06", "Z11", "Z12", "Z13", "Z14", "Z15", "Z16", "Z17", "Z18")
     private const val HORIZON_BARS = 4 * 24 * 7
 
     /** Kurulumu sinyalden sonraki mumdan itibaren simüle eder; giriş dolmazsa null. Dönüş: (R, çıkış zamanı). */

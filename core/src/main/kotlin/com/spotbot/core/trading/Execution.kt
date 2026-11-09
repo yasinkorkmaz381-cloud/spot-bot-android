@@ -52,6 +52,7 @@ object ExitManager {
 
     /** Canlı fiyat güncellemesi (en iyi alış fiyatı). */
     fun onPrice(p: Position, bid: Double, now: Long, cfg: ExecutionConfig): List<ExitAction> {
+        p.closingReason?.let { return listOf(ExitAction.Close(bid, it, maker = false, note = "Önceki çıkışın kalan miktarı satılıyor")) }
         if (bid <= p.stopPrice) return listOf(ExitAction.Close(bid, stopReason(p), maker = false, note = "Fiyat stop seviyesine indi (yazılım stopu)"))
         if (bid >= p.targetPrice) {
             return listOf(
@@ -82,6 +83,7 @@ object ExitManager {
      * stop ancak bir sonraki mumdan itibaren geçerli olur; limit emirler fiyat seviyeyi aşarsa dolar.
      */
     fun onBar(p: Position, bar: Candle, cfg: ExecutionConfig): List<ExitAction> {
+        p.closingReason?.let { return listOf(ExitAction.Close(bar.open, it, false, "Önceki çıkışın kalan miktarı satılıyor")) }
         if (bar.open <= p.stopPrice) return listOf(ExitAction.Close(bar.open, stopReason(p), false, "Fiyat stopun altında açıldı (boşluk)"))
         if (bar.low <= p.stopPrice) return listOf(ExitAction.Close(p.stopPrice, stopReason(p), false, "Mum içinde stop"))
         val actions = mutableListOf<ExitAction>()
@@ -90,12 +92,13 @@ object ExitManager {
             val trigger = p.entryPrice + atR * r
             val hit = if (cfg.limitTakeProfit) bar.high > trigger else bar.high >= trigger
             if (!p.partialTaken && hit && trigger < p.targetPrice) {
-                actions += ExitAction.PartialClose(cfg.partialFraction, maxOf(trigger, bar.open), cfg.limitTakeProfit, "+%.1fR kısmi kâr".format(atR))
+                // Limit emir seviyesinden (ihtiyatlı) dolar; piyasa emri açılış boşluğunda açılıştan.
+                actions += ExitAction.PartialClose(cfg.partialFraction, if (cfg.limitTakeProfit) trigger else maxOf(trigger, bar.open), cfg.limitTakeProfit, "+%.1fR kısmi kâr".format(atR))
             }
         }
         val targetHit = if (cfg.limitTakeProfit) bar.high > p.targetPrice else bar.high >= p.targetPrice
         if (bar.open >= p.targetPrice || targetHit) {
-            actions += ExitAction.Close(maxOf(p.targetPrice, bar.open), ExitReason.TAKE_PROFIT, cfg.limitTakeProfit, "Mum içinde hedef")
+            actions += ExitAction.Close(if (cfg.limitTakeProfit) p.targetPrice else maxOf(p.targetPrice, bar.open), ExitReason.TAKE_PROFIT, cfg.limitTakeProfit, "Mum içinde hedef")
             return actions
         }
         cfg.breakEvenAtR?.let { atR ->
@@ -107,7 +110,37 @@ object ExitManager {
         return actions
     }
 
-    /** Eylemleri sırayla hesaba uygular. */
+    /**
+     * Eylemleri gerçekçi dolumlarla uygular: [fillFor] (pozisyon, eylem, istenen miktar) için bir dolum döndürür
+     * ya da dolum mümkün değilse null (o zaman pozisyon değişmez, sonraki fiyat/mumda yeniden denenir).
+     */
+    fun applyWithFills(
+        state: PortfolioState,
+        positionId: String,
+        actions: List<ExitAction>,
+        now: Long,
+        fillFor: (Position, ExitAction, Double) -> Fill?,
+    ): PortfolioState {
+        var s = state
+        for (action in actions) {
+            val position = s.positions.firstOrNull { it.id == positionId } ?: break
+            s = when (action) {
+                is ExitAction.MoveStop -> PaperAccount.moveStop(s, positionId, action.price, action.note, now)
+                is ExitAction.PartialClose -> {
+                    val fill = fillFor(position, action, position.quantity * action.fraction) ?: continue
+                    val partialState = PaperAccount.exitWithFill(s, positionId, fill.copy(requestedQuantity = position.quantity), ExitReason.TAKE_PROFIT, action.note + " kısmi kâr", now)
+                    partialState.copy(positions = partialState.positions.map { if (it.id == positionId) it.copy(partialTaken = true, closingReason = null) else it })
+                }
+                is ExitAction.Close -> {
+                    val fill = fillFor(position, action, position.quantity) ?: continue
+                    PaperAccount.exitWithFill(s, positionId, fill, action.reason, action.note, now)
+                }
+            }
+        }
+        return s
+    }
+
+    /** Eylemleri sırayla hesaba uygular (sabit fiyat modeli; testler ve basit kullanım için). */
     fun apply(state: PortfolioState, positionId: String, actions: List<ExitAction>, costs: com.spotbot.core.risk.CostModel, now: Long): PortfolioState {
         var s = state
         for (action in actions) {

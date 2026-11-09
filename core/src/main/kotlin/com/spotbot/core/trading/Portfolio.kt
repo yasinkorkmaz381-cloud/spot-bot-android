@@ -46,9 +46,16 @@ data class Position(
     val partialFees: Double = 0.0,
     val partialTaken: Boolean = false,
     val breakEvenSet: Boolean = false,
+    /** Çıkış tetiklendi ama likidite yetmediği için kısmen gerçekleşti; kalan miktar ilk fırsatta satılır. */
+    val closingReason: ExitReason? = null,
 ) {
     /** Kalan miktarın maliyeti (giriş ücretinin kalan payı dahil). */
     val cost: Double get() = entryPrice * quantity + entryFee
+
+    /** Stop gerçekleşirse kalan miktarın kaybı (USDT). Başa baş/kısmi kâr sonrası küçülür; en az 0. */
+    val openRisk: Double
+        get() = if (!breakEvenSet && quantity >= initialQuantity * (1 - 1e-9)) riskAmount
+        else maxOf(0.0, quantity * (entryPrice - stopPrice) + entryFee)
 
     /** Şu an satılırsa net kâr/zarar (satış ücreti ve kayma dahil). */
     fun unrealizedPnl(bid: Double, costs: CostModel): Double {
@@ -117,7 +124,18 @@ data class PortfolioState(
     val dayStartEquity: Double = initialCapital,
     val equityHistory: List<EquityPoint> = emptyList(),
     val nextPositionId: Long = 1,
+    val pendingOrders: List<PendingOrder> = emptyList(),
+    /** Motorun son "canlıyım" zamanı (çevrimdışı süreyi ölçmek için). */
+    val lastHeartbeat: Long = 0,
+    val downtimes: List<Downtime> = emptyList(),
+    /** Kullanıcı botu kapattığında yazılır (çevrimdışı süreyi "beklenmedik" ile ayırmak için). */
+    val stoppedByUserAt: Long = 0,
+    /** Motorun ilk başlatıldığı zaman (çalışma oranı penceresi için). */
+    val firstStartedAt: Long = 0,
 ) {
+    /** Bekleyen limit emirler için ayrılmamış nakit. */
+    val availableCash: Double get() = cash - pendingOrders.sumOf { it.reservedQuote }
+
     fun equity(bids: Map<String, Double>, costs: (String) -> CostModel): Double =
         cash + positions.sumOf { p -> p.marketValue(bids[p.symbol] ?: p.lastPrice, costs(p.symbol)) }
 
@@ -148,6 +166,9 @@ object PaperAccount {
         // Limit (maker) emir tam limit fiyatından dolar; piyasa emri spread ve kayma öder.
         val fill = if (maker) askReference else costs.buyPrice(askReference)
         val fee = fill * quantity * (if (maker) costs.makerFee else costs.takerFee)
+        if (fill * quantity + fee > state.availableCash + 1e-9) {
+            return log(state, Decision(now, setup.symbol, setup.strategy, DecisionOutcome.REJECTED, "${setup.symbol}: bakiye yetersiz, emir reddedildi"))
+        }
         val position = Position(
             id = "P${state.nextPositionId}",
             symbol = setup.symbol,
@@ -174,6 +195,84 @@ object PaperAccount {
         return log(
             state.copy(cash = state.cash - fill * quantity - fee, positions = state.positions + position, nextPositionId = state.nextPositionId + 1),
             decision,
+        )
+    }
+
+    /**
+     * Gerçekleşmiş bir dolumla pozisyon açar. Nakit (bekleyen emirler için ayrılan hariç) yetmezse açmaz.
+     * [fromPending] bekleyen emrin dolumudur; o emrin ayırdığı nakit kullanılabilir.
+     */
+    fun openWithFill(
+        state: PortfolioState,
+        setup: TradeSetup,
+        fill: Fill,
+        riskAmount: Double,
+        qualityScore: Double,
+        rationale: TradeRationale,
+        report: RuleReport?,
+        now: Long,
+        fromPending: PendingOrder? = null,
+    ): PortfolioState {
+        val spend = fill.averagePrice * fill.quantity + fill.fee
+        val usable = state.availableCash + (fromPending?.reservedQuote ?: 0.0)
+        if (fill.quantity <= 0 || spend > usable + 1e-9) {
+            return log(
+                state.copy(pendingOrders = state.pendingOrders - listOfNotNull(fromPending).toSet()),
+                Decision(now, setup.symbol, setup.strategy, DecisionOutcome.REJECTED, "${setup.symbol}: bakiye yetersiz, emir reddedildi", listOf("Gereken %.2f USDT, kullanılabilir %.2f USDT".format(spend, usable))),
+            )
+        }
+        val scaledRisk = if (fill.requestedQuantity > 0) riskAmount * fill.quantity / fill.requestedQuantity else riskAmount
+        val position = Position(
+            id = "P${state.nextPositionId}", symbol = setup.symbol, strategy = setup.strategy, openedAt = now,
+            entryPrice = fill.averagePrice, quantity = fill.quantity, entryFee = fill.fee,
+            stopPrice = setup.stopPrice, targetPrice = setup.targetPrice, invalidationPrice = setup.invalidationPrice,
+            riskAmount = scaledRisk, qualityScore = qualityScore, setup = setup, rationale = rationale, ruleReport = report,
+        )
+        val details = listOfNotNull(rationale.whyEntry, rationale.stopReason, rationale.riskReward, fill.note.takeIf { it.isNotEmpty() })
+        val decision = Decision(
+            now, setup.symbol, setup.strategy, DecisionOutcome.OPENED,
+            "${setup.symbol} alındı (${setup.strategy.title}) @ ${"%.6g".format(fill.averagePrice)}${if (fill.partial) " — kısmi" else ""}",
+            details, qualityScore,
+        )
+        return log(
+            state.copy(
+                cash = state.cash - spend,
+                positions = state.positions + position,
+                nextPositionId = state.nextPositionId + 1,
+                pendingOrders = state.pendingOrders - listOfNotNull(fromPending).toSet(),
+            ),
+            decision,
+        )
+    }
+
+    /** Gerçekleşmiş bir satış dolumu: tamamıysa kapatır, kısmiyse kalan miktar açık kalır. */
+    fun exitWithFill(state: PortfolioState, positionId: String, fill: Fill, reason: ExitReason, note: String, now: Long): PortfolioState {
+        val position = state.positions.firstOrNull { it.id == positionId } ?: return state
+        if (fill.quantity >= position.quantity * (1 - 1e-9)) {
+            val trade = ClosedTrade(position, now, fill.averagePrice, fill.fee, reason, listOf(note, fill.note).filter { it.isNotEmpty() }.joinToString(" · "))
+            val decision = Decision(
+                now, position.symbol, position.strategy, DecisionOutcome.CLOSED,
+                "${position.symbol} kapandı: ${reason.title}, net %+.2f USDT (%+.2fR)".format(trade.netPnl, trade.rMultiple), listOf(trade.note),
+            )
+            return log(state.copy(cash = state.cash + trade.proceeds, positions = state.positions.filterNot { it.id == positionId }, closedTrades = state.closedTrades + trade), decision)
+        }
+        val fraction = fill.quantity / position.quantity
+        val makerCosts = CostModel(takerFee = 0.0, slippage = 0.0, halfSpread = 0.0, makerFee = 0.0)
+        // Ücret dolumda hesaplandığından kısmi kapatma ücretsiz modelle yapılır, ardından ücret düşülür.
+        val partial = partialClose(state, positionId, fraction, fill.averagePrice, maker = true, note = "${reason.title} — ${fill.note}", costs = makerCosts, now = now)
+        // Likidite yetmediği için kısmi kalan çıkış: kalan miktar ilk fırsatta satılmaya devam eder.
+        return partial.copy(
+            cash = partial.cash - fill.fee,
+            positions = partial.positions.map { p ->
+                if (p.id == positionId) {
+                    p.copy(
+                        realizedPnl = p.realizedPnl - fill.fee,
+                        partialFees = p.partialFees + fill.fee,
+                        closingReason = reason,
+                        partialTaken = position.partialTaken,
+                    )
+                } else p
+            },
         )
     }
 

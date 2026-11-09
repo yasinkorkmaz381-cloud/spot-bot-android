@@ -21,7 +21,25 @@ data class RiskConfig(
     val maxCorrelatedRiskPercent: Double = 1.0,
     val correlationThreshold: Double = 0.7,
     val correlationWindowBars: Int = 100,
+    /**
+     * Açık pozisyonların (bekleyen emirler dahil) ve yeni işlemin toplam riski bu yüzdeyi aşamaz.
+     * Varsayılan %1,5 = en fazla 3 işlem × %0,5; mevcut davranışı değiştirmez, açık bir sınıra dönüştürür.
+     */
+    val maxTotalOpenRiskPercent: Double = 1.5,
+    /** ATR tabanlı stop (varsayılan kapalı; mevcut yapısal stop kullanılır). */
+    val atrStopMode: AtrStopMode = AtrStopMode.OFF,
+    /** ATR stop çarpanı (1H ATR'nin katı). */
+    val atrStopMultiple: Double = 1.5,
 )
+
+@Serializable
+enum class AtrStopMode(val title: String) {
+    OFF("Kapalı (yapısal stop)"),
+    /** Yapısal stop girişe 1H ATR × çarpandan yakınsa stop o mesafeye genişletilir. */
+    FLOOR("Asgari mesafe: yapısal stop en az ATR × çarpan uzakta"),
+    /** Stop doğrudan giriş − 1H ATR × çarpan seviyesine konur. */
+    REPLACE("ATR stop: giriş − ATR × çarpan"),
+}
 
 /** İşlem maliyetleri: komisyon (taker), kayma ve yarım spread; hepsi oran (0.0005 = %0,05). */
 @Serializable

@@ -57,6 +57,16 @@ data class SymbolInfo(
     val riskFlagged: Boolean,
     /** 1: alım-satım serbest, 2: yalnız alım, 3: yalnız satım, 4: kapalı. */
     val tradeSideType: Int,
+    /** Emir başına en büyük tutar, USDT (MEXC: maxQuoteAmount; 0 = bilinmiyor). */
+    val maxQuoteAmount: Double = 0.0,
+    /** Piyasa emri asgari tutarı, USDT (MEXC: quoteAmountPrecisionMarket). */
+    val minMarketNotional: Double = 0.0,
+    /** Piyasa emri en büyük tutarı, USDT (MEXC: maxQuoteAmountMarket; 0 = bilinmiyor). */
+    val maxMarketQuoteAmount: Double = 0.0,
+    /** Fiyat bandı (MEXC PERCENT_PRICE_BY_SIDE): alış emri fiyatı ≤ piyasa × (1 + bu oran). */
+    val buyPriceBandUp: Double = 0.0,
+    /** Satış emri fiyatı ≥ piyasa × (1 − bu oran). */
+    val sellPriceBandDown: Double = 0.0,
 ) {
     val canTradeBothSides: Boolean get() = tradeSideType == 1
 }

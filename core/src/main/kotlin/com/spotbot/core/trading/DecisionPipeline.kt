@@ -10,6 +10,8 @@ import com.spotbot.core.risk.SizingResult
 import com.spotbot.core.risk.netRiskReward
 import com.spotbot.core.rules.RuleContext
 import com.spotbot.core.rules.RuleEngine
+import com.spotbot.core.rules.RuleGroup
+import com.spotbot.core.rules.RuleOutcome
 import com.spotbot.core.rules.RuleReport
 import com.spotbot.core.scanner.CoinScan
 import com.spotbot.core.scanner.MarketState
@@ -29,6 +31,41 @@ class Candidate(
     val scan: CoinScan?,
     val info: SymbolInfo?,
     val costs: CostModel,
+    /** Veri güncel değilse nedeni (Z17). */
+    val dataIssue: String? = null,
+)
+
+/**
+ * Bağımsız test edilebilir strateji profilleri. Hiçbiri mevcut kuralları değiştirmez; yalnız hangi stratejilerin
+ * kullanılacağını ve (Seçici'de) ek giriş eşiklerini belirler. Canlıdaki varsayılan Adaptif'tir.
+ */
+@kotlinx.serialization.Serializable
+enum class StrategyProfile(val title: String, val description: String) {
+    ADAPTIVE("Adaptif", "4H rejimine göre uygun strateji (varsayılan: A ve B; C ayarlardan açılırsa)"),
+    TREND("Trend", "Yalnız B – Trend Pullback"),
+    SELECTIVE("Seçici", "A+B; yalnız kalite puanı ≥ 60 ve net R:R ≥ 2 olan kurulumlar"),
+    ;
+
+    fun strategies(configured: Set<StrategyId>): Set<StrategyId> = when (this) {
+        ADAPTIVE -> configured
+        TREND -> setOf(StrategyId.TREND_PULLBACK)
+        SELECTIVE -> setOf(StrategyId.BREAKOUT_RETEST, StrategyId.TREND_PULLBACK)
+    }
+
+    companion object {
+        const val SELECTIVE_MIN_QUALITY = 60.0
+        const val SELECTIVE_MIN_NET_RR = 2.0
+    }
+}
+
+/** Bir stratejinin bir aday için sonucu (karar günlüğü için). */
+class StrategyEvaluation(
+    val strategy: StrategyId,
+    val applicable: Boolean,
+    val reasons: List<String>,
+    val setup: TradeSetup? = null,
+    val riskReward: RiskReward? = null,
+    val report: RuleReport? = null,
 )
 
 /** Kararın verildiği andaki portföy ve piyasa bağlamı. */
@@ -44,10 +81,13 @@ class DecisionContext(
     val hourlyCloses: Map<String, DoubleArray>,
     /** Kapanmış işlemler (coin dinlenmesi için). */
     val closedTrades: List<ClosedTrade> = emptyList(),
+    /** Bekleyen limit emirlerin riski (USDT); açık riske eklenir. */
+    val pendingRiskAmount: Double = 0.0,
 )
 
 sealed interface CandidateDecision {
     val symbol: String
+    val evaluations: List<StrategyEvaluation>
 
     data class Enter(
         override val symbol: String,
@@ -56,11 +96,21 @@ sealed interface CandidateDecision {
         val riskReward: RiskReward,
         val report: RuleReport,
         val rationale: TradeRationale,
+        override val evaluations: List<StrategyEvaluation> = emptyList(),
     ) : CandidateDecision
 
-    data class Reject(override val symbol: String, val setup: TradeSetup, val report: RuleReport) : CandidateDecision
+    data class Reject(
+        override val symbol: String,
+        val setup: TradeSetup,
+        val report: RuleReport,
+        override val evaluations: List<StrategyEvaluation> = emptyList(),
+    ) : CandidateDecision
 
-    data class NoSetup(override val symbol: String, val reasons: List<String>) : CandidateDecision
+    data class NoSetup(
+        override val symbol: String,
+        val reasons: List<String>,
+        override val evaluations: List<StrategyEvaluation> = emptyList(),
+    ) : CandidateDecision
 }
 
 /**
@@ -73,8 +123,12 @@ class DecisionPipeline(
     val enabledStrategies: Set<StrategyId> = setOf(StrategyId.BREAKOUT_RETEST, StrategyId.TREND_PULLBACK),
     strategyParams: StrategyParams = StrategyParams(),
     val execution: ExecutionConfig = ExecutionConfig(),
+    val profile: StrategyProfile = StrategyProfile.ADAPTIVE,
 ) {
     private val makerEntry get() = execution.entryMode == EntryMode.LIMIT
+
+    /** Profile göre kullanılabilir stratejiler. */
+    val activeStrategies: Set<StrategyId> = profile.strategies(enabledStrategies)
 
     val strategies: List<Strategy> = listOf(
         BreakoutRetestStrategy(strategyParams),
@@ -85,23 +139,55 @@ class DecisionPipeline(
     fun evaluate(candidate: Candidate, context: DecisionContext): CandidateDecision {
         val mtf = candidate.mtf
         val regime = mtf.h4.regime
-        val applicable = strategies.filter { it.id in enabledStrategies && regime in it.suitableRegimes }
-        if (applicable.isEmpty()) {
-            return CandidateDecision.NoSetup(mtf.symbol, listOf("4H rejimi $regime için etkin strateji yok"))
-        }
-        val notFound = mutableListOf<String>()
-        val evaluated = applicable.mapNotNull { strategy ->
-            when (val result = strategy.evaluate(mtf)) {
-                is StrategyResult.NotFound -> {
-                    notFound += "${strategy.id.code}: ${result.reasons.joinToString("; ")}"
-                    null
+        val evaluations = mutableListOf<StrategyEvaluation>()
+        val decisions = mutableListOf<CandidateDecision>()
+        for (strategy in strategies) {
+            when {
+                strategy.id !in activeStrategies ->
+                    evaluations += StrategyEvaluation(strategy.id, false, listOf("${profile.title} profilinde ya da ayarlarda kapalı"))
+                regime !in strategy.suitableRegimes ->
+                    evaluations += StrategyEvaluation(strategy.id, false, listOf("4H rejimi $regime bu strateji için uygun değil (uygun: ${strategy.suitableRegimes.joinToString()})"))
+                else -> when (val result = strategy.evaluate(mtf)) {
+                    is StrategyResult.NotFound -> evaluations += StrategyEvaluation(strategy.id, true, result.reasons)
+                    is StrategyResult.Found -> {
+                        val decision = assess(strategy, applyAtrStop(result.setup, mtf), candidate, context)
+                        decisions += decision
+                        val (report, rr) = when (decision) {
+                            is CandidateDecision.Enter -> decision.report to decision.riskReward
+                            is CandidateDecision.Reject -> decision.report to null
+                            is CandidateDecision.NoSetup -> null to null
+                        }
+                        val setup = (decision as? CandidateDecision.Enter)?.setup ?: (decision as? CandidateDecision.Reject)?.setup
+                        evaluations += StrategyEvaluation(strategy.id, true, emptyList(), setup, rr ?: setup?.let { netRiskReward(it.entryPrice, it.stopPrice, it.targetPrice, candidate.costs, makerEntry, execution.limitTakeProfit) }, report)
+                    }
                 }
-                is StrategyResult.Found -> assess(strategy, result.setup, candidate, context)
             }
         }
-        if (evaluated.isEmpty()) return CandidateDecision.NoSetup(mtf.symbol, notFound)
-        return evaluated.filterIsInstance<CandidateDecision.Enter>().maxByOrNull { it.report.qualityScore }
-            ?: evaluated.filterIsInstance<CandidateDecision.Reject>().maxBy { it.report.qualityScore }
+        if (decisions.isEmpty()) {
+            val reasons = evaluations.filter { it.applicable }.map { "${it.strategy.code}: ${it.reasons.joinToString("; ")}" }
+                .ifEmpty { listOf("4H rejimi $regime için ${profile.title} profilinde etkin strateji yok") }
+            return CandidateDecision.NoSetup(mtf.symbol, reasons, evaluations)
+        }
+        return when (val best = decisions.filterIsInstance<CandidateDecision.Enter>().maxByOrNull { it.report.qualityScore }
+            ?: decisions.filterIsInstance<CandidateDecision.Reject>().maxBy { it.report.qualityScore }) {
+            is CandidateDecision.Enter -> best.copy(evaluations = evaluations)
+            is CandidateDecision.Reject -> best.copy(evaluations = evaluations)
+            is CandidateDecision.NoSetup -> best
+        }
+    }
+
+    /** ATR stop seçeneği (varsayılan kapalı). Geçersizlik seviyesi yapısal kalır. */
+    private fun applyAtrStop(setup: TradeSetup, mtf: MultiTimeframe): TradeSetup {
+        val atr = mtf.h1.indicators.atr
+        if (riskConfig.atrStopMode == com.spotbot.core.risk.AtrStopMode.OFF || atr.isNaN() || atr <= 0) return setup
+        val atrStop = setup.entryPrice - riskConfig.atrStopMultiple * atr
+        return when (riskConfig.atrStopMode) {
+            com.spotbot.core.risk.AtrStopMode.FLOOR -> if (atrStop < setup.stopPrice) {
+                setup.copy(stopPrice = atrStop, stopReason = setup.stopReason + " Stop, asgari %.1f×ATR(1H) mesafeye genişletildi.".format(riskConfig.atrStopMultiple))
+            } else setup
+            com.spotbot.core.risk.AtrStopMode.REPLACE -> setup.copy(stopPrice = atrStop, stopReason = "ATR stop: giriş − %.1f×ATR(1H).".format(riskConfig.atrStopMultiple))
+            com.spotbot.core.risk.AtrStopMode.OFF -> setup
+        }
     }
 
     private fun assess(strategy: Strategy, setup: TradeSetup, candidate: Candidate, context: DecisionContext): CandidateDecision {
@@ -128,10 +214,29 @@ class DecisionPipeline(
             dailyPnlPercent = context.dailyPnlPercent,
             correlatedRiskPercent = correlatedRisk(setup.symbol, context) + newRiskPercent,
             cooldownReason = Cooldown.reason(context.closedTrades, setup.symbol, context.now, execution),
+            dataIssue = candidate.dataIssue,
+            openRiskPercent = (context.openPositions.sumOf { it.openRisk } + context.pendingRiskAmount) / context.equity * 100,
+            newRiskPercent = newRiskPercent,
         )
-        val report = ruleEngine.evaluate(ruleContext)
+        val report = withProfileGates(ruleEngine.evaluate(ruleContext), rr)
         if (!report.allowed || sizing !is SizingResult.Sized) return CandidateDecision.Reject(setup.symbol, setup, report)
         return CandidateDecision.Enter(setup.symbol, setup, sizing, rr, report, rationale(setup, candidate, context, rr, sizing))
+    }
+
+    /** Seçici profilin ek zorunlu eşikleri (kurallara eklenir, mevcut kuralları değiştirmez). */
+    private fun withProfileGates(report: RuleReport, rr: RiskReward): RuleReport {
+        if (profile != StrategyProfile.SELECTIVE) return report
+        val gates = listOf(
+            RuleOutcome(
+                "P01", "Seçici profil: kalite puanı ≥ %.0f".format(StrategyProfile.SELECTIVE_MIN_QUALITY), RuleGroup.MANDATORY,
+                report.qualityScore >= StrategyProfile.SELECTIVE_MIN_QUALITY, "Kalite puanı %.0f".format(report.qualityScore), 0.0,
+            ),
+            RuleOutcome(
+                "P02", "Seçici profil: net R:R ≥ %.1f".format(StrategyProfile.SELECTIVE_MIN_NET_RR), RuleGroup.MANDATORY,
+                rr.ratio >= StrategyProfile.SELECTIVE_MIN_NET_RR, "Net R:R %.2f".format(rr.ratio), 0.0,
+            ),
+        )
+        return report.copy(outcomes = report.outcomes + gates)
     }
 
     /** Aday ile güçlü korelasyonlu (ya da aynı) açık pozisyonların toplam riski, özsermayenin %'si. */
@@ -141,7 +246,7 @@ class DecisionPipeline(
             if (p.symbol == symbol) return@filter true
             val other = context.hourlyCloses[p.symbol] ?: return@filter true // bilinmiyorsa ihtiyatlı davran
             mine == null || Indicators.returnCorrelation(mine, other, riskConfig.correlationWindowBars) >= riskConfig.correlationThreshold
-        }.sumOf { it.riskAmount } / context.equity * 100
+        }.sumOf { it.openRisk } / context.equity * 100
     }
 
     private fun rationale(

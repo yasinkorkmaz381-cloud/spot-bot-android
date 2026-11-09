@@ -193,7 +193,17 @@ internal fun parseSymbolInfo(o: JsonObject): SymbolInfo = SymbolInfo(
     orderTypes = o["orderTypes"]?.jsonArray?.map { it.jsonPrimitive.content }.orEmpty(),
     riskFlagged = (o["st"] as? JsonPrimitive)?.content == "true",
     tradeSideType = (o["tradeSideType"] as? JsonPrimitive)?.content?.toIntOrNull() ?: 1,
+    maxQuoteAmount = o.doubleOrZero("maxQuoteAmount"),
+    minMarketNotional = o.doubleOrZero("quoteAmountPrecisionMarket"),
+    maxMarketQuoteAmount = o.doubleOrZero("maxQuoteAmountMarket"),
+    buyPriceBandUp = priceFilter(o, "bidMultiplierUp"),
+    sellPriceBandDown = priceFilter(o, "askMultiplierDown"),
 )
+
+private fun priceFilter(o: JsonObject, key: String): Double =
+    o["filters"]?.jsonArray?.map { it.jsonObject }
+        ?.firstOrNull { (it["filterType"] as? JsonPrimitive)?.content == "PERCENT_PRICE_BY_SIDE" }
+        ?.doubleOrZero(key) ?: 0.0
 
 internal fun parseTicker24h(o: JsonObject): Ticker24h = Ticker24h(
     symbol = o.string("symbol"),

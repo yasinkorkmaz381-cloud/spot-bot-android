@@ -25,6 +25,8 @@ data class FeedHealth(
     /** Son doğrulamada WebSocket ile REST arasındaki en büyük fiyat sapması (%). */
     val lastMaxDeviationPercent: Double? = null,
     val lastError: String? = null,
+    /** Başlangıçtan bu yana WebSocket yeniden bağlanma sayısı. */
+    val reconnects: Int = 0,
 )
 
 /**
@@ -70,7 +72,7 @@ class LivePriceFeed(
             }
         }
         jobs += scope.launch {
-            webSocket.state.collect { s -> _health.update { it.copy(webSocket = s.status) } }
+            webSocket.state.collect { s -> _health.update { it.copy(webSocket = s.status, reconnects = s.reconnects) } }
         }
         jobs += scope.launch { restLoop() }
     }

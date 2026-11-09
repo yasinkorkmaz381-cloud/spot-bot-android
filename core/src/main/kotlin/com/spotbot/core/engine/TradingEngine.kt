@@ -35,6 +35,26 @@ import com.spotbot.core.trading.EntryMode
 import com.spotbot.core.trading.ExecutionConfig
 import com.spotbot.core.trading.ExitManager
 import com.spotbot.core.trading.asPendingPosition
+import com.spotbot.core.trading.CoinDecision
+import com.spotbot.core.trading.CoinOutcome
+import com.spotbot.core.trading.DataStamp
+import com.spotbot.core.trading.DecisionLogStore
+import com.spotbot.core.trading.DecisionLogs
+import com.spotbot.core.trading.Downtime
+import com.spotbot.core.trading.ExitAction
+import com.spotbot.core.trading.Fill
+import com.spotbot.core.trading.FillModel
+import com.spotbot.core.trading.FillResult
+import com.spotbot.core.trading.InMemoryDecisionLogStore
+import com.spotbot.core.trading.OrderRules
+import com.spotbot.core.trading.OrderSide
+import com.spotbot.core.trading.OrderType
+import com.spotbot.core.trading.PendingOrder
+import com.spotbot.core.trading.Reliability
+import com.spotbot.core.trading.RiskStatus
+import com.spotbot.core.trading.ScanLog
+import com.spotbot.core.trading.StrategyProfile
+import com.spotbot.core.ta.Indicators
 import com.spotbot.core.trading.PaperAccount
 import com.spotbot.core.trading.PortfolioState
 import com.spotbot.core.trading.Position
@@ -71,10 +91,19 @@ data class EngineConfig(
     val historyBars: Int = 400,
     /** Mum kapanışından sonra verinin oturması için beklenen süre. */
     val candleSettleMillis: Long = 3_000,
-    /** Sinyal kapanışı ile anlık alış fiyatı arasında izin verilen en büyük kayma (%). */
+    /** Sinyal kapanışı ile ortalama dolum fiyatı arasında izin verilen en büyük kayma (%). */
     val maxEntryDriftPercent: Double = 0.3,
     val universeRefreshMillis: Long = 4 * 60 * 60_000L,
     val execution: ExecutionConfig = ExecutionConfig(),
+    /** Strateji profili (varsayılan Adaptif = önceki davranış). */
+    val profile: StrategyProfile = StrategyProfile.ADAPTIVE,
+    /** Girişte canlı fiyatın en fazla yaşı (sn); daha eskiyse işlem açılmaz. */
+    val maxPriceAgeSeconds: Int = 30,
+    /** Piyasa emri emir defterinde en iyi fiyattan en fazla bu oran kadar uzaklaşabilir; ötesi kısmi gerçekleşir. */
+    val maxBookSlippage: Double = 0.005,
+    val heartbeatMillis: Long = 60_000,
+    /** Son "canlıyım" kaydından bu kadar süre sonra başlarsa aradaki süre çevrimdışı sayılır. */
+    val downtimeThresholdMillis: Long = 3 * 60_000,
 )
 
 /** Portföy durumunu kalıcı saklama (Android'de uygulama dosyası, CLI'da yerel JSON). */
@@ -102,6 +131,13 @@ data class EngineHealth(
     val message: String? = null,
     /** Bekleyen limit giriş emirleri (ör. "ETHUSDT @ 2751.7"). */
     val pendingOrders: List<String> = emptyList(),
+    /** Botun çalıştığı yer (telefon / sunucu). */
+    val runLocation: String = "",
+    /** Son 24 saatte (ya da ilk başlatmadan beri) çalışma oranı, %. */
+    val uptime24hPercent: Double? = null,
+    val lastDowntime: Downtime? = null,
+    /** Son taramada verisi güncel olmayan coinler. */
+    val staleSymbols: List<String> = emptyList(),
 )
 
 sealed interface EngineEvent {
@@ -114,8 +150,10 @@ sealed interface EngineEvent {
  * 7/24 çalışan sanal işlem (paper trading) motoru. MEXC canlı verisini kullanır, gerçek emir göndermez.
  *
  * Akış: her 15M kapanışında kapanmış mumlar REST ile alınır → tarama → en iyi 2–4 aday → strateji →
- * zorunlu/kalite kuralları → risk → sanal giriş. Açık pozisyonların stop/hedefi WebSocket fiyatlarıyla
- * anlık, yapısal bozulması 1H kapanışlarında izlenir.
+ * zorunlu/kalite kuralları → risk → sanal emir. Her coin için karar ve kullanılan verinin zamanı
+ * [scanLogs] ile kaydedilir. Eski veriyle (mum ya da fiyat) işlem açılmaz. Emirler emir defteri
+ * derinliğiyle doldurulur; yetmezse kısmi gerçekleşir. Açık pozisyonların stop/hedefi WebSocket
+ * fiyatlarıyla, yapısal bozulması 1H kapanışlarında izlenir.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class TradingEngine(
@@ -126,6 +164,8 @@ class TradingEngine(
     config: EngineConfig = EngineConfig(),
     private val ruleConfig: RuleConfig = RuleConfig.default(),
     private val timeSource: TimeSource = TimeSource.System,
+    private val decisionLog: DecisionLogStore = InMemoryDecisionLogStore(),
+    runLocation: String = "Sunucu / bilgisayar (komut satırı)",
 ) {
     var config: EngineConfig = config
         private set
@@ -140,8 +180,15 @@ class TradingEngine(
     private val _lastScan = MutableStateFlow<ScanReport?>(null)
     val lastScan: StateFlow<ScanReport?> = _lastScan.asStateFlow()
 
-    private val _health = MutableStateFlow(EngineHealth())
+    private val _scanLogs = MutableStateFlow(runCatching { decisionLog.recent(SCAN_LOGS_IN_MEMORY) }.getOrDefault(emptyList()))
+    /** Son taramaların coin bazında karar kayıtları (en yenisi sonda). */
+    val scanLogs: StateFlow<List<ScanLog>> = _scanLogs.asStateFlow()
+
+    private val _health = MutableStateFlow(EngineHealth(runLocation = runLocation))
     val health: StateFlow<EngineHealth> = _health.asStateFlow()
+
+    private val _riskStatus = MutableStateFlow(RiskStatus())
+    val riskStatus: StateFlow<RiskStatus> = _riskStatus.asStateFlow()
 
     private val _events = MutableSharedFlow<EngineEvent>(extraBufferCapacity = 64)
     val events: SharedFlow<EngineEvent> = _events.asSharedFlow()
@@ -171,7 +218,9 @@ class TradingEngine(
         jobs.forEach { it.cancel() }
         jobs = emptyList()
         feed.stop()
-        store.save(_portfolio.value)
+        val stopped = _portfolio.value.copy(stoppedByUserAt = now(), lastHeartbeat = now())
+        _portfolio.value = stopped
+        runCatching { store.save(stopped) }
         _health.update { it.copy(status = EngineStatus.STOPPED, message = "Durduruldu") }
     }
 
@@ -179,15 +228,31 @@ class TradingEngine(
 
     /** Yeni işlem açmayı durdurur/sürdürür; açık pozisyonların takibi devam eder. */
     fun setEntriesPaused(paused: Boolean) {
-        _health.update { it.copy(entriesPaused = paused) }
-        log(Decision(now(), null, null, DecisionOutcome.INFO, if (paused) "Yeni işlemler durduruldu (açık pozisyon takibi sürüyor)" else "Yeni işlemlere izin verildi"))
+        scope.launch(dispatcher) {
+            _health.update { it.copy(entriesPaused = paused) }
+            log(Decision(now(), null, null, DecisionOutcome.INFO, if (paused) "Yeni işlemler durduruldu (açık pozisyon takibi sürüyor)" else "Yeni işlemlere izin verildi"))
+            refreshRisk()
+        }
     }
 
     fun closePosition(positionId: String) {
         scope.launch(dispatcher) {
             val position = _portfolio.value.positions.firstOrNull { it.id == positionId } ?: return@launch
-            val bid = feed.prices.value[position.symbol]?.bid ?: runCatching { api.bookTicker(position.symbol).bid }.getOrNull() ?: position.lastPrice
-            closeAt(position, bid, ExitReason.MANUAL, "Kullanıcı tarafından kapatıldı")
+            val quote = feed.prices.value[position.symbol] ?: runCatching { api.bookTicker(position.symbol) }.getOrNull()
+            if (quote == null) {
+                problem("${position.symbol} için fiyat alınamadı; manuel kapatma yapılamadı")
+                return@launch
+            }
+            exit(position, ExitAction.Close(quote.bid, ExitReason.MANUAL, false, "Kullanıcı tarafından kapatıldı"), quote)
+        }
+    }
+
+    fun cancelPendingOrder(symbol: String) {
+        scope.launch(dispatcher) {
+            val state = _portfolio.value
+            val order = state.pendingOrders.firstOrNull { it.symbol == symbol } ?: return@launch
+            publish(PaperAccount.log(state.copy(pendingOrders = state.pendingOrders - order), Decision(now(), symbol, order.setup.strategy, DecisionOutcome.INFO, "$symbol: bekleyen limit emir kullanıcı tarafından iptal edildi")))
+            publishPending()
         }
     }
 
@@ -196,14 +261,17 @@ class TradingEngine(
         scope.launch(dispatcher) {
             config = newConfig
             pipeline = buildPipeline()
-            log(Decision(now(), null, null, DecisionOutcome.INFO, "Ayarlar güncellendi"))
+            log(Decision(now(), null, null, DecisionOutcome.INFO, "Ayarlar güncellendi (profil: ${newConfig.profile.title})"))
+            refreshRisk()
         }
     }
 
     fun resetPaperAccount(capital: Double) {
         scope.launch(dispatcher) {
             config = config.copy(initialCapital = capital)
-            publish(PortfolioState.create(capital))
+            publish(PortfolioState.create(capital).copy(firstStartedAt = now(), lastHeartbeat = now()))
+            publishPending()
+            refreshRisk()
         }
     }
 
@@ -218,16 +286,9 @@ class TradingEngine(
         return MultiTimeframe(symbol, h4.analyze(), h1.analyze(), m15.analyze())
     }
 
-    private fun buildPipeline() = DecisionPipeline(RuleEngine(ruleConfig), config.risk, config.enabledStrategies, config.strategyParams, config.execution)
-
-    /** Bekleyen limit giriş emri (yalnız bellekte; uygulama yeniden başlarsa iptal olur). */
-    private class PendingLimit(val decision: CandidateDecision.Enter, val expiresAt: Long)
-
-    private val pendingLimits = mutableListOf<PendingLimit>()
-
-    private fun publishPending() {
-        _health.update { h -> h.copy(pendingOrders = pendingLimits.map { "${it.decision.symbol} @ ${"%.6g".format(it.decision.setup.entryPrice)}" }) }
-    }
+    private fun buildPipeline() = DecisionPipeline(
+        RuleEngine(ruleConfig), config.risk, config.enabledStrategies, config.strategyParams, config.execution, config.profile,
+    )
 
     private fun now() = timeSource.now() + serverOffset
 
@@ -252,12 +313,15 @@ class TradingEngine(
                 delay(wait)
             }
         }
+        recordStartup()
         _health.update { it.copy(status = EngineStatus.RUNNING, message = "Çalışıyor", lastError = null) }
+        publishPending()
         val first = Timeframe.M15.lastCloseAtOrBefore(now())
-        runCatching { process(first, allowEntries = false) }.onFailure { problem("İlk tarama hatası: ${it.message}", it) }
+        runCatching { process(first, allowEntries = false) }.onFailure { if (it is CancellationException) throw it; problem("İlk tarama hatası: ${it.message}", it) }
         var lastProcessed = first
         var lastTimeSync = timeSource.now()
         var lastEquityUpdate = 0L
+        var lastHeartbeat = timeSource.now()
         while (scope.isActive) {
             val settled = Timeframe.M15.lastCloseAtOrBefore(now() - config.candleSettleMillis)
             if (settled > lastProcessed) {
@@ -271,12 +335,44 @@ class TradingEngine(
                 runCatching { syncServerTime() }
                 lastTimeSync = timeSource.now()
             }
+            if (timeSource.now() - lastHeartbeat >= config.heartbeatMillis) {
+                publish(_portfolio.value.copy(lastHeartbeat = now()))
+                lastHeartbeat = timeSource.now()
+            }
             if (timeSource.now() - lastEquityUpdate > 10_000L) {
                 updateEquity()
                 lastEquityUpdate = timeSource.now()
             }
             delay(1_000)
         }
+    }
+
+    /**
+     * Başlangıçta önceki "canlıyım" kaydına bakar: aradaki süre çevrimdışı olarak kaydedilir ve bu sürede açık
+     * pozisyonların stop/hedef seviyeleri aşıldıysa bildirilir (bot çalışmadığı için o anda satış yapılamamıştır;
+     * pozisyon ilk canlı fiyatla kapanır).
+     */
+    private fun recordStartup() {
+        var state = _portfolio.value
+        val now = now()
+        if (state.firstStartedAt == 0L) state = state.copy(firstStartedAt = now)
+        val last = state.lastHeartbeat
+        if (last > 0 && now - last > config.downtimeThresholdMillis) {
+            val byUser = state.stoppedByUserAt > 0 && state.stoppedByUserAt >= last - config.heartbeatMillis
+            val note = if (byUser) "Bot kullanıcı tarafından kapatılmıştı" else "Bot beklenmedik şekilde durmuş (telefon, Android ya da uygulama kapanmış olabilir)"
+            val minutes = (now - last) / 60_000
+            val missed = state.positions.mapNotNull { p ->
+                val during = candles[p.symbol]?.get(Timeframe.M15).orEmpty().filter { it.closeTime > last && it.openTime < now }
+                when {
+                    during.any { it.low <= p.stopPrice } -> "${p.symbol}: çevrimdışıyken stop (${p.stopPrice}) aşıldı, en düşük ${during.minOf { it.low }}; satış yapılamadı, ilk canlı fiyatla kapanacak"
+                    during.any { it.high >= p.targetPrice } -> "${p.symbol}: çevrimdışıyken hedef (${p.targetPrice}) görüldü; satış yapılamadı"
+                    else -> null
+                }
+            }
+            state = state.copy(downtimes = (state.downtimes + Downtime(last, now, note)).takeLast(MAX_DOWNTIMES))
+            state = PaperAccount.log(state, Decision(now, null, null, DecisionOutcome.INFO, "Bot $minutes dakika çalışmadı: $note", missed))
+        }
+        publish(state.copy(lastHeartbeat = now, stoppedByUserAt = 0))
     }
 
     private suspend fun syncServerTime() {
@@ -292,7 +388,8 @@ class TradingEngine(
         val tickers = api.tickers24h()
         universe = Scanner.selectUniverse(symbols.values.toList(), tickers, config.scanner)
         universeLoadedAt = timeSource.now()
-        val watch = (universe + "BTCUSDT" + _portfolio.value.positions.map { it.symbol }).distinct()
+        val state = _portfolio.value
+        val watch = (universe + "BTCUSDT" + state.positions.map { it.symbol } + state.pendingOrders.map { it.symbol }).distinct()
         for (symbol in watch) {
             for (tf in listOf(Timeframe.M15, Timeframe.H1, Timeframe.H4)) {
                 if (candles[symbol]?.get(tf).isNullOrEmpty()) loadHistory(symbol, tf)
@@ -323,6 +420,18 @@ class TradingEngine(
         }
     }
 
+    private fun stamp(symbol: String) = DataStamp(
+        m15Close = candles[symbol]?.get(Timeframe.M15)?.lastOrNull()?.closeTime,
+        h1Close = candles[symbol]?.get(Timeframe.H1)?.lastOrNull()?.closeTime,
+        h4Close = candles[symbol]?.get(Timeframe.H4)?.lastOrNull()?.closeTime,
+        priceTime = feed.prices.value[symbol]?.time,
+    )
+
+    private fun freshnessIssue(stamp: DataStamp, boundary: Long): String? =
+        com.spotbot.core.trading.DataFreshness.issue(stamp, boundary, now(), config.maxPriceAgeSeconds)
+
+    private enum class Mode { LIVE, OBSERVE, PAUSED }
+
     private suspend fun process(boundary: Long, allowEntries: Boolean) {
         if (timeSource.now() - universeLoadedAt > config.universeRefreshMillis) refreshUniverse()
         val watch = candles.keys.toList()
@@ -341,13 +450,30 @@ class TradingEngine(
 
         val report = scan(boundary)
         _lastScan.value = report
-        _health.update { it.copy(lastScanAt = now()) }
-        if (!allowEntries) {
-            log(Decision(now(), null, null, DecisionOutcome.INFO, "Başlangıç taraması tamamlandı; işlemler bir sonraki 15M kapanışından itibaren değerlendirilecek"))
-            return
+        val mode = when {
+            !allowEntries -> Mode.OBSERVE
+            _health.value.entriesPaused -> Mode.PAUSED
+            else -> Mode.LIVE
         }
-        if (_health.value.entriesPaused) return
-        decide(report)
+        val decisions = mutableListOf<CoinDecision>()
+        for (coin in report.coins.filter { it.symbol !in report.candidates }) {
+            val (outcome, summary) = when (coin.status) {
+                CoinStatus.ELIMINATED -> CoinOutcome.ELIMINATED to "Tarama filtresinde elendi"
+                CoinStatus.FLAGGED -> CoinOutcome.FLAGGED to "Manipülasyon riski işareti"
+                else -> CoinOutcome.NOT_SELECTED to "Ön puan ${coin.preScore}: en iyi ${config.scanner.topCandidates} aday arasında değil (ya da puan ≤ 0)"
+            }
+            decisions += CoinDecision(coin.symbol, outcome, summary, coin.reasons, coin.preScore, stamp(coin.symbol))
+        }
+        for (symbol in report.candidates) decisions += decide(symbol, report, boundary, mode)
+        val stale = decisions.filter { it.outcome == CoinOutcome.STALE_DATA }.map { it.symbol }
+        val scanLog = ScanLog(now(), boundary, config.profile, report.market.allowsLongs, report.market.reasons, mode == Mode.PAUSED, decisions)
+        runCatching { decisionLog.append(scanLog) }.onFailure { _health.update { h -> h.copy(lastError = "Karar günlüğü yazılamadı: ${it.message}") } }
+        _scanLogs.update { (it + scanLog).takeLast(SCAN_LOGS_IN_MEMORY) }
+        _health.update { it.copy(lastScanAt = now(), staleSymbols = stale) }
+        if (mode == Mode.OBSERVE) {
+            log(Decision(now(), null, null, DecisionOutcome.INFO, "Başlangıç taraması tamamlandı; işlemler bir sonraki 15M kapanışından itibaren değerlendirilecek"))
+        }
+        refreshRisk(report.market.allowsLongs)
     }
 
     private suspend fun scan(boundary: Long): ScanReport {
@@ -368,149 +494,212 @@ class TradingEngine(
 
     private fun costsFor(symbol: String): CostModel {
         val spread = feed.prices.value[symbol]?.spreadPercent?.takeIf { !it.isNaN() }?.let { it / 200 } ?: config.fallbackHalfSpread
-        return CostModel(symbols[symbol]?.takerFee ?: 0.0005, config.slippage, spread)
+        val info = symbols[symbol]
+        return CostModel(info?.takerFee ?: 0.0005, config.slippage, spread, info?.makerFee ?: 0.0)
     }
 
-    private fun decide(report: ScanReport) {
-        for (symbol in report.candidates) {
-            val mtf = analysis(symbol)?.takeIf { it.isValid } ?: continue
-            val state = _portfolio.value
-            val equity = currentEquity(state)
-            val context = DecisionContext(
-                now = now(),
-                equity = equity,
-                availableQuote = state.cash,
-                openPositions = state.positions + pendingLimits.map { it.decision.asPendingPosition(now()) },
-                dailyPnlPercent = (equity - state.dayStartEquity) / state.dayStartEquity * 100,
-                market = report.market,
-                btc = analysis("BTCUSDT"),
-                hourlyCloses = candles.mapValues { (_, byTf) -> byTf[Timeframe.H1].orEmpty().takeLast(config.risk.correlationWindowBars + 1).map { it.close }.toDoubleArray() },
-                closedTrades = state.closedTrades,
-            )
-            val candidate = Candidate(mtf, report.coins.firstOrNull { it.symbol == symbol }, symbols[symbol], costsFor(symbol))
-            when (val decision = pipeline.evaluate(candidate, context)) {
-                is CandidateDecision.NoSetup -> log(
-                    Decision(now(), symbol, null, DecisionOutcome.NO_SETUP, "$symbol: uygun kurulum yok", decision.reasons),
+    private fun hourlyCloses(): Map<String, DoubleArray> =
+        candles.mapValues { (_, byTf) -> byTf[Timeframe.H1].orEmpty().takeLast(config.risk.correlationWindowBars + 1).map { it.close }.toDoubleArray() }
+
+    private suspend fun decide(symbol: String, report: ScanReport, boundary: Long, mode: Mode): CoinDecision {
+        val stamp = stamp(symbol)
+        val scan = report.coins.firstOrNull { it.symbol == symbol }
+        val mtf = analysis(symbol)?.takeIf { it.isValid }
+            ?: return CoinDecision(symbol, CoinOutcome.STALE_DATA, "Analiz için yeterli mum verisi yok", preScore = scan?.preScore, data = stamp)
+        val state = _portfolio.value
+        val equity = currentEquity(state)
+        val context = DecisionContext(
+            now = now(),
+            equity = equity,
+            availableQuote = state.availableCash,
+            openPositions = state.positions + state.pendingOrders.map { it.asPosition() },
+            dailyPnlPercent = (equity - state.dayStartEquity) / state.dayStartEquity * 100,
+            market = report.market,
+            btc = analysis("BTCUSDT"),
+            hourlyCloses = hourlyCloses(),
+            closedTrades = state.closedTrades,
+        )
+        val dataIssue = freshnessIssue(stamp, boundary)
+        val decision = pipeline.evaluate(Candidate(mtf, scan, symbols[symbol], costsFor(symbol), dataIssue), context)
+        val checks = DecisionLogs.strategyChecks(decision.evaluations)
+        return when (decision) {
+            is CandidateDecision.NoSetup -> {
+                log(Decision(now(), symbol, null, DecisionOutcome.NO_SETUP, "$symbol: uygun kurulum yok", decision.reasons))
+                CoinDecision(symbol, CoinOutcome.NO_SETUP, "Uygun kurulum bulunamadı", decision.reasons, scan?.preScore, stamp, checks)
+            }
+            is CandidateDecision.Reject -> {
+                val failures = decision.report.mandatoryFailures.map { "${it.id} ${it.title}: ${it.detail}" }
+                log(Decision(now(), symbol, decision.setup.strategy, DecisionOutcome.REJECTED, "$symbol: ${decision.setup.strategy.title} kurulumu reddedildi", failures, decision.report.qualityScore))
+                val onlyData = decision.report.mandatoryFailures.all { it.id == "Z17" }
+                CoinDecision(
+                    symbol, if (onlyData) CoinOutcome.STALE_DATA else CoinOutcome.REJECTED,
+                    "${decision.setup.strategy.title} kurulumu zorunlu kurallarca reddedildi", failures, scan?.preScore, stamp, checks,
                 )
-                is CandidateDecision.Reject -> log(
-                    Decision(
-                        now(), symbol, decision.setup.strategy, DecisionOutcome.REJECTED,
-                        "$symbol: ${decision.setup.strategy.title} kurulumu reddedildi",
-                        decision.report.mandatoryFailures.map { "${it.id} ${it.title}: ${it.detail}" },
-                        decision.report.qualityScore,
-                    ),
-                )
-                is CandidateDecision.Enter -> enter(decision)
+            }
+            is CandidateDecision.Enter -> when (mode) {
+                Mode.OBSERVE -> CoinDecision(symbol, CoinOutcome.OBSERVE_ONLY, "Kurallar geçti ama başlangıç taramasında işlem açılmaz", emptyList(), scan?.preScore, stamp, checks)
+                Mode.PAUSED -> CoinDecision(symbol, CoinOutcome.PAUSED, "Kurallar geçti ama yeni işlemler duraklatılmış", emptyList(), scan?.preScore, stamp, checks)
+                Mode.LIVE -> {
+                    val (outcome, summary, reasons) = enter(decision)
+                    CoinDecision(symbol, outcome, summary, reasons, scan?.preScore, stamp, checks)
+                }
             }
         }
     }
 
-    private fun enter(decision: CandidateDecision.Enter) {
+    private suspend fun enter(decision: CandidateDecision.Enter): Triple<CoinOutcome, String, List<String>> {
         val setup = decision.setup
+        val info = symbols[setup.symbol]
+        val quote = feed.prices.value[setup.symbol]
+        val fail = { reason: String ->
+            log(Decision(now(), setup.symbol, setup.strategy, DecisionOutcome.REJECTED, "${setup.symbol}: emir gerçekleşmedi", listOf(reason), decision.report.qualityScore))
+            Triple(CoinOutcome.ENTRY_FAILED, "Kurallar geçti ama emir gerçekleşmedi", listOf(reason))
+        }
         if (config.execution.entryMode == EntryMode.LIMIT) {
-            pendingLimits += PendingLimit(decision, now() + config.execution.limitEntryMaxBars * Timeframe.M15.millis)
+            val limit = OrderRules.roundPrice(setup.entryPrice, OrderSide.BUY, info)
+            val qty = OrderRules.roundQuantity(decision.sizing.quantity, info)
+            OrderRules.validate(OrderSide.BUY, OrderType.LIMIT, qty, limit, info, quote?.ask)?.let { return fail(it) }
+            if (limit * qty * (1 + costsFor(setup.symbol).makerFee) > _portfolio.value.availableCash) return fail("Bekleyen emirler sonrası bakiye yetersiz")
+            val order = PendingOrder(
+                setup, limit, qty, decision.sizing.riskAmount, decision.report.qualityScore, decision.rationale, decision.report,
+                now(), now() + config.execution.limitEntryMaxBars * Timeframe.M15.millis,
+            )
+            publish(
+                PaperAccount.log(
+                    _portfolio.value.copy(pendingOrders = _portfolio.value.pendingOrders + order),
+                    Decision(now(), setup.symbol, setup.strategy, DecisionOutcome.INFO, "${setup.symbol}: limit alış emri verildi @ ${"%.6g".format(limit)} (${config.execution.limitEntryMaxBars} mum geçerli)", listOf(decision.rationale.whyEntry), decision.report.qualityScore),
+                ),
+            )
             publishPending()
-            log(
-                Decision(
-                    now(), setup.symbol, setup.strategy, DecisionOutcome.INFO,
-                    "${setup.symbol}: limit alış emri verildi @ ${"%.6g".format(setup.entryPrice)} (${config.execution.limitEntryMaxBars} mum geçerli)",
-                    listOf(decision.rationale.whyEntry), decision.report.qualityScore,
-                ),
-            )
-            return
+            return Triple(CoinOutcome.ORDER_PLACED, "Limit alış emri verildi @ ${"%.6g".format(limit)}", emptyList())
         }
-        val ask = feed.prices.value[setup.symbol]?.ask
-        val drift = ask?.let { (it / setup.entryPrice - 1) * 100 }
-        if (ask == null || ask <= setup.stopPrice || drift!! > config.maxEntryDriftPercent) {
-            log(
-                Decision(
-                    now(), setup.symbol, setup.strategy, DecisionOutcome.REJECTED, "${setup.symbol}: giriş fiyatı uygun değil",
-                    listOf(if (ask == null) "Canlı fiyat yok" else "Anlık alış %.6g, sinyal %.6g (kayma %%%.2f)".format(ask, setup.entryPrice, drift)),
-                    decision.report.qualityScore,
-                ),
-            )
-            return
-        }
+        if (quote == null) return fail("Canlı fiyat yok")
+        val age = (now() - quote.time) / 1000
+        if (age > config.maxPriceAgeSeconds) return fail("Canlı fiyat $age sn eski")
         val costs = costsFor(setup.symbol)
-        val updated = PaperAccount.open(
-            _portfolio.value, setup, decision.sizing.quantity, ask, costs, decision.sizing.riskAmount,
-            decision.report.qualityScore, decision.rationale, decision.report, now(),
-        )
+        val book = runCatching { api.orderBook(setup.symbol, 50) }.getOrNull()
+        val result = if (book != null) FillModel.walkBook(OrderSide.BUY, decision.sizing.quantity, book, config.maxBookSlippage, costs, info)
+        else FillModel.marketFromQuote(OrderSide.BUY, decision.sizing.quantity, quote.ask, costs, info)
+        val fill = when (result) {
+            is FillResult.Rejected -> return fail(result.reason)
+            is FillResult.Filled -> result.fill
+        }
+        val drift = (fill.averagePrice / setup.entryPrice - 1) * 100
+        if (drift > config.maxEntryDriftPercent) return fail("Ortalama dolum %.6g, sinyal %.6g (kayma %%%.2f > %%%.2f); emir gönderilmedi".format(fill.averagePrice, setup.entryPrice, drift, config.maxEntryDriftPercent))
+        if (fill.averagePrice <= setup.stopPrice) return fail("Dolum fiyatı stopun altında")
+        val before = _portfolio.value
+        val updated = PaperAccount.openWithFill(before, setup, fill, decision.sizing.riskAmount, decision.report.qualityScore, decision.rationale, decision.report, now())
         publish(updated)
-        updated.positions.lastOrNull()?.let { _events.tryEmit(EngineEvent.Opened(it)) }
+        val opened = updated.positions.size > before.positions.size
+        if (!opened) return Triple(CoinOutcome.ENTRY_FAILED, "Bakiye yetersiz", listOf(updated.decisions.last().details.joinToString()))
+        updated.positions.last().let { _events.tryEmit(EngineEvent.Opened(it)) }
+        refreshRisk()
+        return Triple(CoinOutcome.OPENED, "İşlem açıldı @ ${"%.6g".format(fill.averagePrice)}${if (fill.partial) " (kısmi: ${fill.quantity}/${fill.requestedQuantity})" else ""}", listOfNotNull(fill.note.takeIf { it.isNotEmpty() }))
     }
 
     private fun onPrices(prices: Map<String, BookTicker>) {
-        fillPendingLimits(prices)
+        fillPendingOrders(prices)
         for (position in _portfolio.value.positions.toList()) {
-            val bid = prices[position.symbol]?.bid ?: continue
-            if (bid <= 0) continue
-            val actions = ExitManager.onPrice(position, bid, now(), config.execution)
+            val quote = prices[position.symbol] ?: continue
+            if (quote.bid <= 0) continue
+            val actions = ExitManager.onPrice(position, quote.bid, now(), config.execution)
             if (actions.isEmpty()) continue
-            val before = _portfolio.value
-            val updated = ExitManager.apply(before, position.id, actions, costsFor(position.symbol), now())
-            publish(updated)
-            if (updated.closedTrades.size > before.closedTrades.size) _events.tryEmit(EngineEvent.Closed(updated.closedTrades.last()))
+            actions.forEach { exit(position, it, quote) }
         }
     }
 
-    /** Limit alış emri: en iyi satış fiyatı limitin altına inerse emir dolmuş sayılır (maker). */
-    private fun fillPendingLimits(prices: Map<String, BookTicker>) {
-        if (pendingLimits.isEmpty()) return
-        val iterator = pendingLimits.iterator()
-        var changed = false
-        while (iterator.hasNext()) {
-            val pending = iterator.next()
-            val setup = pending.decision.setup
-            val ask = prices[setup.symbol]?.ask
+    /** Çıkış eylemini en iyi alış fiyatı ve oradaki miktarla (likidite sınırı) gerçekleştirir. */
+    private fun exit(position: Position, action: ExitAction, quote: BookTicker) {
+        val before = _portfolio.value
+        if (before.positions.none { it.id == position.id }) return
+        val costs = costsFor(position.symbol)
+        val info = symbols[position.symbol]
+        val updated = ExitManager.applyWithFills(before, position.id, listOf(action), now()) { p, a, requested ->
+            val maker = (a as? ExitAction.Close)?.maker ?: (a as? ExitAction.PartialClose)?.maker ?: false
+            val price = if (maker) ((a as? ExitAction.Close)?.price ?: (a as ExitAction.PartialClose).price) else quote.bid * (1 - costs.slippage)
+            val available = if (quote.bidQty > 0) quote.bidQty else requested
+            val qty = OrderRules.roundQuantity(minOf(requested, available), info).let { if (requested - it < 1e-12 || it >= p.quantity) minOf(requested, p.quantity) else it }
+            if (qty <= 0) return@applyWithFills null
+            // Kalanın tamamı satılıyorsa asgari tutar engeli uygulanmaz (aksi halde pozisyon kapanamaz).
+            if (qty < p.quantity && OrderRules.validate(OrderSide.SELL, OrderType.MARKET, qty, price, info) != null) return@applyWithFills null
+            val note = if (qty < requested) "Kısmi gerçekleşme: en iyi alış seviyesinde yalnız $qty adet vardı" else ""
+            Fill(qty, price, price * qty * (if (maker) costs.makerFee else costs.takerFee), maker, requested, note)
+        }
+        if (updated == before) return
+        publish(updated)
+        if (updated.closedTrades.size > before.closedTrades.size) _events.tryEmit(EngineEvent.Closed(updated.closedTrades.last()))
+        refreshRisk()
+    }
+
+    /** Limit alış emri: en iyi satış fiyatı limitin altına inerse o seviyedeki miktar kadar dolar (maker). */
+    private fun fillPendingOrders(prices: Map<String, BookTicker>) {
+        val pending = _portfolio.value.pendingOrders
+        if (pending.isEmpty()) return
+        for (order in pending) {
+            val quote = prices[order.symbol]
+            val state = _portfolio.value
             when {
-                now() > pending.expiresAt -> {
-                    iterator.remove()
-                    changed = true
-                    log(Decision(now(), setup.symbol, setup.strategy, DecisionOutcome.INFO, "${setup.symbol}: limit emir dolmadı, iptal edildi"))
-                }
-                ask != null && ask > 0 && ask <= setup.stopPrice -> {
-                    iterator.remove()
-                    changed = true
-                    log(Decision(now(), setup.symbol, setup.strategy, DecisionOutcome.INFO, "${setup.symbol}: fiyat stopun altına indi, limit emir iptal edildi"))
-                }
-                ask != null && ask > 0 && ask < setup.entryPrice -> {
-                    iterator.remove()
-                    changed = true
-                    val updated = PaperAccount.open(
-                        _portfolio.value, setup, pending.decision.sizing.quantity, setup.entryPrice, costsFor(setup.symbol),
-                        pending.decision.sizing.riskAmount, pending.decision.report.qualityScore, pending.decision.rationale,
-                        pending.decision.report, now(), maker = true,
-                    )
+                now() > order.expiresAt -> publish(PaperAccount.log(state.copy(pendingOrders = state.pendingOrders - order), Decision(now(), order.symbol, order.setup.strategy, DecisionOutcome.INFO, "${order.symbol}: limit emir ${config.execution.limitEntryMaxBars} mum içinde dolmadı, iptal edildi")))
+                quote != null && quote.ask > 0 && quote.ask <= order.setup.stopPrice -> publish(PaperAccount.log(state.copy(pendingOrders = state.pendingOrders - order), Decision(now(), order.symbol, order.setup.strategy, DecisionOutcome.INFO, "${order.symbol}: fiyat stopun altına indi, limit emir iptal edildi")))
+                quote != null && quote.ask > 0 && quote.ask < order.limitPrice -> {
+                    val info = symbols[order.symbol]
+                    val qty = OrderRules.roundQuantity(if (quote.askQty > 0) minOf(order.quantity, quote.askQty) else order.quantity, info)
+                    val invalid = OrderRules.validate(OrderSide.BUY, OrderType.LIMIT, qty, order.limitPrice, info)
+                    if (invalid != null) {
+                        // Bu fiyattaki miktar asgari emri karşılamıyor; emir beklemeye devam eder.
+                        continue
+                    }
+                    val costs = costsFor(order.symbol)
+                    val note = if (qty < order.quantity) "Kısmi gerçekleşme: limit seviyesinde yalnız $qty adet vardı; kalan iptal edildi" else "Limit emir doldu"
+                    val fill = Fill(qty, order.limitPrice, order.limitPrice * qty * costs.makerFee, true, order.quantity, note)
+                    val updated = PaperAccount.openWithFill(state, order.setup, fill, order.riskAmount, order.qualityScore, order.rationale, order.report, now(), fromPending = order)
                     publish(updated)
-                    updated.positions.lastOrNull()?.let { _events.tryEmit(EngineEvent.Opened(it)) }
+                    if (updated.positions.size > state.positions.size) _events.tryEmit(EngineEvent.Opened(updated.positions.last()))
                 }
             }
         }
-        if (changed) publishPending()
+        if (_portfolio.value.pendingOrders != pending) {
+            publishPending()
+            refreshRisk()
+        }
+    }
+
+    private fun publishPending() {
+        _health.update { h -> h.copy(pendingOrders = _portfolio.value.pendingOrders.map { "${it.symbol} @ ${"%.6g".format(it.limitPrice)}" }) }
     }
 
     private suspend fun checkInvalidations() {
         for (position in _portfolio.value.positions.toList()) {
             val last = candles[position.symbol]?.get(Timeframe.H1)?.lastOrNull() ?: continue
             if (ExitRules.onHourlyClose(position, last.close)) {
-                val bid = feed.prices.value[position.symbol]?.bid ?: runCatching { api.bookTicker(position.symbol).bid }.getOrNull() ?: last.close
-                closeAt(position, bid, ExitReason.INVALIDATION, "1H kapanış (${last.close}) geçersizlik seviyesinin (${position.invalidationPrice}) altında")
+                val quote = feed.prices.value[position.symbol] ?: runCatching { api.bookTicker(position.symbol) }.getOrNull() ?: continue
+                exit(position, ExitAction.Close(quote.bid, ExitReason.INVALIDATION, false, "1H kapanış (${last.close}) geçersizlik seviyesinin (${position.invalidationPrice}) altında"), quote)
             }
         }
-    }
-
-    private fun closeAt(position: Position, bid: Double, reason: ExitReason, note: String) {
-        val before = _portfolio.value
-        if (before.positions.none { it.id == position.id }) return
-        val updated = PaperAccount.close(before, position.id, bid, reason, note, costsFor(position.symbol), now())
-        publish(updated)
-        updated.closedTrades.lastOrNull()?.let { _events.tryEmit(EngineEvent.Closed(it)) }
     }
 
     private fun currentEquity(state: PortfolioState): Double {
         val bids = feed.prices.value.mapValues { it.value.bid }
         return state.equity(bids) { costsFor(it) }
+    }
+
+    private fun correlatedPairs(state: PortfolioState): List<String> {
+        val closes = hourlyCloses()
+        val symbols = (state.positions.map { it.symbol } + state.pendingOrders.map { it.symbol }).distinct()
+        return symbols.flatMapIndexed { i, a ->
+            symbols.drop(i + 1).mapNotNull { b ->
+                val ca = closes[a] ?: return@mapNotNull null
+                val cb = closes[b] ?: return@mapNotNull null
+                val corr = Indicators.returnCorrelation(ca, cb, config.risk.correlationWindowBars)
+                if (corr >= config.risk.correlationThreshold) "%s ~ %s (%.2f)".format(a.removeSuffix("USDT"), b.removeSuffix("USDT"), corr) else null
+            }
+        }
+    }
+
+    private fun refreshRisk(marketAllowsLongs: Boolean? = _lastScan.value?.market?.allowsLongs) {
+        val state = _portfolio.value
+        val equity = currentEquity(state)
+        _riskStatus.value = RiskStatus.of(state, equity, config.risk, config.profile, _health.value.entriesPaused, marketAllowsLongs, correlatedPairs(state))
     }
 
     private fun updateEquity() {
@@ -520,6 +709,9 @@ class TradingEngine(
         state = PaperAccount.rollDay(state, now(), equity)
         state = PaperAccount.recordEquity(state, now(), equity)
         if (state != _portfolio.value) publish(state, persist = state.equityHistory != _portfolio.value.equityHistory || state.dayStart != _portfolio.value.dayStart)
+        val from = maxOf(now() - DAY, state.firstStartedAt.takeIf { it > 0 } ?: now())
+        _health.update { it.copy(uptime24hPercent = Reliability.uptimePercent(state.downtimes, from, now()), lastDowntime = state.downtimes.lastOrNull()) }
+        refreshRisk()
     }
 
     private fun log(decision: Decision) = publish(PaperAccount.log(_portfolio.value, decision))
@@ -533,5 +725,11 @@ class TradingEngine(
         _health.update { it.copy(lastError = message) }
         _events.tryEmit(EngineEvent.Problem(message))
         log(Decision(now(), null, null, DecisionOutcome.INFO, message, listOfNotNull(error?.javaClass?.simpleName)))
+    }
+
+    companion object {
+        const val SCAN_LOGS_IN_MEMORY = 48
+        private const val MAX_DOWNTIMES = 100
+        private const val DAY = 24 * 60 * 60_000L
     }
 }

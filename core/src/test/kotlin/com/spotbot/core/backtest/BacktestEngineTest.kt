@@ -59,7 +59,10 @@ class BacktestEngineTest {
         val limitConfig = config.copy(execution = com.spotbot.core.trading.ExecutionConfig(entryMode = com.spotbot.core.trading.EntryMode.LIMIT), shadowAnalysis = true)
         val limit = BacktestEngine(limitConfig).run(data, info)
         limit.closedTrades.forEach { t ->
-            assertEquals(t.position.setup.entryPrice, t.position.entryPrice, 0.0)
+            // Limit fiyatı borsanın fiyat adımına aşağı yuvarlanır (alış emri).
+            val expected = com.spotbot.core.trading.OrderRules.roundPrice(t.position.setup.entryPrice, com.spotbot.core.trading.OrderSide.BUY, info.getValue("NEARUSDT"))
+            assertEquals(expected, t.position.entryPrice, 0.0)
+            assertTrue(t.position.entryPrice <= t.position.setup.entryPrice)
             assertEquals(0.0, t.position.entryFee, 0.0)
         }
         val shadow = limit.shadow!!

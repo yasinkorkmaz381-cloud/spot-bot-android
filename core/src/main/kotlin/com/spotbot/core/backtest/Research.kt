@@ -140,3 +140,46 @@ object WalkForward {
 
 fun BacktestConfig.with(variant: Variant, start: Long, end: Long) =
     copy(startTime = start, endTime = end, enabledStrategies = variant.strategies, execution = variant.execution)
+
+@Serializable
+data class ProfileComparison(
+    val profile: com.spotbot.core.trading.StrategyProfile,
+    val full: RunSummary,
+    /** Dönemin ilk yarısı (seçim/ayar için kullanılabilecek kısım). */
+    val firstHalf: RunSummary,
+    /** Dönemin ikinci yarısı (görülmemiş dönem gibi değerlendirilir). */
+    val secondHalf: RunSummary,
+    val partialFills: Int,
+    val rejectedOrders: Int,
+)
+
+/**
+ * Strateji profillerini **aynı koşullarda** karşılaştırır: aynı veri, aynı dönem, aynı maliyet, risk ve emir
+ * modeli. Yalnız profil değişir. Ayrıca dönem ikiye bölünür; bir profil yalnız iki yarıda da tutarlıysa anlamlıdır.
+ */
+object StrategyComparison {
+    fun run(
+        base: BacktestConfig,
+        data: Map<String, HistoricalDataset>,
+        info: Map<String, SymbolInfo>,
+        profiles: List<com.spotbot.core.trading.StrategyProfile> = com.spotbot.core.trading.StrategyProfile.entries,
+        runner: (List<() -> BacktestReport>) -> List<BacktestReport> = { jobs -> jobs.map { it() } },
+        onProgress: (Double) -> Unit = {},
+    ): List<ProfileComparison> {
+        val split = base.startTime + (base.endTime - base.startTime) / 2
+        val jobs = profiles.flatMap { profile ->
+            val config = base.copy(profile = profile)
+            listOf(
+                { BacktestEngine(config).run(data, info) },
+                { BacktestEngine(config.copy(endTime = split)).run(data, info) },
+                { BacktestEngine(config.copy(startTime = split)).run(data, info) },
+            )
+        }
+        var done = 0
+        val reports = runner(jobs.map { job -> { job().also { synchronized(this) { done++; onProgress(done.toDouble() / jobs.size) } } } })
+        return profiles.mapIndexed { i, profile ->
+            val (full, first, second) = Triple(reports[3 * i], reports[3 * i + 1], reports[3 * i + 2])
+            ProfileComparison(profile, full.summary(), first.summary(), second.summary(), full.partialFills, full.rejectedOrders.values.sum())
+        }
+    }
+}

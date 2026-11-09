@@ -115,4 +115,58 @@ class TradingEngineTest {
         assertEquals(state.closedTrades, store.load()!!.closedTrades)
         engine.stop()
     }
+
+    @Test
+    fun `every scanned coin gets a decision record with data timestamps`() = runBlocking {
+        val engine = engine(FakeApi(candles, now))
+        engine.start()
+        val log = withTimeout(20_000) { engine.scanLogs.first { it.isNotEmpty() } }.last()
+        val report = engine.lastScan.value!!
+
+        assertEquals(report.coins.map { it.symbol }.toSet(), log.coins.map { it.symbol }.toSet())
+        log.coins.forEach { coin ->
+            assertTrue("${coin.symbol} veri zamanı eksik", coin.data.m15Close != null && coin.data.h1Close != null && coin.data.h4Close != null)
+            assertTrue(coin.summary.isNotBlank())
+        }
+        // İlk tarama gözlem amaçlıdır; hiçbir coin için işlem açılmaz.
+        assertTrue(log.coins.none { it.outcome == com.spotbot.core.trading.CoinOutcome.OPENED })
+        engine.stop()
+    }
+
+    @Test
+    fun `pending limit order survives a restart and fills as maker at the limit`() = runBlocking {
+        val price = candles.last().close
+        val setup = TestData.setup("BTCUSDT", entry = price * 1.01, stop = price * 0.97, target = price * 1.06)
+        val order = com.spotbot.core.trading.PendingOrder(
+            setup, limitPrice = price * 1.01, quantity = 0.001, riskAmount = 3.0, qualityScore = 55.0,
+            rationale = TradeRationale("", "", "", "", "", ""), report = null, placedAt = now - 60_000, expiresAt = now + 3_600_000,
+        )
+        val store = InMemoryStateStore(PortfolioState.create(1_000.0).copy(pendingOrders = listOf(order)))
+        val engine = engine(FakeApi(candles, now), store)
+        engine.start()
+        val state = withTimeout(20_000) { engine.portfolio.first { it.positions.isNotEmpty() } }
+
+        assertTrue(state.pendingOrders.isEmpty())
+        with(state.positions.single()) {
+            assertEquals(price * 1.01, entryPrice, 1e-9)
+            assertEquals(0.0, entryFee, 0.0)
+            assertEquals(0.001, quantity, 1e-12)
+        }
+        engine.stop()
+    }
+
+    @Test
+    fun `downtime since the last heartbeat is recorded on start`() = runBlocking {
+        val store = InMemoryStateStore(PortfolioState.create(1_000.0).copy(lastHeartbeat = now - 3_600_000, firstStartedAt = now - 7_200_000))
+        val engine = engine(FakeApi(candles, now), store)
+        engine.start()
+        val state = withTimeout(20_000) { engine.portfolio.first { it.downtimes.isNotEmpty() } }
+
+        val downtime = state.downtimes.single()
+        assertEquals(now - 3_600_000, downtime.from)
+        assertTrue(downtime.note.contains("beklenmedik"))
+        assertTrue(state.decisions.any { it.summary.startsWith("Bot 60 dakika çalışmadı") })
+        engine.stop()
+        assertTrue(store.load()!!.stoppedByUserAt > 0)
+    }
 }

@@ -56,6 +56,12 @@ data class BacktestConfig(
     val execution: ExecutionConfig = ExecutionConfig(),
     /** Gölge işlem analizi (her kurulumun bağımsız sonucu ve kural katkısı). */
     val shadowAnalysis: Boolean = false,
+    val profile: com.spotbot.core.trading.StrategyProfile = com.spotbot.core.trading.StrategyProfile.ADAPTIVE,
+    /**
+     * Bir emir, 15M mumun USDT hacminin en fazla bu payı kadar dolabilir; fazlası kısmi gerçekleşir.
+     * Geçmiş emir defteri olmadığından likidite bu yolla sınırlanır.
+     */
+    val participationRate: Double = 0.1,
 )
 
 /** Bir paritenin backtest için tarihsel mumları. */
@@ -105,6 +111,11 @@ data class BacktestReport(
     /** Limit giriş emri verilip dolmayan kurulum sayısı. */
     val limitOrdersNotFilled: Int = 0,
     val shadow: ShadowReport? = null,
+    /** Kısmi gerçekleşen giriş/çıkış emri sayısı (likidite sınırı). */
+    val partialFills: Int = 0,
+    /** Borsa kuralları ya da likidite nedeniyle gerçekleşmeyen emirler (neden → sayı). */
+    val rejectedOrders: Map<String, Int> = emptyMap(),
+    val profile: com.spotbot.core.trading.StrategyProfile = com.spotbot.core.trading.StrategyProfile.ADAPTIVE,
 )
 
 /** Tarihsel veriyi MEXC'den indirir (15M, 1H, 4H; BTCUSDT her zaman eklenir). */
@@ -147,7 +158,9 @@ class BacktestEngine(private val config: BacktestConfig, private val ruleConfig:
         symbolInfo: Map<String, SymbolInfo>,
         onProgress: (Double) -> Unit = {},
     ): BacktestReport {
-        val pipeline = DecisionPipeline(RuleEngine(ruleConfig), config.risk, config.enabledStrategies, config.strategyParams, config.execution)
+        val pipeline = DecisionPipeline(RuleEngine(ruleConfig), config.risk, config.enabledStrategies, config.strategyParams, config.execution, config.profile)
+        var partialFills = 0
+        val rejectedOrders = HashMap<String, Int>()
         val execution = config.execution
         val maker = execution.entryMode == EntryMode.LIMIT
         var limitNotFilled = 0
@@ -182,33 +195,52 @@ class BacktestEngine(private val config: BacktestConfig, private val ruleConfig:
         timeline.forEachIndexed { step, t ->
             val bars = tradable.associateWith { s -> series.getValue(s).first.let { m15 -> m15.indexAtOrBefore(t).takeIf { it >= 0 && m15.candles[it].closeTime == t }?.let(m15.candles::get) } }
 
-            // 1) Bekleyen girişler: piyasa emri bu mumun açılışında; limit emir fiyat limitin altına inerse dolar.
+            // 1) Bekleyen girişler: piyasa emri bu mumun açılışında; limit emir yalnız fiyat limitin altında işlem görürse.
+            //    Her iki durumda da mum hacminin [participationRate] payıyla sınırlı ve borsa emir kurallarına tabi.
             val stillPending = mutableListOf<Pending>()
             for (p in pending) {
                 val bar = bars[p.decision.symbol] ?: continue
                 val setup = p.decision.setup
                 if (bar.open <= setup.stopPrice || state.positions.any { it.symbol == setup.symbol }) continue
-                val reference = if (maker) setup.entryPrice else bar.open
-                val filled = !maker || bar.low < setup.entryPrice
-                if (!filled) {
-                    p.barsLeft--
-                    if (p.barsLeft > 0) stillPending += p else limitNotFilled++
-                    continue
+                val info = symbolInfo[setup.symbol]
+                val limit = com.spotbot.core.trading.OrderRules.roundPrice(setup.entryPrice, com.spotbot.core.trading.OrderSide.BUY, info)
+                val unitCost = if (maker) limit * (1 + p.costs.makerFee) else p.costs.buyPrice(bar.open) * (1 + p.costs.takerFee)
+                val qty = minOf(p.decision.sizing.quantity, state.availableCash / unitCost)
+                val result = if (maker) {
+                    com.spotbot.core.trading.FillModel.limitFromBar(com.spotbot.core.trading.OrderSide.BUY, qty, limit, bar.low, bar.high, bar.quoteVolume, config.participationRate, p.costs, info)
+                } else {
+                    com.spotbot.core.trading.FillModel.marketFromBar(com.spotbot.core.trading.OrderSide.BUY, qty, bar.open, bar.quoteVolume, config.participationRate, p.costs, info)
                 }
-                val unitCost = if (maker) reference * (1 + p.costs.makerFee) else p.costs.buyPrice(reference) * (1 + p.costs.takerFee)
-                val qty = minOf(p.decision.sizing.quantity, state.cash / unitCost)
-                if (qty <= 0) continue
-                state = PaperAccount.open(
-                    state, setup, qty, reference, p.costs, p.decision.sizing.riskAmount * qty / p.decision.sizing.quantity,
-                    p.decision.report.qualityScore, p.decision.rationale, null, bar.openTime, maker,
-                )
+                when (result) {
+                    is com.spotbot.core.trading.FillResult.Rejected -> {
+                        if (maker && result.reason.startsWith("Fiyat limit")) {
+                            p.barsLeft--
+                            if (p.barsLeft > 0) stillPending += p else limitNotFilled++
+                        } else {
+                            rejectedOrders.merge(result.reason.substringBefore(" (").take(60), 1, Int::plus)
+                        }
+                    }
+                    is com.spotbot.core.trading.FillResult.Filled -> {
+                        if (result.fill.partial) partialFills++
+                        state = PaperAccount.openWithFill(
+                            state, setup, result.fill.copy(requestedQuantity = p.decision.sizing.quantity), p.decision.sizing.riskAmount,
+                            p.decision.report.qualityScore, p.decision.rationale, null, bar.openTime,
+                        )
+                    }
+                }
             }
             pending = stillPending
 
-            // 2) Açık pozisyonlarda mum içi stop / hedef / kısmi kâr / başa baş / süre kontrolü (ihtiyatlı sıra).
+            // 2) Açık pozisyonlarda mum içi stop / hedef / kısmi kâr / başa baş / süre kontrolü (ihtiyatlı sıra);
+            //    çıkış emirleri de mum hacmiyle sınırlı (yetmezse kalan bir sonraki mumda satılır).
             for (position in state.positions.toList()) {
                 val bar = bars[position.symbol] ?: continue
-                state = ExitManager.apply(state, position.id, ExitManager.onBar(position, bar, execution), costsBySymbol.getValue(position.symbol), t)
+                val actions = ExitManager.onBar(position, bar, execution)
+                if (actions.isEmpty()) continue
+                val costs = costsBySymbol.getValue(position.symbol)
+                state = ExitManager.applyWithFills(state, position.id, actions, t) { p, action, requested ->
+                    barExitFill(p, action, requested, bar, costs, symbolInfo[p.symbol])?.also { if (it.partial) partialFills++ }
+                }
             }
 
             // 3) 1H kapanışında yapısal bozulma kontrolü.
@@ -216,11 +248,13 @@ class BacktestEngine(private val config: BacktestConfig, private val ruleConfig:
                 for (position in state.positions.toList()) {
                     val h1 = series.getValue(position.symbol).second
                     val i = h1.indexAtOrBefore(t)
-                    if (i >= 0 && h1.candles[i].closeTime == t && ExitRules.onHourlyClose(position, h1.close[i])) {
-                        state = PaperAccount.close(
-                            state, position.id, h1.close[i], ExitReason.INVALIDATION,
-                            "1H kapanış geçersizlik seviyesinin altında", costsBySymbol.getValue(position.symbol), t,
-                        )
+                    val bar = bars[position.symbol]
+                    if (i >= 0 && h1.candles[i].closeTime == t && bar != null && ExitRules.onHourlyClose(position, h1.close[i])) {
+                        val action = com.spotbot.core.trading.ExitAction.Close(h1.close[i], ExitReason.INVALIDATION, false, "1H kapanış geçersizlik seviyesinin altında")
+                        val costs = costsBySymbol.getValue(position.symbol)
+                        state = ExitManager.applyWithFills(state, position.id, listOf(action), t) { p, a, requested ->
+                            barExitFill(p, a, requested, bar, costs, symbolInfo[p.symbol])
+                        }
                     }
                 }
             }
@@ -319,7 +353,37 @@ class BacktestEngine(private val config: BacktestConfig, private val ruleConfig:
             ruleConfig.custom.associate { it.id to (it.title to it.group) }
         val shadowReport = if (config.shadowAnalysis) ShadowSimulator.report(shadows, titles, shadowNotFilled) else null
         return report(state, maxDrawdown, exposedSteps, timeline.size, setupsFound, blocked, curve, series["BTCUSDT"]?.first)
-            .copy(limitOrdersNotFilled = limitNotFilled, shadow = shadowReport)
+            .copy(limitOrdersNotFilled = limitNotFilled, shadow = shadowReport, partialFills = partialFills, rejectedOrders = rejectedOrders, profile = config.profile)
+    }
+
+    /** Mum içi çıkış dolumu: piyasa satışı açılış/stop referansından kayma ile, limit satış seviyeden; hacimle sınırlı. */
+    private fun barExitFill(
+        position: com.spotbot.core.trading.Position,
+        action: com.spotbot.core.trading.ExitAction,
+        requested: Double,
+        bar: com.spotbot.core.model.Candle,
+        costs: CostModel,
+        info: SymbolInfo?,
+    ): com.spotbot.core.trading.Fill? {
+        val (price, maker) = when (action) {
+            is com.spotbot.core.trading.ExitAction.Close -> action.price to action.maker
+            is com.spotbot.core.trading.ExitAction.PartialClose -> action.price to action.maker
+            is com.spotbot.core.trading.ExitAction.MoveStop -> return null
+        }
+        val side = com.spotbot.core.trading.OrderSide.SELL
+        val result = if (maker) {
+            com.spotbot.core.trading.FillModel.limitFromBar(side, requested, price, bar.low, bar.high, bar.quoteVolume, config.participationRate, costs, info)
+        } else {
+            com.spotbot.core.trading.FillModel.marketFromBar(side, requested, price, bar.quoteVolume, config.participationRate, costs, info)
+        }
+        return when (result) {
+            is com.spotbot.core.trading.FillResult.Filled -> result.fill
+            // Kalanın tamamı asgari tutarın altındaysa yine de satılır (aksi halde pozisyon kapanamaz).
+            is com.spotbot.core.trading.FillResult.Rejected -> if (requested >= position.quantity * (1 - 1e-9) && result.reason.contains("asgari")) {
+                val fillPrice = if (maker) price else costs.sellPrice(price)
+                com.spotbot.core.trading.Fill(requested, fillPrice, fillPrice * requested * (if (maker) costs.makerFee else costs.takerFee), maker, requested, "Asgari tutar altı kalan satıldı")
+            } else null
+        }
     }
 
     private fun multiTimeframe(symbol: String, s: Triple<Series, Series, Series>, t: Long): MultiTimeframe? {

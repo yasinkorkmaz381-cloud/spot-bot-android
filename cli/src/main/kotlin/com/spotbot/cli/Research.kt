@@ -154,3 +154,29 @@ private fun printShadow(name: String, s: ShadowReport) {
         println("    %+.3fR  %-4s %-55s geçti %4d (%+.3fR) · kaldı %4d (%+.3fR)".format(r.lift, r.id, r.title.take(55), r.passCount, r.passAvgR, r.failCount, r.failAvgR))
     }
 }
+
+
+/** Strateji profillerini aynı koşullarda karşılaştırır (ilk yarı / ikinci yarı ayrımıyla). */
+suspend fun compare(options: Map<String, String>) {
+    val dir = File(options["data"] ?: error("--data klasörü gerekli"))
+    val data = dir.listFiles { f -> f.name.endsWith("USDT.json") }!!.sorted().associate { f ->
+        val d = researchJson.decodeFromString(HistoricalDataset.serializer(), f.readText())
+        d.symbol to d
+    }
+    val info: Map<String, SymbolInfo> = runCatching { MexcRestClient().exchangeInfo().associateBy { it.symbol } }.getOrDefault(emptyMap())
+    val start = data.values.maxOf { it.m15.first().openTime } + 2 * 24 * 3_600_000L
+    val end = data.values.minOf { it.m15.last().closeTime }
+    val base = BacktestConfig(data.keys.toList(), start, end, scanner = ScannerConfig(extraCoins = 0))
+    val pool = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors())
+    val results = com.spotbot.core.backtest.StrategyComparison.run(base, data, info, runner = { jobs -> jobs.map { pool.submit<BacktestReport> { it() } }.map { it.get() } })
+    pool.shutdown()
+    println("Aynı koşullarda profil karşılaştırması · ${data.size} coin · ${day.format(Instant.ofEpochMilli(start))} → ${day.format(Instant.ofEpochMilli(end))}")
+    results.forEach { r ->
+        println("\n${r.profile.title} — ${r.profile.description}")
+        println("  Tüm dönem : ${line(r.full)}")
+        println("  İlk yarı  : ${line(r.firstHalf)}")
+        println("  İkinci yarı: ${line(r.secondHalf)}")
+        println("  Kısmi gerçekleşme: ${r.partialFills} · gerçekleşmeyen emir: ${r.rejectedOrders}")
+    }
+    options["out"]?.let { File(it).writeText(researchJson.encodeToString(kotlinx.serialization.builtins.ListSerializer(com.spotbot.core.backtest.ProfileComparison.serializer()), results)); println("\nRapor: $it") }
+}

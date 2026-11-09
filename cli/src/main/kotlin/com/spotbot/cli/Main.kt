@@ -39,6 +39,7 @@ fun main(args: Array<String>) = runBlocking {
         "backtest" -> backtest(options)
         "paper" -> paper(options)
         "research" -> research(options)
+        "compare" -> compare(options)
         else -> println(
             """
             CryptoScan Pro — MEXC spot botu (sanal işlem)
@@ -54,6 +55,7 @@ fun main(args: Array<String>) = runBlocking {
               paper [--data klasör]        7/24 sanal işlem motorunu çalıştırır (Ctrl+C ile durur)
               research --data klasör       Önceden tanımlı seçenekleri ilk/ikinci yarıda, ileri yürüyen testte,
                        [--out rapor.json]  Monte Carlo ve gölge işlemlerle karşılaştırır
+              compare --data klasör        Adaptif / Trend / Seçici profillerini aynı koşullarda karşılaştırır
             """.trimIndent(),
         )
     }
