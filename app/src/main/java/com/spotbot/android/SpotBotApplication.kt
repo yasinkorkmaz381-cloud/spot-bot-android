@@ -2,6 +2,7 @@ package com.spotbot.android
 
 import android.app.Application
 import com.spotbot.android.bot.BacktestRunner
+import com.spotbot.android.data.FileDecisionLogStore
 import com.spotbot.android.data.FileStateStore
 import com.spotbot.android.data.SettingsRepository
 import com.spotbot.core.engine.TradingEngine
@@ -26,6 +27,8 @@ class AppContainer(app: Application) {
         scope = scope,
         store = FileStateStore(app.filesDir),
         config = settings.settings.value.engine,
+        decisionLog = FileDecisionLogStore(java.io.File(app.filesDir, "decisions")),
+        runLocation = "Bu telefon (Android ön plan servisi)",
     )
     val backtest = BacktestRunner(api, scope, app.cacheDir)
 }

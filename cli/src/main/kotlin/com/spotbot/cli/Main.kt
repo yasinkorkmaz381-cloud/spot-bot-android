@@ -89,6 +89,19 @@ private suspend fun scan() {
     println()
     println("Ayrıntılı incelenen adaylar: ${report.candidates.joinToString().ifEmpty { "yok (işlem açılmaz)" }}")
     engine.portfolio.value.decisions.takeLast(8).forEach { println("• ${it.summary} ${it.details.joinToString(" | ")}") }
+    engine.scanLogs.value.lastOrNull()?.let { log ->
+        println("\nKarar günlüğü (${log.coins.size} coin, profil ${log.profile.title}):")
+        log.coins.filter { it.strategies.isNotEmpty() }.forEach { coin ->
+            val d = coin.data
+            println("  ${coin.symbol}: ${coin.outcome.title} — ${coin.summary}")
+            println("    veri: 15M ${d.m15Close?.let { time.format(Instant.ofEpochMilli(it)) }} · 1H ${d.h1Close?.let { time.format(Instant.ofEpochMilli(it)) }} · 4H ${d.h4Close?.let { time.format(Instant.ofEpochMilli(it)) }} · fiyat ${d.priceTime?.let { time.format(Instant.ofEpochMilli(it)) }}")
+            coin.strategies.forEach { s ->
+                println("    ${s.strategy.code}: ${if (!s.applicable) "değerlendirilmedi" else if (!s.setupFound) "kurulum yok" else "kurulum var, kurallar ${if (s.rulesAllowed == true) "geçti" else "reddetti"}"} — ${s.reasons.joinToString("; ")}")
+                s.rules.filter { !it.passed }.forEach { r -> println("      ✗ ${r.id} ${r.title}: ${r.detail}") }
+            }
+        }
+        println("  Diğer coinler: " + log.coins.filter { it.strategies.isEmpty() }.groupingBy { it.outcome.title }.eachCount().entries.joinToString { "${it.key} ${it.value}" })
+    }
     engine.stop()
     scope.cancel()
 }

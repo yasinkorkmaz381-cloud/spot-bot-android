@@ -24,6 +24,9 @@ data class ChartLine(val values: List<Double>, val color: Color, val label: Stri
 
 data class PriceMarker(val price: Double, val color: Color, val label: String)
 
+/** Belirli bir zamandaki dikey çizgi (örn. işlem giriş/çıkış anı). */
+data class TimeMarker(val time: Long, val color: Color, val label: String)
+
 /** Mum grafiği: göstergeler çizgi, işlem seviyeleri kesikli yatay çizgi olarak çizilir. */
 @Composable
 fun CandleChart(
@@ -31,6 +34,7 @@ fun CandleChart(
     modifier: Modifier = Modifier,
     lines: List<ChartLine> = emptyList(),
     markers: List<PriceMarker> = emptyList(),
+    timeMarkers: List<TimeMarker> = emptyList(),
 ) {
     val gain = SpotBotTheme.tradingColors.gain
     val loss = SpotBotTheme.tradingColors.loss
@@ -78,6 +82,13 @@ fun CandleChart(
             drawPath(path, line.color, style = Stroke(width = 2f))
         }
         val dash = PathEffect.dashPathEffect(floatArrayOf(10f, 8f))
+        timeMarkers.forEach { m ->
+            val index = candles.indexOfLast { it.openTime <= m.time }
+            if (index < 0) return@forEach
+            val x = index * step + step / 2
+            drawLine(m.color, Offset(x, 0f), Offset(x, size.height), strokeWidth = 2f, pathEffect = PathEffect.dashPathEffect(floatArrayOf(4f, 6f)))
+            drawText(measurer, m.label, Offset((x + 3.dp.toPx()).coerceAtMost(plotWidth - 40.dp.toPx()), size.height - 14.dp.toPx()), labelStyle.copy(color = m.color))
+        }
         visibleMarkers.forEach { m ->
             val yy = y(m.price)
             drawLine(m.color, Offset(0f, yy), Offset(plotWidth, yy), strokeWidth = 2f, pathEffect = dash)

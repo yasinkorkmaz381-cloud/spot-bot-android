@@ -130,6 +130,16 @@ class TradingEngineTest {
         }
         // İlk tarama gözlem amaçlıdır; hiçbir coin için işlem açılmaz.
         assertTrue(log.coins.none { it.outcome == com.spotbot.core.trading.CoinOutcome.OPENED })
+        // Ayrıntılı incelenen adaylarda her strateji kaydedilir; diğerlerinde strateji kaydı olmaz.
+        assertTrue("Test verisinde en az bir aday bekleniyor", report.candidates.isNotEmpty())
+        log.coins.forEach { coin ->
+            if (coin.symbol in report.candidates) {
+                assertEquals(3, coin.strategies.size)
+                assertTrue(coin.outcome in setOf(com.spotbot.core.trading.CoinOutcome.OBSERVE_ONLY, com.spotbot.core.trading.CoinOutcome.NO_SETUP, com.spotbot.core.trading.CoinOutcome.REJECTED, com.spotbot.core.trading.CoinOutcome.STALE_DATA))
+            } else {
+                assertTrue(coin.strategies.isEmpty())
+            }
+        }
         engine.stop()
     }
 

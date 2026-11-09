@@ -51,6 +51,8 @@ import com.spotbot.core.rules.BuiltInRules
 import com.spotbot.core.rules.RuleGroup
 import com.spotbot.core.strategy.StrategyId
 import com.spotbot.core.trading.EntryMode
+import com.spotbot.core.trading.StrategyProfile
+import com.spotbot.core.risk.AtrStopMode
 import com.spotbot.core.trading.ExecutionConfig
 
 class SettingsViewModel(private val engine: TradingEngine, private val repository: SettingsRepository) : ViewModel() {
@@ -65,6 +67,8 @@ class SettingsViewModel(private val engine: TradingEngine, private val repositor
     var extraCoins by mutableStateOf(settings.value.engine.scanner.extraCoins.toString())
     var minVolume by mutableStateOf(formatEditable(settings.value.engine.scanner.minQuoteVolume24h))
     var capital by mutableStateOf(formatEditable(settings.value.engine.initialCapital))
+    var totalRiskCap by mutableStateOf(formatEditable(settings.value.engine.risk.maxTotalOpenRiskPercent))
+    var atrMultiple by mutableStateOf(formatEditable(settings.value.engine.risk.atrStopMultiple))
     var message by mutableStateOf<String?>(null)
 
     fun saveRisk() {
@@ -75,6 +79,12 @@ class SettingsViewModel(private val engine: TradingEngine, private val repositor
         val cap = parseDecimal(maxPositionPct)
         val extras = extraCoins.trim().toIntOrNull()
         val volume = parseDecimal(minVolume)
+        val totalCap = parseDecimal(totalRiskCap)
+        val atrK = parseDecimal(atrMultiple)
+        if (totalCap == null || totalCap <= 0 || totalCap > 20 || atrK == null || atrK <= 0 || atrK > 10) {
+            message = "Geçersiz değer: toplam risk sınırı %0–20, ATR çarpanı 0–10 olmalı."
+            return
+        }
         if (risk == null || risk <= 0 || risk > 5 || daily == null || daily <= 0 || max == null || max !in 1..10 ||
             rr == null || rr < 1 || cap == null || cap <= 0 || cap > 100 || extras == null || extras !in 0..30 || volume == null || volume < 0
         ) {
@@ -84,7 +94,10 @@ class SettingsViewModel(private val engine: TradingEngine, private val repositor
         repository.update {
             it.copy(
                 engine = it.engine.copy(
-                    risk = it.engine.risk.copy(riskPerTradePercent = risk, dailyLossLimitPercent = daily, maxOpenPositions = max, minNetRiskReward = rr, maxPositionPercentOfEquity = cap),
+                    risk = it.engine.risk.copy(
+                        riskPerTradePercent = risk, dailyLossLimitPercent = daily, maxOpenPositions = max, minNetRiskReward = rr,
+                        maxPositionPercentOfEquity = cap, maxTotalOpenRiskPercent = totalCap, atrStopMultiple = atrK,
+                    ),
                     scanner = it.engine.scanner.copy(extraCoins = extras, minQuoteVolume24h = volume),
                 ),
             )
@@ -98,6 +111,16 @@ class SettingsViewModel(private val engine: TradingEngine, private val repositor
             val set = if (enabled) it.engine.enabledStrategies + id else it.engine.enabledStrategies - id
             it.copy(engine = it.engine.copy(enabledStrategies = set))
         }
+        engine.updateConfig(repository.settings.value.engine)
+    }
+
+    fun setProfile(profile: StrategyProfile) {
+        repository.update { it.copy(engine = it.engine.copy(profile = profile)) }
+        engine.updateConfig(repository.settings.value.engine)
+    }
+
+    fun setAtrStopMode(mode: AtrStopMode) {
+        repository.update { it.copy(engine = it.engine.copy(risk = it.engine.risk.copy(atrStopMode = mode))) }
         engine.updateConfig(repository.settings.value.engine)
     }
 
@@ -135,10 +158,32 @@ fun SettingsScreen(modifier: Modifier = Modifier, viewModel: SettingsViewModel =
             NumberField("Eş zamanlı en fazla işlem", viewModel.maxPositions) { viewModel.maxPositions = it }
             NumberField("Asgari net R:R", viewModel.minRr) { viewModel.minRr = it }
             NumberField("Pozisyon üst sınırı (sermayenin %)", viewModel.maxPositionPct) { viewModel.maxPositionPct = it }
+            NumberField("Toplam açık risk sınırı (%)", viewModel.totalRiskCap) { viewModel.totalRiskCap = it }
+            NumberField("ATR stop çarpanı (1H ATR × k)", viewModel.atrMultiple) { viewModel.atrMultiple = it }
             NumberField("Ek coin sayısı (izleme listesine)", viewModel.extraCoins) { viewModel.extraCoins = it }
             NumberField("Asgari 24s hacim (USDT)", viewModel.minVolume) { viewModel.minVolume = it }
             KeyValueRow("Kaldıraç / zararda ek alım", "Kullanılmaz / yasak")
             Button(onClick = viewModel::saveRisk, modifier = Modifier.fillMaxWidth()) { Text("Kaydet") }
+        }
+        SectionCard("Strateji profili") {
+            StrategyProfile.entries.forEach { profile ->
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text(profile.title + if (profile == StrategyProfile.ADAPTIVE) " (varsayılan)" else "", style = MaterialTheme.typography.bodyLarge)
+                        Text(profile.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    androidx.compose.material3.RadioButton(selected = settings.engine.profile == profile, onClick = { viewModel.setProfile(profile) })
+                }
+            }
+            Text("Profiller mevcut kuralları değiştirmez. Karşılaştırma için Backtest → Profil karşılaştırma.", style = MaterialTheme.typography.bodySmall)
+        }
+        SectionCard("Stop yöntemi") {
+            AtrStopMode.entries.forEach { mode ->
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(mode.title + if (mode == AtrStopMode.OFF) " (varsayılan)" else "", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                    androidx.compose.material3.RadioButton(selected = settings.engine.risk.atrStopMode == mode, onClick = { viewModel.setAtrStopMode(mode) })
+                }
+            }
         }
         SectionCard("Stratejiler") {
             StrategyId.entries.forEach { id ->
@@ -199,6 +244,9 @@ fun SettingsScreen(modifier: Modifier = Modifier, viewModel: SettingsViewModel =
             }
         }
         SectionCard("Güvenlik") {
+            KeyValueRow("İşlem modu", "Sanal işlem (paper) — tek seçenek", SpotBotTheme.tradingColors.gain)
+            KeyValueRow("Gerçek emir gönderme", "Uygulamada yok")
+            KeyValueRow("API anahtarı", "Kullanılmıyor, uygulamada saklanmıyor")
             Text("V1 sanal işlem yapar ve MEXC API anahtarı kullanmaz. Gerçek işleme geçildiğinde (V2) anahtarda para çekme yetkisi olmayacak, IP kısıtlaması uygulanacak ve anahtar cihazda şifreli saklanacak.", style = MaterialTheme.typography.bodySmall)
             Text("MEXC spot API'si borsa tarafında stop emri desteklemiyor (yalnız LIMIT, MARKET, LIMIT_MAKER, IOC, FOK). Bu doğrulanmadan gerçek parayla otomatik işlem başlatılmayacak.", style = MaterialTheme.typography.bodySmall, color = SpotBotTheme.tradingColors.loss)
         }

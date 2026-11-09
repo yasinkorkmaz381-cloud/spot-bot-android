@@ -148,8 +148,11 @@ class ScreenshotTest {
         return PanelUiState(
             health = EngineHealth(
                 status = EngineStatus.RUNNING,
-                feed = FeedHealth(ConnectionStatus.CONNECTED, false, btc.candles.last().closeTime, btc.candles.last().closeTime, 0.004),
+                feed = FeedHealth(ConnectionStatus.CONNECTED, false, btc.candles.last().closeTime, btc.candles.last().closeTime, 0.004, reconnects = 2),
                 lastScanAt = btc.candles.last().closeTime, universe = List(20) { "X" },
+                runLocation = "Bu telefon (Android ön plan servisi)",
+                uptime24hPercent = 97.4,
+                lastDowntime = com.spotbot.core.trading.Downtime(btc.candles.last().closeTime - 3 * 3_600_000, btc.candles.last().closeTime - 3 * 3_600_000 + 37 * 60_000, "Bot beklenmedik şekilde durmuş (telefon, Android ya da uygulama kapanmış olabilir)"),
             ),
             equity = portfolio.cash + position.marketValue(bid, costs),
             cash = portfolio.cash,
@@ -160,6 +163,10 @@ class ScreenshotTest {
             decisions = portfolio.decisions.reversed(),
             enabledStrategies = setOf(StrategyId.BREAKOUT_RETEST, StrategyId.TREND_PULLBACK),
             equityHistory = backtest.equityCurve.map { it.second },
+            risk = com.spotbot.core.trading.RiskStatus.of(
+                portfolio.copy(dayStartEquity = 1_010.0), portfolio.cash + position.marketValue(bid, costs), RiskConfig(),
+                com.spotbot.core.trading.StrategyProfile.ADAPTIVE, false, true, listOf("ETH ~ SOL (0.82)"),
+            ),
         )
     }
 
@@ -202,6 +209,52 @@ class ScreenshotTest {
 
     @Test
     fun closedTrades() = capture("5-kapanmis-islemler") { TradesContent(portfolio, initialTab = 1) }
+
+    private val scanLog: com.spotbot.core.trading.ScanLog by lazy {
+        val t = btc.candles.last().closeTime
+        val stamp = com.spotbot.core.trading.DataStamp(t, t, t - 3_600_000, t + 2_000)
+        val decision = com.spotbot.core.trading.DecisionPipeline().evaluate(
+            com.spotbot.core.trading.Candidate(mtf, null, info("BTCUSDT"), costs),
+            com.spotbot.core.trading.DecisionContext(t, 1_000.0, 1_000.0, emptyList(), 0.0, Scanner.marketState(mtf, emptyList(), ScannerConfig()), mtf, emptyMap()),
+        )
+        val checks = com.spotbot.core.trading.DecisionLogs.strategyChecks(decision.evaluations)
+        com.spotbot.core.trading.ScanLog(
+            t + 3_000, t, com.spotbot.core.trading.StrategyProfile.ADAPTIVE, true, listOf("BTC 4H rejimi: RANGE"), false,
+            listOf(
+                com.spotbot.core.trading.CoinDecision("ETHUSDT", com.spotbot.core.trading.CoinOutcome.REJECTED, "Breakout + Retest kurulumu zorunlu kurallarca reddedildi", listOf("Z03 Net risk/getiri en az asgari oran: Net R:R 1.21 (asgari 1.5)"), 4, stamp, checks),
+                com.spotbot.core.trading.CoinDecision("SOLUSDT", com.spotbot.core.trading.CoinOutcome.NO_SETUP, "Uygun kurulum bulunamadı", listOf("B: Düzeltme bir destek bölgesine değmedi"), 3, stamp),
+                com.spotbot.core.trading.CoinDecision("XRPUSDT", com.spotbot.core.trading.CoinOutcome.NOT_SELECTED, "Ön puan 0: en iyi 4 aday arasında değil (ya da puan ≤ 0)", emptyList(), 0, stamp),
+                com.spotbot.core.trading.CoinDecision("NEARUSDT", com.spotbot.core.trading.CoinOutcome.ELIMINATED, "Tarama filtresinde elendi", listOf("24s hacim düşük (300,000 USDT)", "Spread yüksek (%0.300)"), 0, stamp),
+                com.spotbot.core.trading.CoinDecision("INJUSDT", com.spotbot.core.trading.CoinOutcome.STALE_DATA, "Veri güncel değil", listOf("Z17: Canlı fiyat 95 sn eski"), 2, stamp.copy(priceTime = t - 95_000)),
+            ),
+        )
+    }
+
+    @Test
+    fun decisionLog() = capture("7-karar-gunlugu") { TradesContent(portfolio, initialTab = 2, expanded = true, scanLogs = listOf(scanLog)) }
+
+    @Test
+    fun tradeChart() {
+        val position = portfolio.positions.single()
+        capture("8-islem-grafigi") {
+            TradesContent(portfolio, initialTab = 0, expanded = true, charts = mapOf(position.id to btc.candles.takeLast(60)))
+        }
+    }
+
+    @Test
+    fun profileComparison() {
+        val data = listOf("NEARUSDT", "BTCUSDT").associateWith { s ->
+            HistoricalDataset(s, candles("/fixtures/${s}_m15.csv.gz"), candles("/fixtures/${s}_h1.csv.gz"), candles("/fixtures/${s}_h4.csv.gz"))
+        }
+        val config = BacktestConfig(listOf("NEARUSDT"), 1_789_689_600_000L, data.getValue("NEARUSDT").m15.last().closeTime, scanner = ScannerConfig(minQuoteVolume24h = 100_000.0))
+        val results = com.spotbot.core.backtest.StrategyComparison.run(config, data, data.keys.associateWith { info(it) })
+        assertTrue(results.size == 3)
+        capture("9-profil-karsilastirma") {
+            Column(Modifier.verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                com.spotbot.android.ui.backtest.ComparisonContent(results, 21, listOf("NEARUSDT"))
+            }
+        }
+    }
 
     @Test
     fun backtestReport() {

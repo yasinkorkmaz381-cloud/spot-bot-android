@@ -33,6 +33,8 @@ data class PanelUiState(
     val decisions: List<Decision> = emptyList(),
     val enabledStrategies: Set<StrategyId> = emptySet(),
     val equityHistory: List<Double> = emptyList(),
+    val risk: com.spotbot.core.trading.RiskStatus = com.spotbot.core.trading.RiskStatus(),
+    val pendingOrders: List<com.spotbot.core.trading.PendingOrder> = emptyList(),
 ) {
     val isActive: Boolean get() = health.status == EngineStatus.RUNNING || health.status == EngineStatus.STARTING
 }
@@ -49,7 +51,8 @@ class PanelViewModel(
         engine.health,
         engine.prices.sample(1_000),
         settings.settings,
-    ) { portfolio, health, prices, appSettings ->
+        engine.riskStatus,
+    ) { portfolio, health, prices, appSettings, risk ->
         val costs = CostModel(slippage = appSettings.engine.slippage)
         val rows = portfolio.positions.map { p ->
             val bid = prices[p.symbol]?.bid
@@ -69,6 +72,8 @@ class PanelViewModel(
             decisions = portfolio.decisions.takeLast(25).reversed(),
             enabledStrategies = appSettings.engine.enabledStrategies,
             equityHistory = portfolio.equityHistory.takeLast(24 * 30).map { it.equity },
+            risk = risk,
+            pendingOrders = portfolio.pendingOrders,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), PanelUiState())
 
@@ -76,4 +81,5 @@ class PanelViewModel(
     fun stopBot() = controller.stop()
     fun setEntriesPaused(paused: Boolean) = engine.setEntriesPaused(paused)
     fun closePosition(id: String) = engine.closePosition(id)
+    fun cancelPending(symbol: String) = engine.cancelPendingOrder(symbol)
 }

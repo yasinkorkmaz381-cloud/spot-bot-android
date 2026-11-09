@@ -57,11 +57,20 @@ class BacktestViewModel(private val runner: BacktestRunner, private val settings
         strategies = if (id in strategies) strategies - id else strategies + id
     }
 
+    var compareMode by mutableStateOf(false)
+
+    private fun symbolList() = symbols.split(',', ' ').map { it.trim().uppercase() }.filter { it.isNotEmpty() }
+        .map { if (it.endsWith("USDT")) it else it + "USDT" }.distinct()
+
     fun run() {
-        val list = symbols.split(',', ' ').map { it.trim().uppercase() }.filter { it.isNotEmpty() }
-            .map { if (it.endsWith("USDT")) it else it + "USDT" }.distinct()
-        if (list.isEmpty() || strategies.isEmpty()) return
-        runner.run(list, days, parseDecimal(capital) ?: 1_000.0, strategies, settings.settings.value.engine)
+        val list = symbolList()
+        if (list.isEmpty()) return
+        if (compareMode) {
+            runner.compare(list, days, parseDecimal(capital) ?: 1_000.0, settings.settings.value.engine)
+        } else {
+            if (strategies.isEmpty()) return
+            runner.run(list, days, parseDecimal(capital) ?: 1_000.0, strategies, settings.settings.value.engine)
+        }
     }
 }
 
@@ -80,8 +89,19 @@ fun BacktestScreen(modifier: Modifier = Modifier, viewModel: BacktestViewModel =
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), singleLine = true, modifier = Modifier.fillMaxWidth(),
             )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                StrategyId.entries.forEach { id ->
-                    FilterChip(selected = id in viewModel.strategies, onClick = { viewModel.toggle(id) }, label = { Text("${id.code} ${id.title}") })
+                FilterChip(selected = !viewModel.compareMode, onClick = { viewModel.compareMode = false }, label = { Text("Tek test") })
+                FilterChip(selected = viewModel.compareMode, onClick = { viewModel.compareMode = true }, label = { Text("Profil karşılaştırma") })
+            }
+            if (viewModel.compareMode) {
+                Text(
+                    "Adaptif, Trend ve Seçici profilleri aynı veri, dönem, maliyet, risk ve emir modeliyle çalıştırılır; dönem ikiye bölünerek iki yarıdaki tutarlılık gösterilir.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            } else {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    StrategyId.entries.forEach { id ->
+                        FilterChip(selected = id in viewModel.strategies, onClick = { viewModel.toggle(id) }, label = { Text("${id.code} ${id.title}") })
+                    }
                 }
             }
             val running = state is BacktestState.Running
@@ -94,6 +114,7 @@ fun BacktestScreen(modifier: Modifier = Modifier, viewModel: BacktestViewModel =
             }
             is BacktestState.Failed -> Text("Backtest başarısız: ${s.message}", color = SpotBotTheme.tradingColors.loss)
             is BacktestState.Done -> BacktestReportContent(s.report)
+            is BacktestState.Compared -> ComparisonContent(s.results, s.days, s.symbols)
             BacktestState.Idle -> Unit
         }
     }
@@ -116,6 +137,9 @@ fun BacktestReportContent(r: BacktestReport) {
         KeyValueRow("Spread + kayma", "${formatMoney(r.spreadAndSlippageCost)} USDT")
         KeyValueRow("Piyasada kalma süresi", formatPercent(r.exposurePercent, minFractionDigits = 1))
         if (r.limitOrdersNotFilled > 0) KeyValueRow("Dolmayan limit giriş emri", "${r.limitOrdersNotFilled}")
+        KeyValueRow("Profil", r.profile.title)
+        if (r.partialFills > 0) KeyValueRow("Kısmi gerçekleşen emir (likidite)", "${r.partialFills}")
+        r.rejectedOrders.forEach { (reason, count) -> KeyValueRow("Gerçekleşmeyen emir: $reason", "$count") }
         if (r.equityCurve.size >= 2) LineChart(r.equityCurve.map { it.second })
     }
     if (r.perStrategy.isNotEmpty()) {
@@ -162,6 +186,32 @@ fun BacktestReportContent(r: BacktestReport) {
                 "${formatPrice(t.position.entryPrice)} → ${formatPrice(t.exitPrice)} ${formatSignedMoney(t.netPnl)} (${t.reason.title})",
                 gainLossColor(t.netPnl.compareTo(0.0)),
             )
+        }
+    }
+}
+
+@Composable
+fun ComparisonContent(results: List<com.spotbot.core.backtest.ProfileComparison>, days: Int, symbols: List<String>) {
+    SectionCard("Profil karşılaştırma · $days gün · ${symbols.size} coin") {
+        Text(
+            "Aynı koşullar: veri, dönem, komisyon/spread/kayma, risk ayarları ve emir modeli ortak; yalnız profil farklı. Bir profilin anlamlı olması için iki yarıda da tutarlı olması gerekir. Kâr garantisi değildir.",
+            style = MaterialTheme.typography.bodySmall,
+        )
+    }
+    results.forEach { r ->
+        SectionCard("${r.profile.title} — ${r.profile.description}") {
+            listOf("Tüm dönem" to r.full, "İlk yarı" to r.firstHalf, "İkinci yarı" to r.secondHalf).forEach { (label, s) ->
+                KeyValueRow(
+                    label,
+                    "${s.trades} işlem · %s · PF %s · %+.2fR · DD %s".format(
+                        formatPercent(s.netReturnPercent, signed = true, minFractionDigits = 2), formatRatio(s.profitFactor), s.expectancyR,
+                        formatPercent(s.maxDrawdownPercent, minFractionDigits = 1),
+                    ),
+                    gainLossColor(s.netReturnPercent.compareTo(0.0)),
+                )
+            }
+            KeyValueRow("Kısmi gerçekleşme / gerçekleşmeyen emir", "${r.partialFills} / ${r.rejectedOrders}")
+            if (r.full.trades < 30) Text("⚠ İşlem sayısı az (${r.full.trades}); sonuç güvenilir değil.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.tertiary)
         }
     }
 }

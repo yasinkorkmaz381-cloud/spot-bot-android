@@ -82,3 +82,32 @@ telefonda çalıştırılmadı (bu ortamda emülatör yok).
   pozisyonlar korumasızdır.
 - Aynı çekirdek `cryptoscan paper` komutuyla **sunucuda/bilgisayarda** da çalışabilir (Android'e bağlı değil).
   Gerçek paraya geçilecekse sunucu çalıştırması önerilir.
+
+---
+
+# V2 sonrası durum (9 Kasım 2026)
+
+| # | Bulgu | Durum | Nasıl doğrulandı |
+| --- | --- | --- | --- |
+| 1 | Eski veriyle karar riski | ✅ Düzeltildi: zorunlu kural **Z17** (15M/1H/4H son mumlar tarama kapanışıyla eşleşmeli, canlı fiyat ≤ 30 sn). Verisi eski coin "Veri güncel değil" olarak kaydedilir, işlem açılmaz | `OrdersTest` (tazelik), canlı motor testi |
+| 2 | Bekleyen limit emirler kalıcı değil, nakit ayrılmıyor | ✅ Portföyde saklanıyor, nakit ayrılıyor, yeniden başlatmada sürüyor | `TradingEngineTest`: yeniden başlatma sonrası dolum |
+| 3 | Bakiye kontrolü yok | ✅ Hesap ödeyemeyeceği dolumu reddeder | `OrdersTest` |
+| 4 | İş parçacığı yarışı, sıfırlamada bekleyen emir | ✅ Duraklatma/sıfırlama motor iş parçacığında; sıfırlama emirleri temizler | Kod incelemesi (eşzamanlılık testi yok) |
+| 5 | Çevrimdışı süre izlenmiyor | ✅ Dakikalık "canlıyım" kaydı; kesinti, nedeni (kullanıcı / beklenmedik) ve o sırada aşılan stop/hedef kaydedilir; 24 saatlik çalışma oranı | `TradingEngineTest`: kesinti kaydı |
+| 6 | Derinliksiz dolum, kısmi gerçekleşme yok | ✅ Canlıda piyasa emri emir defterini %0,5 bant içinde tüketir; limit emir yalnız fiyat limitin ötesinde işlem görünce dolar; backtest'te mum hacminin %10'u sınırı; kısmi gerçekleşmede kalan miktar satılmaya devam eder | `OrdersTest`, `BacktestV2Test` |
+| 7 | Emir sınırları eksik | ✅ Asgari/azami tutar, piyasa emri asgari tutarı, fiyat bandı, yön kısıtı, fiyat/miktar adımı | `OrdersTest` |
+| 8 | Toplam risk sınırı örtük | ✅ Zorunlu kural **Z18**, varsayılan %1,5 (önceki örtük sınırla aynı) | `BacktestV2Test` |
+| 9 | ATR stop yok | ✅ Seçenek eklendi (Asgari mesafe / ATR stop), **varsayılan kapalı** | `BacktestV2Test` |
+| 10 | Profil karşılaştırması yok | ✅ Adaptif (varsayılan) / Trend / Seçici; aynı koşullarda karşılaştırma ve ilk/ikinci yarı; uygulamada ve `cryptoscan compare` | `BacktestV2Test`, 1 yıllık çalıştırma |
+| 11 | Backtest sızıntı testi yok | ✅ "Kesim tarihinden sonraki veri silinince önceki kararlar değişmiyor" testi; gölge analizin kararları etkilemediği testi | `BacktestV2Test` |
+| — | Coin bazında karar günlüğü yok | ✅ Her taramada her coin: sonuç, gerekçe, veri zamanları; adaylarda her strateji ve her kuralın geçti/kaldı sonucu; son 3 gün telefonda saklanır | `TradingEngineTest`, ekran testi, canlı CLI taraması |
+
+## Hâlâ cihazda denenmemiş olanlar
+
+Ön plan servisi, bildirimler, açılışta başlatma, pil muafiyeti, uygulama içi backtest, yeni karar günlüğü ve
+grafik ekranlarının dokunma etkileşimleri. Ekranlar yalnız Robolectric'te gerçek veriyle çizildi.
+
+## Hâlâ yok (bilinçli ya da sonraki aşama)
+
+- Gerçek emir gönderme ve API anahtarı (V1/V2 yalnız sanal işlem; güvenlik testi bunu denetler)
+- 60 kuralın metni, Telegram bildirimi, YZ analizi

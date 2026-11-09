@@ -27,7 +27,7 @@ object AppViewModels {
         initializer { PanelViewModel(container().engine, container().settings, BotController(application())) }
         initializer { ScanViewModel(container().engine) }
         initializer { CoinDetailViewModel(container().engine, container().api, createSavedStateHandle()) }
-        initializer { TradesViewModel(container().engine) }
+        initializer { TradesViewModel(container().engine, container().api) }
         initializer { BacktestViewModel(container().backtest, container().settings) }
         initializer { SettingsViewModel(container().engine, container().settings) }
     }

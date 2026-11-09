@@ -2,7 +2,9 @@ package com.spotbot.android.data
 
 import com.spotbot.core.engine.EngineConfig
 import com.spotbot.core.engine.StateStore
+import com.spotbot.core.trading.DecisionLogStore
 import com.spotbot.core.trading.PortfolioState
+import com.spotbot.core.trading.ScanLog
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -51,5 +53,35 @@ class SettingsRepository(dir: File) {
         val updated = transform(_settings.value)
         _settings.value = updated
         file.write(updated)
+    }
+}
+
+/**
+ * Coin bazında karar günlüğü: her tarama bir satır (JSON Lines), gün başına bir dosya; son [keepDays] gün tutulur.
+ * Bir tarama ~15 KB; günde 96 tarama ≈ 1,5 MB.
+ */
+class FileDecisionLogStore(private val dir: File, private val keepDays: Int = 3) : DecisionLogStore {
+    private val day = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).apply { timeZone = java.util.TimeZone.getTimeZone("UTC") }
+
+    init { dir.mkdirs() }
+
+    @Synchronized
+    override fun append(log: ScanLog) {
+        File(dir, "${day.format(java.util.Date(log.time))}.jsonl").appendText(storageJson.encodeToString(ScanLog.serializer(), log) + "\n")
+        dir.listFiles { f -> f.name.endsWith(".jsonl") }?.sortedBy { it.name }?.dropLast(keepDays)?.forEach { it.delete() }
+    }
+
+    @Synchronized
+    override fun recent(limit: Int): List<ScanLog> {
+        val files = dir.listFiles { f -> f.name.endsWith(".jsonl") }?.sortedBy { it.name }.orEmpty()
+        val result = ArrayDeque<ScanLog>()
+        for (file in files.reversed()) {
+            val lines = file.readLines().filter { it.isNotBlank() }
+            for (line in lines.reversed()) {
+                runCatching { storageJson.decodeFromString(ScanLog.serializer(), line) }.getOrNull()?.let { result.addFirst(it) }
+                if (result.size >= limit) return result.toList()
+            }
+        }
+        return result.toList()
     }
 }

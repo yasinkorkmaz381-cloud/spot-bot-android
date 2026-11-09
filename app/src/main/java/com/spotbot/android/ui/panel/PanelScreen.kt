@@ -63,12 +63,13 @@ class PanelActions(
     val setPaused: (Boolean) -> Unit,
     val closePosition: (String) -> Unit,
     val openSymbol: (String) -> Unit,
+    val cancelPending: (String) -> Unit = {},
 )
 
 @Composable
 fun PanelScreen(onOpenSymbol: (String) -> Unit, modifier: Modifier = Modifier, viewModel: PanelViewModel = viewModel(factory = AppViewModels.Factory)) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    PanelContent(state, PanelActions(viewModel::startBot, viewModel::stopBot, viewModel::setEntriesPaused, viewModel::closePosition, onOpenSymbol), modifier)
+    PanelContent(state, PanelActions(viewModel::startBot, viewModel::stopBot, viewModel::setEntriesPaused, viewModel::closePosition, onOpenSymbol, viewModel::cancelPending), modifier)
 }
 
 @Composable
@@ -79,11 +80,25 @@ fun PanelContent(state: PanelUiState, actions: PanelActions, modifier: Modifier 
     LazyColumn(modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item { InfoBanner("Sanal işlem (paper trading): MEXC canlı verisi kullanılır, gerçek emir gönderilmez.") }
         item { BotCard(state, actions) }
+        item { RiskCard(state) }
+        item { ReliabilityCard(state) }
         item { CapitalCard(state) }
         item {
             SectionCard("Açık işlemler (${state.positions.size})") {
                 if (state.positions.isEmpty()) EmptyText("Açık işlem yok. Kurallar sağlanmadığında işlem açmamak da doğru bir karardır.")
                 state.positions.forEach { row -> PositionItem(row, onOpenSymbol) { closing = row } }
+                state.pendingOrders.forEach { order ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text("${order.symbol} · bekleyen limit alış", fontWeight = FontWeight.SemiBold)
+                            Text(
+                                "Limit ${formatPrice(order.limitPrice)} · ${order.quantity} adet · son ${formatTime(order.expiresAt)} · ayrılan ${formatMoney(order.reservedQuote)} USDT",
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                        }
+                        TextButton(onClick = { actions.cancelPending(order.symbol) }) { Text("İptal") }
+                    }
+                }
             }
         }
         item { StrategiesCard(state.enabledStrategies) }
@@ -156,6 +171,50 @@ private fun BotCard(state: PanelUiState, actions: PanelActions) {
                 Text("Botu başlat")
             }
         }
+    }
+}
+
+@Composable
+private fun RiskCard(state: PanelUiState) {
+    val r = state.risk
+    val colors = SpotBotTheme.tradingColors
+    SectionCard(
+        "Risk durumu",
+        trailing = { Tag(if (r.entriesBlockedReason == null) "YENİ İŞLEME AÇIK" else "YENİ İŞLEM YOK", if (r.entriesBlockedReason == null) colors.gain else colors.loss) },
+    ) {
+        r.entriesBlockedReason?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = colors.loss) }
+        KeyValueRow("Strateji profili", r.profile.title)
+        KeyValueRow("Toplam açık risk", "%s / %s".format(formatPercent(r.openRiskPercent, minFractionDigits = 2), formatPercent(r.maxTotalOpenRiskPercent)))
+        KeyValueRow(
+            "Bugünkü sonuç / günlük limit", "%s / -%s".format(formatPercent(r.dailyPnlPercent, signed = true, minFractionDigits = 2), formatPercent(r.dailyLossLimitPercent)),
+            gainLossColor(r.dailyPnlPercent.compareTo(0.0)),
+        )
+        KeyValueRow("Açık işlem + bekleyen emir", "${r.openPositions} + ${r.pendingOrders} / ${r.maxOpenPositions}")
+        KeyValueRow("İşlem başına risk", formatPercent(r.riskPerTradePercent))
+        KeyValueRow("Stop yöntemi", r.atrStopMode.title)
+        if (r.correlatedPairs.isNotEmpty()) KeyValueRow("İlişkili pozisyonlar", r.correlatedPairs.joinToString())
+    }
+}
+
+@Composable
+private fun ReliabilityCard(state: PanelUiState) {
+    val h = state.health
+    val colors = SpotBotTheme.tradingColors
+    SectionCard("Çalışma güvenilirliği") {
+        KeyValueRow("Çalıştığı yer", h.runLocation)
+        h.uptime24hPercent?.let { KeyValueRow("Son 24 saatte çalışma oranı", formatPercent(it, minFractionDigits = 1), if (it >= 99) colors.gain else colors.loss) }
+        KeyValueRow("WebSocket yeniden bağlanma", "${h.feed.reconnects}")
+        h.lastDowntime?.let { d ->
+            KeyValueRow("Son kesinti", "${formatDateTime(d.from)} → ${formatTime(d.to)} (${(d.to - d.from) / 60_000} dk)")
+            Text(d.note, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        if (h.staleSymbols.isNotEmpty()) {
+            Text("Son taramada verisi güncel olmayan coinler (işlem açılmadı): ${h.staleSymbols.joinToString()}", style = MaterialTheme.typography.bodySmall, color = colors.loss)
+        }
+        Text(
+            "Bot telefonda çalışırken telefon kapanır, internet kesilir ya da Android uygulamayı durdurursa izleme durur. MEXC spot API'sinde borsa tarafı stop emri olmadığından bu sürede pozisyonlar korumasızdır.",
+            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 

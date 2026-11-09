@@ -3,11 +3,43 @@
 MEXC spot piyasasında (USDT pariteleri) çalışan, **kontrollü risk** ve **sistematik karar** odaklı otomatik
 işlem botu. Android uygulaması (Türkçe kumanda paneli) + platformdan bağımsız Kotlin çekirdeği + komut satırı.
 
-> **Durum: V1 — sanal işlem (paper trading).** MEXC canlı verisi kullanılır, **gerçek emir gönderilmez**,
+> **Durum: V2 — sanal işlem (paper trading).** MEXC canlı verisi kullanılır, **gerçek emir gönderilmez**,
 > API anahtarı istenmez. Aşağıdaki backtest sonuçları stratejilerin henüz kâr avantajı göstermediğini
 > söylüyor; bu yüzden gerçek parayla kullanım (V2) için hazır değildir.
 
 **Kalite > İşlem sayısı · Risk kontrolü > Kâr beklentisi · Kanıtlanmış strateji > Tahmin**
+
+## V2'de neler değişti
+
+Ayrıntılı denetim ve öncesi/sonrası: [`docs/DENETIM.md`](docs/DENETIM.md).
+
+- **Kritik altyapı:** eski veriyle karar verilmez (kural Z17); bekleyen limit emirler kalıcı ve nakit ayrılır;
+  hesap ödeyemeyeceği dolumu reddeder; çevrimdışı süre ve o sırada kaçırılan stop/hedefler kaydedilir.
+- **Karar günlüğü:** her 15M taramasında her coin için sonuç, gerekçe, kullanılan verinin zamanı; ayrıntılı
+  incelenen adaylarda her stratejinin sonucu ve her kuralın geçti/kaldı ayrıntısı (İşlemler → Karar günlüğü).
+- **Gerçekçi emir simülasyonu:** MEXC emir kuralları (asgari/azami tutar, fiyat/miktar adımı, fiyat bandı),
+  maker/taker komisyon, alış-satış farkı, emir defterinde kayma, mum hacmiyle sınırlı ve kısmi gerçekleşme;
+  gerçekleşmesi mümkün olmayan emir doldurulmaz.
+- **Risk:** işlem başına %0,5, günlük %1,5, korelasyon, **toplam açık risk sınırı %1,5** (kural Z18; önceki
+  örtük "3 × %0,5" sınırıyla aynı, davranışı değiştirmez), **ATR stop seçeneği (varsayılan kapalı)**.
+- **Strateji profilleri:** Adaptif (varsayılan, önceki davranış), Trend (yalnız B), Seçici (A+B, kalite ≥ 60 ve
+  net R:R ≥ 2). Mevcut kurallar ve varsayılan parametreler değiştirilmedi.
+- **Backtest güvenceleri:** gelecek veri silinince geçmiş kararların değişmediği test edilir; profiller aynı
+  koşullarda, dönemin iki yarısında ayrı ayrı karşılaştırılır.
+- **Arayüz:** Panel'e risk durumu ve çalışma güvenilirliği kartları; karar günlüğü, işlem grafikleri, profil
+  karşılaştırma; bekleyen emri iptal.
+
+### Profil karşılaştırması (1 yıl, 15 coin, aynı koşullar)
+
+| Profil | Tüm dönem | İlk yarı | İkinci yarı |
+| --- | --- | --- | --- |
+| Adaptif (varsayılan) | 194 işlem, **−21,0 %**, PF 0,61 | −8,9 % | −13,3 % |
+| Trend (yalnız B) | 144 işlem, **−13,3 %**, PF 0,67 | −5,8 % | −8,0 % |
+| Seçici | 87 işlem, **−10,7 %**, PF 0,60 | −5,3 % | −5,8 % |
+
+Üç profil de iki yarıda da zararda; kârlı bir profil yok. Seçici daha az işlem açarak zararı azaltıyor ama
+işlem başına beklenti (−0,27R) Adaptif'ten (−0,29R) anlamlı biçimde iyi değil. Çıktı:
+[`docs/research/2026-11-09-profil-karsilastirma.txt`](docs/research/2026-11-09-profil-karsilastirma.txt).
 
 ## Modüller
 
@@ -29,6 +61,8 @@ Gerçek MEXC verisiyle (BTC/NEAR) Robolectric üzerinde çizilmiş görüntüler
 | ![Panel](docs/screenshots/1-panel.png) | ![Tarama](docs/screenshots/2-tarama.png) | ![Coin detayı](docs/screenshots/3-coin-detay.png) |
 | **İşlem gerekçesi ve kurallar** | **Backtest** | **Koyu tema** |
 | ![İşlemler](docs/screenshots/4-islemler.png) | ![Backtest](docs/screenshots/6-backtest.png) | ![Koyu tema](docs/screenshots/1-panel-dark.png) |
+| **Karar günlüğü** | **İşlem grafiği** | **Profil karşılaştırma** |
+| ![Karar günlüğü](docs/screenshots/7-karar-gunlugu.png) | ![İşlem grafiği](docs/screenshots/8-islem-grafigi.png) | ![Profil karşılaştırma](docs/screenshots/9-profil-karsilastirma.png) |
 
 ## Akış
 
@@ -192,14 +226,15 @@ cli/build/install/cryptoscan/bin/cryptoscan scan
 cli/build/install/cryptoscan/bin/cryptoscan backtest --days 90 --symbols BTC,ETH,SOL --strategies A,B --out rapor.json
 cli/build/install/cryptoscan/bin/cryptoscan paper --data ./cryptoscan-data   # 7/24 sanal işlem
 cli/build/install/cryptoscan/bin/cryptoscan research --data ./veri --out arastirma.json   # deney paketi
+cli/build/install/cryptoscan/bin/cryptoscan compare --data ./veri    # profilleri aynı koşullarda karşılaştır
 ```
 
 ## Derleme ve testler
 
 ```bash
-./gradlew :core:test                  # 71 çekirdek testi
+./gradlew :core:test                  # 93 çekirdek testi (+2 canlı)
 ./gradlew :core:test -Plive           # + gerçek MEXC'ye bağlanan duman testleri
-./gradlew :app:testDebugUnitTest      # 7 ekran çizim testi (Robolectric) + biçimlendirme testleri
+./gradlew :app:testDebugUnitTest      # 10 ekran çizim testi (Robolectric) + 5 biçimlendirme testi
 ./gradlew :app:testDebugUnitTest -Pscreenshots   # ekran görüntülerini app/build/outputs/roborazzi'ye kaydeder
 ./gradlew :app:lintDebug :app:assembleDebug
 ```
