@@ -3,11 +3,18 @@
 MEXC spot piyasasında (USDT pariteleri) çalışan, **kontrollü risk** ve **sistematik karar** odaklı otomatik
 işlem botu. Android uygulaması (Türkçe kumanda paneli) + platformdan bağımsız Kotlin çekirdeği + komut satırı.
 
-> **Durum: V2.2.1 — sanal işlem (paper trading).** MEXC canlı verisi kullanılır, **gerçek emir gönderilmez**,
+> **Durum: V2.3 — sanal işlem (paper trading).** MEXC canlı verisi kullanılır, **gerçek emir gönderilmez**,
 > API anahtarı istenmez. Aşağıdaki backtest sonuçları stratejilerin henüz kâr avantajı göstermediğini
 > söylüyor; bu yüzden gerçek parayla kullanım (V2) için hazır değildir.
 
 **Kalite > İşlem sayısı · Risk kontrolü > Kâr beklentisi · Kanıtlanmış strateji > Tahmin**
+
+## V2.3: kritik sorunlar incelemesi (10 Kasım 2026)
+
+Rapor: [`docs/KRITIK-SORUNLAR.md`](docs/KRITIK-SORUNLAR.md). Yazılım doğru çalışıyor (geçmiş bir sinyal canlı motora
+beslenince kâğıt işlem açılıyor); bot işlem açmıyor çünkü BTC düşüş trendinde ve 22 coinin 13'ü MEXC'deki geniş
+spread/sığ defter nedeniyle eleniyor. Backtest spread'i gerçekçi hale getirildi; Tarama'ya teşhis paneli eklendi.
+Sekiz filtre eğitim/test ve ileri yürüyen testle denendi, hiçbiri bağımsız dönemde başarılı olmadı ve etkinleştirilmedi.
 
 ## V2.2.1: BTC / piyasa filtresi açıklaması (10 Kasım 2026)
 

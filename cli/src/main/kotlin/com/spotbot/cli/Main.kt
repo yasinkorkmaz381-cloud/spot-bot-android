@@ -42,6 +42,7 @@ fun main(args: Array<String>) = runBlocking {
         "research" -> research(options)
         "compare" -> compare(options)
         "analyze" -> analyze(options)
+        "study" -> study(options)
         else -> println(
             """
             CryptoScan Pro — MEXC spot botu (sanal işlem)
@@ -60,6 +61,7 @@ fun main(args: Array<String>) = runBlocking {
               research --data klasör       Önceden tanımlı seçenekleri ilk/ikinci yarıda, ileri yürüyen testte,
                        [--out rapor.json]  Monte Carlo ve gölge işlemlerle karşılaştırır
               compare --data klasör        Adaptif / Trend / Seçici profillerini aynı koşullarda karşılaştırır
+              study --data klasör          A/B filtrelerini eğitim/test ve ileri yürüyen testle doğrular; 3 yapılandırma
               analyze --data klasör        A ve B ayrı, rejim filtresi açık/kapalı, kayıp analizi ve önceden
                       [--out rapor.json]   tanımlı filtreler (ilk/ikinci yarı ayrı)
             """.trimIndent(),
@@ -240,6 +242,21 @@ private suspend fun paper(options: Map<String, String>) {
         engine.portfolio.collect { p ->
             p.decisions.drop(lastCount.coerceAtMost(p.decisions.size)).forEach { println("${time.format(Instant.ofEpochMilli(it.time))} ${it.summary}") }
             lastCount = p.decisions.size
+        }
+    }
+    scope.launch {
+        var seen = 0L
+        engine.scanLogs.collect { logs ->
+            val log = logs.lastOrNull() ?: return@collect
+            if (log.time == seen) return@collect
+            seen = log.time
+            val d = com.spotbot.core.trading.ScanDiagnostics.of(log, engine.lastScan.value?.market)
+            println("${time.format(Instant.ofEpochMilli(log.time))} TEŞHİS tarama ${time.format(Instant.ofEpochMilli(d.boundary))}: taranan ${d.scanned} · elenen ${d.eliminated} · riskli ${d.flagged} · seçilmeyen ${d.notSelected} · kurulum yok ${d.noSetup} · reddedilen ${d.rejected} · eski veri ${d.staleData} · uygun ${d.eligible} · açılan ${d.opened}")
+            println("    neden: ${d.shortReason ?: "işlem açıldı"}")
+            d.topReasons.take(6).forEach { println("    ${it.second}× ${it.first}") }
+            com.spotbot.core.trading.ScanDiagnostics.lastSignal(logs)?.let { s -> println("    son sinyal: ${s.symbol} ${s.strategy} ${time.format(Instant.ofEpochMilli(s.time))} · ${if (s.opened) "işleme dönüştü" else "dönüşmedi: " + s.blockedBy.joinToString("; ")}") }
+            val h = engine.health.value
+            println("    veri: WS ${h.feed.webSocket} · REST yedeği ${h.feed.restFallbackActive} · yeniden bağlanma ${h.feed.reconnects} · WS/REST sapma ${h.feed.lastMaxDeviationPercent} · saat farkı ${h.serverTimeOffsetMillis} ms · karar gecikmesi ${(log.time - log.boundary) / 1000} sn")
         }
     }
     Runtime.getRuntime().addShutdownHook(Thread { engine.stop() })

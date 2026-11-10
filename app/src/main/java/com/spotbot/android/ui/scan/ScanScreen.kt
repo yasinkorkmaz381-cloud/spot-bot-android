@@ -52,7 +52,11 @@ import com.spotbot.android.ui.common.formatPrice
 import com.spotbot.android.ui.common.formatTime
 import com.spotbot.android.ui.theme.SpotBotTheme
 import com.spotbot.android.ui.theme.gainLossColor
+import com.spotbot.core.engine.EngineHealth
+import com.spotbot.core.engine.EngineStatus
 import com.spotbot.core.engine.TradingEngine
+import com.spotbot.core.trading.ScanDiagnostics
+import com.spotbot.core.trading.SignalInfo
 import com.spotbot.core.scanner.CoinScan
 import com.spotbot.core.scanner.MarketBlockKind
 import com.spotbot.core.scanner.MarketExplanation
@@ -67,7 +71,16 @@ import com.spotbot.core.trading.ScanLog
 class ScanViewModel(engine: TradingEngine) : ViewModel() {
     val report = engine.lastScan
     val scanLogs = engine.scanLogs
+    val health = engine.health
 }
+
+/** Teşhis panelinin verisi: hepsi motorun gerçek kayıtlarından gelir. */
+data class DiagnosticsView(
+    val health: EngineHealth,
+    val diagnostics: ScanDiagnostics?,
+    val lastSignal: SignalInfo?,
+    val market: MarketState?,
+)
 
 /** Analiz durumu: taramanın coin hakkındaki sonucu. */
 @Composable
@@ -98,7 +111,9 @@ fun eligibilityLabel(outcome: CoinOutcome?): Pair<String, Color> {
 fun ScanScreen(onOpenSymbol: (String) -> Unit, onOpenDecisionLog: () -> Unit, modifier: Modifier = Modifier, viewModel: ScanViewModel = viewModel(factory = AppViewModels.Factory)) {
     val report by viewModel.report.collectAsStateWithLifecycle()
     val logs by viewModel.scanLogs.collectAsStateWithLifecycle()
-    ScanContent(report, logs.lastOrNull()?.coins?.associateBy { it.symbol }.orEmpty(), onOpenSymbol, modifier, onOpenDecisionLog)
+    val health by viewModel.health.collectAsStateWithLifecycle()
+    val view = DiagnosticsView(health, logs.lastOrNull()?.let { ScanDiagnostics.of(it, report?.market) }, ScanDiagnostics.lastSignal(logs), report?.market)
+    ScanContent(report, logs.lastOrNull()?.coins?.associateBy { it.symbol }.orEmpty(), onOpenSymbol, modifier, onOpenDecisionLog, view)
 }
 
 @Composable
@@ -108,14 +123,17 @@ fun ScanContent(
     onOpenSymbol: (String) -> Unit,
     modifier: Modifier = Modifier,
     onOpenDecisionLog: () -> Unit = {},
+    diagnostics: DiagnosticsView? = null,
 ) {
     LazyColumn(modifier.fillMaxSize(), contentPadding = PaddingValues(Spacing.screen), verticalArrangement = Arrangement.spacedBy(Spacing.cards)) {
         if (r == null) {
             item { InfoBanner("Henüz tarama yok. Botu başlattığınızda ilk tarama hemen, sonrakiler her 15 dakikalık mum kapanışında yapılır.") }
+            diagnostics?.let { d -> item { DiagnosticsCard(d) } }
             item { AppCard { NavRow("Karar günlüğü", subtitle = "Önceki taramaların kayıtları", onClick = onOpenDecisionLog) } }
             return@LazyColumn
         }
         item { MarketCard(r) }
+        diagnostics?.let { d -> item { DiagnosticsCard(d) } }
         item { SectionLabel("Coinler", trailing = { Text("${r.coins.size}", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant) }) }
         item { ListHeader() }
         items(r.coins, key = { it.symbol }) { coin ->
@@ -183,6 +201,76 @@ fun MarketFilterDetails(market: MarketState) {
         "Trend kararı BTC 4H'ye göre verilir (düşüş trendi: kapanış ve EMA21 EMA55'in altında, SuperTrend aşağı, ADX ≥ 20, yapı yükselişte değil). 1H yalnız son 4 saatteki sert düşüşü (%3) ölçer.",
         style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
+}
+
+/** Canlı sinyal teşhisi: bot neden işlem açmıyor sorusunun sayılarla yanıtı. Varsayılan kapalı; başlıkta kısa neden. */
+@Composable
+fun DiagnosticsCard(v: DiagnosticsView, initiallyExpanded: Boolean = false) {
+    val colors = SpotBotTheme.tradingColors
+    val d = v.diagnostics
+    val h = v.health
+    val running = h.status == EngineStatus.RUNNING || h.status == EngineStatus.STARTING
+    val subtitle = when {
+        !running -> "Bot çalışmıyor: tarama yapılmıyor"
+        d == null -> "İlk tarama bekleniyor"
+        d.shortReason == null -> "Son taramada işlem açıldı"
+        else -> d.shortReason!!
+    }
+    ExpandableCard("Teşhis: neden işlem yok?", subtitle = subtitle, initiallyExpanded = initiallyExpanded) {
+        KeyValueRow(
+            "Bot",
+            when (h.status) {
+                EngineStatus.RUNNING -> if (h.entriesPaused) "Çalışıyor · yeni işlemler duraklatıldı" else "Çalışıyor"
+                EngineStatus.STARTING -> "Başlatılıyor"
+                EngineStatus.ERROR -> "Hata: ${h.message ?: h.lastError ?: ""}"
+                EngineStatus.STOPPED -> "Durduruldu"
+            },
+            if (h.status == EngineStatus.RUNNING && !h.entriesPaused) colors.gain else MaterialTheme.colorScheme.tertiary,
+        )
+        KeyValueRow("Son başarılı tarama", h.lastScanAt?.let { formatDateTime(it) } ?: "—")
+        KeyValueRow("Son mum güncellemesi", h.lastCandleSyncAt?.let { formatDateTime(it) } ?: "—")
+        KeyValueRow("Son fiyat verisi", h.feed.lastUpdateAt?.let { formatTime(it) } ?: "—")
+        KeyValueRow("Veri yolu", if (h.feed.restFallbackActive) "REST yedeği" else "WebSocket")
+        KeyValueRow("Yeniden bağlanma", "${h.feed.reconnects}")
+        v.market?.let { m ->
+            KeyValueRow("BTC filtresi", if (m.allowsLongs) "Alıma izin veriyor" else "Alım yok · ${m.blockKind?.title ?: ""}", marketBlockColor(m.blockKind))
+        }
+        if (d != null) {
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Text("Son tarama · ${formatDateTime(d.boundary)}", style = MaterialTheme.typography.titleSmall)
+            KeyValueRow("Taranan coin", "${d.scanned}")
+            KeyValueRow("Likidite / spread nedeniyle elenen", "${d.eliminated}")
+            if (d.flagged > 0) KeyValueRow("Riskli işaretlenen", "${d.flagged}")
+            KeyValueRow("Trend / güç zayıf (aday olmadı)", "${d.notSelected}")
+            KeyValueRow("Giriş koşulu bekleyen (kurulum yok)", "${d.noSetup}")
+            KeyValueRow("Kuralların reddettiği", "${d.rejected}")
+            if (d.staleData > 0) KeyValueRow("Verisi güncel olmayan", "${d.staleData}", colors.loss)
+            KeyValueRow("İşleme uygun", "${d.eligible}", if (d.eligible > 0) colors.gain else Color.Unspecified)
+            KeyValueRow("Açılan işlem", "${d.opened}", if (d.opened > 0) colors.gain else Color.Unspecified)
+            if (d.topReasons.isNotEmpty()) {
+                Text("En sık nedenler", style = MaterialTheme.typography.titleSmall)
+                d.topReasons.take(5).forEach { (reason, count) ->
+                    Row(Modifier.fillMaxWidth()) {
+                        Text(reason, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
+                        Text("$count coin", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium)
+                    }
+                }
+            }
+        }
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+        Text("Son alım sinyali", style = MaterialTheme.typography.titleSmall)
+        val s = v.lastSignal
+        if (s == null) {
+            Text("Kayıtlı taramalarda (son 3 gün) strateji kurulumu oluşmadı.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        } else {
+            KeyValueRow("${s.symbol.removeSuffix("USDT")} · ${s.strategy}", formatDateTime(s.time))
+            if (s.opened) Text("İşleme dönüştü.", style = MaterialTheme.typography.bodySmall, color = colors.gain)
+            else {
+                Text("İşleme dönüşmedi:", style = MaterialTheme.typography.bodySmall)
+                s.blockedBy.take(4).forEach { Text("• $it", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            }
+        }
+    }
 }
 
 @Composable

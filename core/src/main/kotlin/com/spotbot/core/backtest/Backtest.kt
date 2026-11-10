@@ -67,6 +67,11 @@ data class BacktestConfig(
      * gönderilmez (EngineConfig.maxEntryDriftPercent ile aynı varsayılan).
      */
     val maxEntryDriftPercent: Double = 0.3,
+    /**
+     * Parite başına yarım spread (oran). Verilirse sabit [halfSpread] yerine kullanılır ve canlıdaki spread filtresi
+     * backtest'te de uygulanır. Geçmiş emir defteri olmadığından değerler ölçüm anındaki spread'dir (varsayım).
+     */
+    val halfSpreadBySymbol: Map<String, Double> = emptyMap(),
 )
 
 /** Bir paritenin backtest için tarihsel mumları. */
@@ -135,6 +140,8 @@ data class BacktestReport(
     /** Dolum fiyatı sinyalden çok uzaklaştığı için gönderilmeyen giriş emirleri (canlı motorla aynı kural). */
     val entriesSkippedForDrift: Int = 0,
     val regimePolicy: com.spotbot.core.analysis.RegimePolicy = com.spotbot.core.analysis.RegimePolicy.OFF,
+    /** Parite başına ölçülen spread kullanıldı mı (yoksa sabit değer). */
+    val measuredSpread: Boolean = false,
 )
 
 /** Tarihsel veriyi MEXC'den indirir (15M, 1H, 4H; BTCUSDT her zaman eklenir). */
@@ -236,7 +243,7 @@ class BacktestEngine(private val config: BacktestConfig, private val ruleConfig:
             )
         }
         val costsBySymbol = data.keys.associateWith { symbol ->
-            CostModel(symbolInfo[symbol]?.takerFee ?: config.defaultTakerFee, config.slippage, config.halfSpread)
+            CostModel(symbolInfo[symbol]?.takerFee ?: config.defaultTakerFee, config.slippage, config.halfSpreadBySymbol[symbol] ?: config.halfSpread)
         }
         val tradable = config.symbols.filter { it in series }
         val timeline = series.values.flatMap { it.first.candles.map { c -> c.closeTime } }
@@ -490,6 +497,12 @@ class BacktestEngine(private val config: BacktestConfig, private val ruleConfig:
                 excursions = trades.associate { it.position.id to excursion(it, series.getValue(it.position.symbol).first) },
                 entriesSkippedForDrift = driftSkipped,
                 regimePolicy = config.strategyParams.regimePolicy,
+                measuredSpread = config.halfSpreadBySymbol.isNotEmpty(),
+                warnings = buildList {
+                    if (trades.size < 30) add("İşlem sayısı (${trades.size}) istatistiksel olarak güvenilir sonuç için az; dönemi ya da coin sayısını artırın.")
+                    if (config.halfSpreadBySymbol.isEmpty()) add("Spread sabit (%%%.3f) modellendi; MEXC'de çoğu altcoinin gerçek spread'i daha büyüktür.".format(config.halfSpread * 200))
+                    else add("Spread, ölçüm anındaki MEXC değerleriyle modellendi (geçmişe uygulanan varsayım); geçmiş emir defteri derinliği test edilmedi.")
+                },
             )
     }
 
@@ -567,7 +580,8 @@ class BacktestEngine(private val config: BacktestConfig, private val ruleConfig:
     }
 
     private fun syntheticBook(symbol: String, price: Double?, t: Long): BookTicker? = price?.let {
-        BookTicker(symbol, it * (1 - config.halfSpread), 0.0, it * (1 + config.halfSpread), 0.0, t)
+        val half = config.halfSpreadBySymbol[symbol] ?: config.halfSpread
+        BookTicker(symbol, it * (1 - half), 0.0, it * (1 + half), 0.0, t)
     }
 
     private fun report(

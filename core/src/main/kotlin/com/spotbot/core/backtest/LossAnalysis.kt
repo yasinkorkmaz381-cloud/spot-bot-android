@@ -96,15 +96,7 @@ object LossAnalysis {
     )
 
     /** Önceden tanımlanmış filtre adayları (sonuçlara bakılarak eklenmedi ya da ayarlanmadı). */
-    val filters: List<Triple<String, String, (TradeFeatures) -> Boolean>> = listOf(
-        Triple("F1", "BTC 4H trendi yükselişte", { f -> f.btcH4Trend == Regime.TREND_UP }),
-        Triple("F2", "1H ADX ≥ 20", { f -> f.adx1h >= 20 }),
-        Triple("F3", "15M hacim ≥ 1,5× ortalama", { f -> f.volumeRatio15m >= 1.5 }),
-        Triple("F4", "Stop mesafesi ≥ 1 ATR (1H)", { f -> f.stopDistanceAtr1h >= 1.0 }),
-        Triple("F5", "4H ve 1H trend uyumlu (ikisi de yükseliş)", { f -> f.h4Trend == Regime.TREND_UP && f.h1Trend == Regime.TREND_UP }),
-        Triple("F6", "1H RSI negatif uyumsuzluk yok", { f -> !f.bearishRsiDivergence1h }),
-        Triple("F7", "Piyasa rejimi güçlü ya da zayıf yükseliş", { f -> f.marketRegime == MarketRegime.STRONG_UP || f.marketRegime == MarketRegime.WEAK_UP }),
-    )
+    val filters: List<Triple<String, String, (TradeFeatures) -> Boolean>> get() = EntryFilters.all.map { Triple(it.id, it.description, it.keep) }
 
     private class Row(val trade: ClosedTrade, val features: TradeFeatures, val firstHalf: Boolean)
 
@@ -227,4 +219,24 @@ object StrategyIsolation {
         val reports = runner(jobs.map { job -> { job().also { synchronized(this) { done++; onProgress(done.toDouble() / jobs.size) } } } })
         return settings.mapIndexed { i, s -> summarize(s, reports.subList(3 * i, 3 * i + 3)) }
     }
+}
+
+/** Önceden tanımlı bir giriş filtresi: özellikler sinyal anında bilinen değerlerdir. */
+class EntryFilter(val id: String, val description: String, val detail: (TradeFeatures) -> String, val keep: (TradeFeatures) -> Boolean)
+
+/**
+ * Giriş filtresi adayları. Eşikler ölçümden önce sabitlendi; hem sonradan alt küme analizinde hem de gerçek yeniden
+ * testte (StrategyParams.entryFilters) aynı tanımlar kullanılır.
+ */
+object EntryFilters {
+    val all: List<EntryFilter> = listOf(
+        EntryFilter("F1", "BTC 4H trendi yükselişte", { "BTC 4H: ${it.btcH4Trend}" }) { it.btcH4Trend == Regime.TREND_UP },
+        EntryFilter("F2", "1H ADX ≥ 20", { "1H ADX %.1f".format(it.adx1h) }) { it.adx1h >= 20 },
+        EntryFilter("F3", "15M hacim ≥ 1,5× ortalama", { "Hacim %.2f×".format(it.volumeRatio15m) }) { it.volumeRatio15m >= 1.5 },
+        EntryFilter("F4", "Stop mesafesi ≥ 1 ATR (1H)", { "Stop %.2f ATR".format(it.stopDistanceAtr1h) }) { it.stopDistanceAtr1h >= 1.0 },
+        EntryFilter("F5", "4H ve 1H trend uyumlu (ikisi de yükseliş)", { "4H ${it.h4Trend} / 1H ${it.h1Trend}" }) { it.h4Trend == Regime.TREND_UP && it.h1Trend == Regime.TREND_UP },
+        EntryFilter("F6", "1H RSI negatif uyumsuzluk yok", { if (it.bearishRsiDivergence1h) "Uyumsuzluk var" else "Uyumsuzluk yok" }) { !it.bearishRsiDivergence1h },
+        EntryFilter("F7", "Piyasa rejimi güçlü ya da zayıf yükseliş", { "Rejim: ${it.marketRegime?.title ?: "veri yok"}" }) { it.marketRegime == MarketRegime.STRONG_UP || it.marketRegime == MarketRegime.WEAK_UP },
+        EntryFilter("F8", "1H MACD histogramı yükseliyor", { if (it.macdHistogram1hRising) "Yükseliyor" else "Düşüyor" }) { it.macdHistogram1hRising },
+    )
 }

@@ -172,4 +172,12 @@ class UiInteractionTest {
         compose.onNodeWithText("BTC 4 saatlik grafikte düşüş trendinde", substring = true).assertExists()
         compose.onNodeWithText("BTC / piyasa filtresi alıma izin vermiyor").assertDoesNotExist()
     }
+
+    @Test
+    fun `panel shows the real reason of the last scan when nothing else blocks`() {
+        val state = panelState(EngineStatus.RUNNING).copy(scanReason = "15M giriş teyidi bekleniyor: 2 adayda kurulum henüz oluşmadı.")
+        show { PanelContent(state, Calls().actions()) }
+        compose.onNodeWithText("Son taramada işlem açılmadı").assertExists()
+        compose.onNodeWithText("15M giriş teyidi bekleniyor", substring = true).assertExists()
+    }
 }

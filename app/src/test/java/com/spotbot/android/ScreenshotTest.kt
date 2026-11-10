@@ -243,6 +243,30 @@ open class ScreenshotTest {
         capture("2-tarama") { ScanContent(scanReport, scanLog.coins.associateBy { it.symbol }, {}) }
     }
 
+    @Test
+    fun scanDiagnostics() {
+        val view = com.spotbot.android.ui.scan.DiagnosticsView(
+            EngineHealth(status = EngineStatus.RUNNING, lastScanAt = scanLog.time, lastCandleSyncAt = scanLog.time, feed = FeedHealth(ConnectionStatus.CONNECTED, false, scanLog.time, reconnects = 1)),
+            com.spotbot.core.trading.ScanDiagnostics.of(scanLog.copy(marketAllowsLongs = false), fallingMarket),
+            com.spotbot.core.trading.ScanDiagnostics.lastSignal(listOf(scanLog)), fallingMarket,
+        )
+        capture("2c-teshis") {
+            Column(Modifier.verticalScroll(rememberScrollState()).padding(16.dp)) { com.spotbot.android.ui.scan.DiagnosticsCard(view, initiallyExpanded = true) }
+        }
+    }
+
+    @Test
+    fun backtestWithStrategyC() {
+        val r = BacktestEngine(backtestConfig.copy(symbols = listOf("NEARUSDT", "BTCUSDT"), enabledStrategies = StrategyId.entries.toSet(), shadowAnalysis = false))
+            .run(backtestData, backtestData.keys.associateWith { info(it) })
+        assertTrue(r.perStrategy.sumOf { it.stats.trades } == r.trades)
+        capture("6c-backtest-uc-strateji") {
+            Column(Modifier.verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                com.spotbot.android.ui.backtest.StrategyCompareCard(r)
+            }
+        }
+    }
+
     private fun detailState() = DetailState(
         symbol = "BTCUSDT",
         analysis = btc.analyze(),

@@ -37,11 +37,11 @@ class BacktestRunner(private val api: MarketDataApi, private val scope: Coroutin
     private var job: Job? = null
 
     /** Profilleri aynı veri, dönem, maliyet ve risk ayarlarıyla karşılaştırır (ilk/ikinci yarı ayrımıyla). */
-    fun compare(symbols: List<String>, days: Int, capital: Double, engine: EngineConfig) {
+    fun compare(symbols: List<String>, days: Int, capital: Double, engine: EngineConfig, realSpread: Boolean = false) {
         if (job?.isActive == true) return
         job = scope.launch(Dispatchers.Default) {
             runCatching {
-                val (config, data, info) = prepare(symbols, days, capital, engine.enabledStrategies, engine)
+                val (config, data, info) = prepare(symbols, days, capital, engine.enabledStrategies, engine, realSpread)
                 _state.value = BacktestState.Running("Profiller aynı koşullarda çalışıyor", 0.5f)
                 com.spotbot.core.backtest.StrategyComparison.run(config.copy(shadowAnalysis = false), data, info) { p ->
                     _state.value = BacktestState.Running("Profiller aynı koşullarda çalışıyor", 0.5f + p.toFloat() / 2)
@@ -52,11 +52,11 @@ class BacktestRunner(private val api: MarketDataApi, private val scope: Coroutin
     }
 
     /** A ve B'yi aynı veri, ücret, sermaye ve dönemde ayrı ayrı çalıştırır (ilk/ikinci yarı ayrımıyla). */
-    fun isolate(symbols: List<String>, days: Int, capital: Double, engine: EngineConfig) {
+    fun isolate(symbols: List<String>, days: Int, capital: Double, engine: EngineConfig, realSpread: Boolean = false) {
         if (job?.isActive == true) return
         job = scope.launch(Dispatchers.Default) {
             runCatching {
-                val (config, data, info) = prepare(symbols, days, capital, setOf(StrategyId.BREAKOUT_RETEST, StrategyId.TREND_PULLBACK), engine)
+                val (config, data, info) = prepare(symbols, days, capital, setOf(StrategyId.BREAKOUT_RETEST, StrategyId.TREND_PULLBACK), engine, realSpread)
                 _state.value = BacktestState.Running("A ve B aynı koşullarda ayrı çalışıyor", 0.5f)
                 com.spotbot.core.backtest.StrategyIsolation.run(config.copy(shadowAnalysis = false), data, info) { p ->
                     _state.value = BacktestState.Running("A ve B aynı koşullarda ayrı çalışıyor", 0.5f + p.toFloat() / 2)
@@ -72,6 +72,7 @@ class BacktestRunner(private val api: MarketDataApi, private val scope: Coroutin
         capital: Double,
         strategies: Set<StrategyId>,
         engine: EngineConfig,
+        realSpread: Boolean = false,
     ): Triple<BacktestConfig, Map<String, HistoricalDataset>, Map<String, com.spotbot.core.model.SymbolInfo>> {
         val end = Timeframe.H4.lastCloseAtOrBefore(api.serverTime())
         val start = end - days * DAY
@@ -80,6 +81,10 @@ class BacktestRunner(private val api: MarketDataApi, private val scope: Coroutin
             risk = engine.risk, scanner = engine.scanner, strategyParams = engine.strategyParams,
             analysis = engine.analysis, enabledStrategies = strategies, slippage = engine.slippage,
             execution = engine.execution, shadowAnalysis = true, profile = engine.profile, maxEntryDriftPercent = engine.maxEntryDriftPercent,
+            // Ölçülen spread: şu anki en iyi alış/satış farkının yarısı (alınamazsa sabit değere düşer).
+            halfSpreadBySymbol = if (realSpread) runCatching {
+                api.bookTickers().filter { it.bid > 0 && !it.spreadPercent.isNaN() }.associate { it.symbol to it.spreadPercent / 200 }
+            }.getOrDefault(emptyMap()) else emptyMap(),
         )
         val loadStart = start - config.warmupDays * DAY
         val all = (symbols + "BTCUSDT").distinct()
@@ -90,11 +95,11 @@ class BacktestRunner(private val api: MarketDataApi, private val scope: Coroutin
         return Triple(config, data, api.exchangeInfo().associateBy { it.symbol })
     }
 
-    fun run(symbols: List<String>, days: Int, capital: Double, strategies: Set<StrategyId>, engine: EngineConfig) {
+    fun run(symbols: List<String>, days: Int, capital: Double, strategies: Set<StrategyId>, engine: EngineConfig, realSpread: Boolean = false) {
         if (job?.isActive == true) return
         job = scope.launch(Dispatchers.Default) {
             runCatching {
-                val (config, data, info) = prepare(symbols, days, capital, strategies, engine)
+                val (config, data, info) = prepare(symbols, days, capital, strategies, engine, realSpread)
                 _state.value = BacktestState.Running("Backtest çalışıyor", 0.5f)
                 // Aynı mumda stop ve hedef görülen durumlar için 5M mumlar indirilir ve test yeniden çalıştırılır.
                 val (report, resolved) = BacktestEngine(config).runResolvingIntrabar(data, info, BacktestDataLoader(api)) { p ->

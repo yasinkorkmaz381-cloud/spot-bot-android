@@ -39,6 +39,8 @@ data class PanelUiState(
     val dayStartEquity: Double = 0.0,
     /** Son kapanan işlemler (en yenisi önce). */
     val recentTrades: List<com.spotbot.core.trading.ClosedTrade> = emptyList(),
+    /** Son taramada neden işlem açılmadığının kısa açıklaması (gerçek tarama kaydından). */
+    val scanReason: String? = null,
 ) {
     val dailyChange: Double get() = if (dayStartEquity > 0) equity - dayStartEquity else 0.0
     val dailyChangePercent: Double get() = if (dayStartEquity > 0) dailyChange / dayStartEquity * 100 else 0.0
@@ -85,6 +87,8 @@ class PanelViewModel(
             dayStartEquity = portfolio.dayStartEquity,
             recentTrades = portfolio.closedTrades.takeLast(3).reversed(),
         )
+    }.combine(engine.scanLogs) { state, logs ->
+        state.copy(scanReason = logs.lastOrNull()?.let { com.spotbot.core.trading.ScanDiagnostics.of(it, engine.lastScan.value?.market).shortReason })
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), PanelUiState())
 
     fun startBot() = controller.start()

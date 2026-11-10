@@ -1,0 +1,102 @@
+Veri: 15 coin · 2025-11-15 → 2026-11-08 · eğitim/test bölmesi 2026-05-13
+
+Strateji A zararlı işlemlerin ortak nedenleri (56 zararlı / 68 işlem; bir işlem birden çok gruba girebilir):
+  Sahte kırılım: lehte 0,3R bile gitmeden döndü                   15 zararlı (% 27) · kazananlarda 0/12
+  Kırılım tuttu ama hedefe varmadan döndü (≥1R lehte gidip zarar)  18 zararlı (% 32) · kazananlarda 12/12
+  BTC 4H yükseliş trendinde değildi                               30 zararlı (% 54) · kazananlarda 4/12
+  4H rejimi yatay (trend yokken kırılım)                          10 zararlı (% 18) · kazananlarda 5/12
+  4H ve 1H trend uyumsuz                                          19 zararlı (% 34) · kazananlarda 5/12
+  Stop dar (< 1 ATR 1H)                                           25 zararlı (% 45) · kazananlarda 1/12
+  Tetik mumunda hacim zayıf (< 1,5× ortalama)                     48 zararlı (% 86) · kazananlarda 10/12
+  1H ADX < 20 (trend gücü yok)                                     9 zararlı (% 16) · kazananlarda 1/12
+  1H RSI negatif uyumsuzluk                                        4 zararlı (%  7) · kazananlarda 0/12
+
+Strateji B kazanan ve kaybeden işlemlerin giriş anı ortalamaları:
+  1H ADX                     kazanan (32)   36.22 · kaybeden (94)   34.97
+  4H ADX                     kazanan (32)   37.03 · kaybeden (94)   39.28
+  1H RSI                     kazanan (32)   58.77 · kaybeden (94)   55.30
+  15M hacim oranı            kazanan (32)    1.23 · kaybeden (94)    1.06
+  Stop mesafesi (ATR)        kazanan (32)    1.26 · kaybeden (94)    0.99
+  1H ATR %                   kazanan (32)    1.50 · kaybeden (94)    1.68
+  Planlanan R:R              kazanan (32)    2.61 · kaybeden (94)    2.97
+  Kalite puanı               kazanan (32)   58.85 · kaybeden (94)   59.16
+  BTC 4H yükseliş (oran)     kazanan (32)    0.53 · kaybeden (94)    0.49
+  4H/1H uyumlu (oran)        kazanan (32)    0.84 · kaybeden (94)    0.68
+  RSI uyumsuzluk (oran)      kazanan (32)    0.16 · kaybeden (94)    0.23
+  MACD yükseliyor (oran)     kazanan (32)    0.22 · kaybeden (94)    0.14
+
+Strateji A — her filtre ayrı backtest (eğitim: ilk yarı | test: ikinci yarı)
+  filtresiz                                    eğitim  28 işlem -0.329R PF 0.57 net %-3.46 | test  47 işlem -0.372R PF 0.47 net %-7.89
+  F1 BTC 4H trendi yükselişte                  eğitim  17 işlem -0.394R PF 0.56 net %-2.20 | test  23 işlem +0.006R PF 0.97 net %-0.18
+  F2 1H ADX ≥ 20                               eğitim  24 işlem -0.231R PF 0.70 net %-2.02 | test  43 işlem -0.383R PF 0.44 net %-7.65
+  F3 15M hacim ≥ 1,5× ortalama                 eğitim   8 işlem -0.153R PF 0.58 net %-0.91 | test  12 işlem -0.515R PF 0.35 net %-3.06
+  F4 Stop mesafesi ≥ 1 ATR (1H)                eğitim  23 işlem -0.326R PF 0.62 net %-2.63 | test  30 işlem -0.296R PF 0.52 net %-4.82
+  F5 4H ve 1H trend uyumlu (ikisi de yükseliş) eğitim  20 işlem -0.203R PF 0.68 net %-1.89 | test  35 işlem -0.427R PF 0.44 net %-6.48
+  F6 1H RSI negatif uyumsuzluk yok             eğitim  27 işlem -0.410R PF 0.47 net %-4.36 | test  44 işlem -0.329R PF 0.52 net %-6.57
+  F7 Piyasa rejimi güçlü ya da zayıf yükseliş  eğitim  25 işlem -0.248R PF 0.68 net %-2.27 | test  37 işlem -0.305R PF 0.54 net %-5.21
+  F8 1H MACD histogramı yükseliyor             eğitim  17 işlem -0.264R PF 0.79 net %-0.94 | test  19 işlem -0.193R PF 0.70 net %-1.72
+  → Eğitimde seçilen: F5 4H ve 1H trend uyumlu (ikisi de yükseliş) (ort -0.203R, 20 işlem) · eğitimde pozitif mi: HAYIR · aynı seçimin testi: -0.427R, 35 işlem
+
+Strateji B — her filtre ayrı backtest (eğitim: ilk yarı | test: ikinci yarı)
+  filtresiz                                    eğitim  81 işlem -0.187R PF 0.74 net %-5.82 | test  63 işlem -0.303R PF 0.59 net %-7.98
+  F1 BTC 4H trendi yükselişte                  eğitim  46 işlem -0.289R PF 0.67 net %-4.40 | test  30 işlem -0.085R PF 0.97 net %-0.29
+  F2 1H ADX ≥ 20                               eğitim  73 işlem -0.185R PF 0.75 net %-4.99 | test  62 işlem -0.251R PF 0.66 net %-6.60
+  F3 15M hacim ≥ 1,5× ortalama                 eğitim  26 işlem -0.070R PF 0.75 net %-2.00 | test  17 işlem -0.119R PF 0.67 net %-1.89
+  F4 Stop mesafesi ≥ 1 ATR (1H)                eğitim  40 işlem +0.020R PF 0.90 net %-1.18 | test  31 işlem -0.208R PF 0.75 net %-2.59
+  F5 4H ve 1H trend uyumlu (ikisi de yükseliş) eğitim  59 işlem -0.049R PF 0.98 net %-0.28 | test  54 işlem -0.202R PF 0.73 net %-4.38
+  F6 1H RSI negatif uyumsuzluk yok             eğitim  64 işlem -0.188R PF 0.71 net %-4.97 | test  53 işlem -0.106R PF 0.82 net %-2.86
+  F7 Piyasa rejimi güçlü ya da zayıf yükseliş  eğitim  66 işlem -0.193R PF 0.76 net %-4.28 | test  46 işlem -0.323R PF 0.57 net %-6.10
+  F8 1H MACD histogramı yükseliyor             eğitim  21 işlem -0.075R PF 0.78 net %-1.30 | test  18 işlem +0.001R PF 0.94 net %-0.34
+  → Eğitimde seçilen: F4 Stop mesafesi ≥ 1 ATR (1H) (ort +0.020R, 40 işlem) · eğitimde pozitif mi: EVET · aynı seçimin testi: -0.208R, 31 işlem
+
+Yapılandırma karşılaştırması — standart maliyet (spread %0,05)
+A · Mevcut A + B
+  Tüm dönem                           194 işlem  44K/150Z kazanma % 22.7 PF  0.61 ort -0.288R beklenen -1.082 net %-20.99 düşüş %22.11 ücret  43.43
+  Eğitim (ilk yarı)                    98 işlem  24K/ 74Z kazanma % 24.5 PF  0.67 ort -0.250R beklenen -0.903 net % -8.85 düşüş %10.72 ücret  23.63
+  Test (ikinci yarı)                   96 işlem  20K/ 76Z kazanma % 20.8 PF  0.55 ort -0.325R beklenen -1.388 net %-13.33 düşüş %13.59 ücret  21.71
+  BTC al-tut: tüm dönem %-20.57 · eğitim %-16.89 · test %-4.52
+B · Yalnız mevcut B
+  Tüm dönem                           144 işlem  36K/108Z kazanma % 25.0 PF  0.67 ort -0.238R beklenen -0.925 net %-13.32 düşüş %16.97 ücret  32.29
+  Eğitim (ilk yarı)                    81 işlem  22K/ 59Z kazanma % 27.2 PF  0.74 ort -0.187R beklenen -0.718 net % -5.82 düşüş % 9.39 ücret  19.38
+  Test (ikinci yarı)                   63 işlem  14K/ 49Z kazanma % 22.2 PF  0.59 ort -0.303R beklenen -1.266 net % -7.98 düşüş % 9.51 ücret  13.71
+C · Eğitimde seçilen (B[F4])
+  Tüm dönem                            71 işlem  22K/ 49Z kazanma % 31.0 PF  0.83 ort -0.080R beklenen -0.526 net % -3.73 düşüş % 8.74 ücret  15.08
+  Eğitim (ilk yarı)                    40 işlem  14K/ 26Z kazanma % 35.0 PF  0.90 ort +0.020R beklenen -0.295 net % -1.18 düşüş % 5.20 ücret   9.09
+  Test (ikinci yarı)                   31 işlem   8K/ 23Z kazanma % 25.8 PF  0.75 ort -0.208R beklenen -0.835 net % -2.59 düşüş % 4.29 ücret   6.06
+(bilgi) A+B, seçilen filtrelerle
+  Tüm dönem                           110 işlem  32K/ 78Z kazanma % 29.1 PF  0.81 ort -0.105R beklenen -0.580 net % -6.38 düşüş %10.86 ücret  25.07
+  Eğitim (ilk yarı)                    54 işlem  18K/ 36Z kazanma % 33.3 PF  0.90 ort +0.002R beklenen -0.306 net % -1.65 düşüş % 6.20 ücret  12.83
+  Test (ikinci yarı)                   56 işlem  14K/ 42Z kazanma % 25.0 PF  0.73 ort -0.209R beklenen -0.858 net % -4.81 düşüş % 6.07 ücret  12.45
+
+Yapılandırma karşılaştırması — ölçülen MEXC spread'leriyle (10.11.2026 ölçümü geçmişe uygulanır; spread > %0,20 olan coin canlıdaki gibi elenir)
+A · Mevcut A + B
+  Tüm dönem                           141 işlem  33K/108Z kazanma % 23.4 PF  0.62 ort -0.265R beklenen -0.987 net %-13.92 düşüş %14.07 ücret  34.55
+  Eğitim (ilk yarı)                    73 işlem  17K/ 56Z kazanma % 23.3 PF  0.64 ort -0.294R beklenen -0.892 net % -6.51 düşüş % 6.72 ücret  17.85
+  Test (ikinci yarı)                   68 işlem  16K/ 52Z kazanma % 23.5 PF  0.59 ort -0.235R beklenen -1.169 net % -7.95 düşüş % 9.63 ücret  17.84
+  BTC al-tut: tüm dönem %-20.57 · eğitim %-16.89 · test %-4.52
+B · Yalnız mevcut B
+  Tüm dönem                            98 işlem  22K/ 76Z kazanma % 22.4 PF  0.56 ort -0.323R beklenen -1.197 net %-11.73 düşüş %12.42 ücret  23.21
+  Eğitim (ilk yarı)                    57 işlem  13K/ 44Z kazanma % 22.8 PF  0.60 ort -0.317R beklenen -1.050 net % -5.99 düşüş % 6.72 ücret  13.53
+  Test (ikinci yarı)                   41 işlem   9K/ 32Z kazanma % 22.0 PF  0.51 ort -0.333R beklenen -1.495 net % -6.13 düşüş % 6.22 ücret  10.29
+C · Eğitimde seçilen (B[F4])
+  Tüm dönem                            51 işlem  12K/ 39Z kazanma % 23.5 PF  0.63 ort -0.281R beklenen -1.190 net % -6.07 düşüş % 7.12 ücret  11.86
+  Eğitim (ilk yarı)                    30 işlem   9K/ 21Z kazanma % 30.0 PF  0.77 ort -0.116R beklenen -0.688 net % -2.07 düşüş % 3.16 ücret   6.98
+  Test (ikinci yarı)                   21 işlem   3K/ 18Z kazanma % 14.3 PF  0.45 ort -0.518R beklenen -1.947 net % -4.09 düşüş % 4.44 ücret   4.98
+(bilgi) A+B, seçilen filtrelerle
+  Tüm dönem                            77 işlem  19K/ 58Z kazanma % 24.7 PF  0.70 ort -0.212R beklenen -0.880 net % -6.77 düşüş % 7.96 ücret  19.29
+  Eğitim (ilk yarı)                    39 işlem  13K/ 26Z kazanma % 33.3 PF  0.95 ort -0.001R beklenen -0.121 net % -0.47 düşüş % 2.55 ücret   9.47
+  Test (ikinci yarı)                   38 işlem   6K/ 32Z kazanma % 15.8 PF  0.49 ort -0.429R beklenen -1.666 net % -6.33 düşüş % 6.95 ücret   9.87
+
+İleri yürüyen test (3 ay eğitim → 2 ay test; her katmanda strateji başına en iyi tek filtre eğitimde seçilir, eğitimde ort. R ≤ 0 olan strateji o katmanda işlem yapmaz)
+  2026-02-13 → 2026-04-14 · A: işlem yok (eğitim en iyi -0.27R) · B: F1 BTC 4H trendi yükselişte (+0.43R, 10)
+      test: seçilen 26 işlem -0.540R net %-5.14 | mevcut A+B 42 işlem -0.350R net %-4.87
+  2026-04-14 → 2026-06-13 · A: işlem yok (eğitim en iyi -0.28R) · B: F3 15M hacim ≥ 1,5× ortalama (+0.23R, 8)
+      test: seçilen 16 işlem -0.786R net %-6.32 | mevcut A+B 38 işlem -0.389R net %-7.14
+  2026-06-13 → 2026-08-12 · A: işlem yok (eğitim en iyi -0.06R) · B: işlem yok (eğitim en iyi -0.32R)
+      test: seçilen işlem yok (%0) | mevcut A+B 34 işlem -0.246R net %-3.21
+  2026-08-12 → 2026-10-11 · A: işlem yok (eğitim en iyi -0.15R) · B: F8 1H MACD histogramı yükseliyor (+0.36R, 9)
+      test: seçilen 7 işlem -0.181R net %-0.64 | mevcut A+B 51 işlem -0.253R net %-5.99
+  2026-10-11 → 2026-11-08 · A: F1 BTC 4H trendi yükselişte (+0.28R, 16) · B: F1 BTC 4H trendi yükselişte (+0.15R, 19)
+      test: seçilen 0 işlem +0.000R net %+0.00 | mevcut A+B 2 işlem -0.907R net %-0.88
+  İleri yürüyen: seçilen (birleşik)    49 işlem   7K/ 42Z kazanma % 14.3 PF  0.31 ort -0.569R beklenen -2.470 net %-12.10 düşüş %12.51 ücret  10.42
+  Aynı dönemlerde mevcut A+B          167 işlem  36K/131Z kazanma % 21.6 PF  0.58 ort -0.315R beklenen -1.322 net %-22.08 düşüş %23.17 ücret  39.10

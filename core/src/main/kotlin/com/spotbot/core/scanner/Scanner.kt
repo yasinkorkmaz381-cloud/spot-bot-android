@@ -313,6 +313,18 @@ object Scanner {
 
 /** Piyasa filtresinin kullanıcıya gösterilen açıklaması (teknik kod yerine düz Türkçe). */
 object MarketExplanation {
+    /** Ana panel için tek cümlelik neden. */
+    fun short(market: MarketState?): String? {
+        if (market == null || market.allowsLongs) return null
+        val ids = market.failedConditions.map { it.id }.toSet()
+        return when {
+            "B1" in ids || ids.isEmpty() -> "MEXC verileri güncellenemedi (BTC verisi eksik)."
+            "B2" in ids -> "MEXC verileri güncellenemedi (BTC verisi eski)."
+            "B3" in ids -> "BTC trendi uygun değil (4 saatlikte düşüş trendi)."
+            else -> "BTC son 4 saatte sert düştü."
+        }
+    }
+
     /** Alım serbestse null; değilse engelin türünü ve nedenini anlatan kısa metin. */
     fun text(market: MarketState?): String? {
         if (market == null || market.allowsLongs) return null

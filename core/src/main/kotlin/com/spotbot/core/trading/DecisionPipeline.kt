@@ -220,9 +220,20 @@ class DecisionPipeline(
             marketRegime = com.spotbot.core.analysis.RegimeClassifier.classify(context.btc?.h4),
             regimePolicy = strategyParams.regimePolicy,
         )
-        val report = withProfileGates(ruleEngine.evaluate(ruleContext), rr)
+        val report = withEntryFilters(withProfileGates(ruleEngine.evaluate(ruleContext), rr), candidate, context, setup)
         if (!report.allowed || sizing !is SizingResult.Sized) return CandidateDecision.Reject(setup.symbol, setup, report)
         return CandidateDecision.Enter(setup.symbol, setup, sizing, rr, report, rationale(setup, candidate, context, rr, sizing))
+    }
+
+    /** Etkinleştirilmiş ek giriş filtreleri (varsayılan: yok). Zorunlu kural gibi çalışır; mevcut kuralları değiştirmez. */
+    private fun withEntryFilters(report: RuleReport, candidate: Candidate, context: DecisionContext, setup: TradeSetup): RuleReport {
+        val ids = strategyParams.entryFilters[setup.strategy].orEmpty()
+        if (ids.isEmpty()) return report
+        val features = com.spotbot.core.backtest.FeatureExtractor.extract(candidate.mtf, context.btc, setup, report.qualityScore)
+        val gates = com.spotbot.core.backtest.EntryFilters.all.filter { it.id in ids }.map { f ->
+            RuleOutcome(f.id, "Ek filtre: ${f.description}", RuleGroup.MANDATORY, f.keep(features), f.detail(features), 0.0)
+        }
+        return report.copy(outcomes = report.outcomes + gates)
     }
 
     /** Seçici profilin ek zorunlu eşikleri (kurallara eklenir, mevcut kuralları değiştirmez). */

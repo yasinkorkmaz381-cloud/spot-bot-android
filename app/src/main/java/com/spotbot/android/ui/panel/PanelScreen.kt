@@ -241,7 +241,12 @@ private fun ControlCard(state: PanelUiState, actions: PanelActions, onStop: () -
                 val kind = state.risk.marketBlockKind
                 StatusPill(kind?.let { "Yeni işlem yok · ${it.title}" } ?: "Yeni işlem yok", kind?.let { marketBlockColor(it) } ?: SpotBotTheme.tradingColors.loss)
                 Text(blocked, style = MaterialTheme.typography.bodySmall)
-                if (kind != null) Text("Ayrıntı: Risk ve sistem ayrıntıları → Piyasa filtresi", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (kind != null) Text("Sayılar: Tarama → Teşhis · ayrıntı: Risk ve sistem ayrıntıları", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            state.scanReason != null -> {
+                Text("Son taramada işlem açılmadı", style = MaterialTheme.typography.labelLarge)
+                Text(state.scanReason, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("Sayılar: Tarama → Teşhis", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             else -> Text("Her 15 dakikada tarar; kurallar sağlanırsa sanal işlem açar.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }

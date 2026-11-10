@@ -64,6 +64,11 @@ data class StrategyParams(
     val rangeMinTouches: Int = 2,
     /** Piyasa (BTC 4H) rejim filtresi; varsayılan kapalı (yalnız bilgi). */
     val regimePolicy: com.spotbot.core.analysis.RegimePolicy = com.spotbot.core.analysis.RegimePolicy.OFF,
+    /**
+     * Strateji başına ek giriş filtreleri (EntryFilters kimlikleri). Varsayılan boş: davranış değişmez. Yalnız
+     * bağımsız testte doğrulanan filtreler etkinleştirilmelidir.
+     */
+    val entryFilters: Map<StrategyId, Set<String>> = emptyMap(),
 )
 
 /** 15M tetik mumu ve teyit kontrolleri; tüm stratejilerde ortak. */

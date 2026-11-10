@@ -159,6 +159,7 @@ fun DetailedMetricsCard(r: BacktestReport) {
         KeyValueRow("Spread + kayma", "${formatMoney(r.spreadAndSlippageCost)} USDT")
         KeyValueRow("Piyasada kalma", formatPercent(r.exposurePercent, minFractionDigits = 1))
         KeyValueRow("Profil", r.profile.title)
+        KeyValueRow("Spread modeli", if (r.measuredSpread) "Ölçülen MEXC spread'i (bugünkü ölçüm)" else "Sabit %0,05")
         val ib = r.intrabar
         KeyValueRow(
             "Aynı mumda stop + hedef",
@@ -228,12 +229,24 @@ fun StatsTable(columns: List<Pair<String, PerformanceStats?>>, keyOnly: Boolean 
 @Composable
 fun StrategyCompareCard(r: BacktestReport) {
     val byId = r.perStrategy.associate { it.strategy to it.stats }
-    SectionCard("Strateji A ve B") {
+    SectionCard("Stratejiler") {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             listOf(StrategyId.BREAKOUT_RETEST, StrategyId.TREND_PULLBACK).forEach { id ->
                 StrategyTile(id, byId[id], Modifier.weight(1f))
             }
         }
+        // İşlem yapan diğer stratejiler (ör. C açıksa) de gösterilir; aksi halde toplamlar tutmaz.
+        val others = r.perStrategy.filter { it.strategy != StrategyId.BREAKOUT_RETEST && it.strategy != StrategyId.TREND_PULLBACK && it.stats.trades > 0 }
+        others.forEach { o ->
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                StrategyTile(o.strategy, o.stats, Modifier.weight(1f))
+                Spacer(Modifier.weight(1f))
+            }
+        }
+        KeyValueRow(
+            "Toplam (${r.perStrategy.joinToString(" + ") { it.strategy.code }})",
+            "${r.perStrategy.sumOf { it.stats.trades }} işlem · ${formatSignedMoney(r.perStrategy.sumOf { it.stats.netPnl })} USDT",
+        )
         val small = r.perStrategy.filter { it.stats.trades < 30 }
         if (small.isNotEmpty()) {
             Text(
@@ -242,8 +255,9 @@ fun StrategyCompareCard(r: BacktestReport) {
             )
         }
     }
-    ExpandableCard("A ve B: tüm ölçüler", subtitle = "Aynı çalıştırma; iki strateji sermayeyi ve pozisyon sınırını paylaşır") {
-        StatsTable(listOf("A" to byId[StrategyId.BREAKOUT_RETEST], "B" to byId[StrategyId.TREND_PULLBACK]))
+    val others = r.perStrategy.filter { it.strategy != StrategyId.BREAKOUT_RETEST && it.strategy != StrategyId.TREND_PULLBACK && it.stats.trades > 0 }
+    ExpandableCard("Stratejiler: tüm ölçüler", subtitle = "Aynı çalıştırma; iki strateji sermayeyi ve pozisyon sınırını paylaşır") {
+        StatsTable(listOf("A" to byId[StrategyId.BREAKOUT_RETEST], "B" to byId[StrategyId.TREND_PULLBACK]) + others.map { it.strategy.code to it.stats })
     }
 }
 
@@ -283,7 +297,7 @@ fun TradeHistoryCard(r: BacktestReport, onOpen: (ClosedTrade) -> Unit) {
     SectionCard("İşlem geçmişi") {
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             FilterChip(selected = strategy == null, onClick = { strategy = null; shown = 30 }, label = { Text("Tümü") })
-            listOf(StrategyId.BREAKOUT_RETEST, StrategyId.TREND_PULLBACK).forEach { id ->
+            (listOf(StrategyId.BREAKOUT_RETEST, StrategyId.TREND_PULLBACK) + r.perStrategy.map { it.strategy }).distinct().forEach { id ->
                 FilterChip(selected = strategy == id.code, onClick = { strategy = id.code; shown = 30 }, label = { Text("Strateji ${id.code}", maxLines = 1) })
             }
         }
