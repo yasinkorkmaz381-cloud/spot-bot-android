@@ -29,6 +29,9 @@ class AppContainer(app: Application) {
         config = settings.settings.value.engine,
         decisionLog = FileDecisionLogStore(java.io.File(app.filesDir, "decisions")),
         runLocation = "Bu telefon (Android ön plan servisi)",
+        shadowStore = com.spotbot.android.data.FileShadowStore(app.filesDir),
     )
     val backtest = BacktestRunner(api, scope, app.cacheDir)
+    /** V3 araştırmasında "umut verici" çıkan S1'in ayrı sanal portföydeki ileri testi (yalnız kâğıt). */
+    val forward = com.spotbot.core.research.ForwardTracker(api, com.spotbot.android.data.FileForwardStore(app.filesDir))
 }

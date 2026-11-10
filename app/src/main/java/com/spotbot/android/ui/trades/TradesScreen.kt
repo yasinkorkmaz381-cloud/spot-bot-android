@@ -100,20 +100,38 @@ class TradeChartLoader(private val api: MarketDataApi, private val scope: Corout
     }
 }
 
-class TradesViewModel(private val engine: TradingEngine) : ViewModel() {
+class TradesViewModel(private val engine: TradingEngine, private val forwardTracker: com.spotbot.core.research.ForwardTracker) : ViewModel() {
     val portfolio = engine.portfolio
+    val shadows = engine.shadows
+    val forward = forwardTracker.state
+    private val _forwardBusy = kotlinx.coroutines.flow.MutableStateFlow(false)
+    val forwardBusy = _forwardBusy.asStateFlow()
+
+    fun refreshForward() {
+        if (_forwardBusy.value) return
+        _forwardBusy.value = true
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            try { forwardTracker.refresh() } finally { _forwardBusy.value = false }
+        }
+    }
     val prices = engine.prices
 
     fun cancelPending(symbol: String) = engine.cancelPendingOrder(symbol)
 }
 
-enum class TradesTab(val title: String) { OPEN("Açık işlemler"), HISTORY("Geçmiş") }
+enum class TradesTab(val title: String) { OPEN("Açık"), HISTORY("Geçmiş"), SHADOW("Gölge test") }
 
 @Composable
 fun TradesScreen(onOpenTrade: (String) -> Unit, onOpenEvents: () -> Unit, modifier: Modifier = Modifier, viewModel: TradesViewModel = viewModel(factory = AppViewModels.Factory)) {
     val portfolio by viewModel.portfolio.collectAsStateWithLifecycle()
     val prices by viewModel.prices.collectAsStateWithLifecycle()
-    TradesContent(portfolio, prices.mapValues { it.value.bid }, onOpenTrade, modifier, onOpenEvents, viewModel::cancelPending)
+    val shadows by viewModel.shadows.collectAsStateWithLifecycle()
+    val forward by viewModel.forward.collectAsStateWithLifecycle()
+    val forwardBusy by viewModel.forwardBusy.collectAsStateWithLifecycle()
+    TradesContent(
+        portfolio, prices.mapValues { it.value.bid }, onOpenTrade, modifier, onOpenEvents, viewModel::cancelPending, shadows = shadows,
+        forward = forward, forwardBusy = forwardBusy, onRefreshForward = viewModel::refreshForward,
+    )
 }
 
 @Composable
@@ -125,6 +143,10 @@ fun TradesContent(
     onOpenEvents: () -> Unit = {},
     onCancelPending: (String) -> Unit = {},
     initialTab: TradesTab = TradesTab.OPEN,
+    shadows: Map<String, PortfolioState> = emptyMap(),
+    forward: com.spotbot.core.research.ForwardState? = null,
+    forwardBusy: Boolean = false,
+    onRefreshForward: () -> Unit = {},
 ) {
     var tab by rememberSaveable { mutableStateOf(initialTab) }
     LazyColumn(modifier.fillMaxSize(), contentPadding = PaddingValues(Spacing.screen), verticalArrangement = Arrangement.spacedBy(Spacing.cards)) {
@@ -151,6 +173,19 @@ fun TradesContent(
                     }
                 }
             }
+            TradesTab.SHADOW -> {
+                item {
+                    Text(
+                        "Gölge testteki stratejiler aynı tarama, kural ve risk koduyla ayrı sanal hesapta işlem açar. Aktif portföyü etkilemez; veri toplamak içindir.",
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                item(key = "forward-s1") { ForwardCard(forward, forwardBusy, onRefreshForward) }
+                if (shadows.isEmpty()) item { EmptyText("Gölge testteki 15M stratejilerinde (ör. A) henüz işlem yok. Kurulum bulunduğunda burada görünür.", Modifier.padding(4.dp)) }
+                shadows.toSortedMap().forEach { (name, state) ->
+                    item(key = "shadow-$name") { ShadowCard(name, state, bids) }
+                }
+            }
             TradesTab.HISTORY -> {
                 val summary = Performance.summarize(portfolio, System.currentTimeMillis())
                 item {
@@ -170,6 +205,74 @@ fun TradesContent(
                 item { AppCard { NavRow("Olay günlüğü", subtitle = "Açılan, kapanan ve reddedilen tüm kararlar", onClick = onOpenEvents) } }
             }
         }
+    }
+}
+
+@Composable
+private fun ShadowCard(name: String, state: PortfolioState, bids: Map<String, Double>) {
+    val id = runCatching { com.spotbot.core.strategy.StrategyId.valueOf(name) }.getOrNull()
+    val summary = Performance.summarize(state, System.currentTimeMillis())
+    val equity = state.cash + state.positions.sumOf { p -> (bids[p.symbol] ?: p.entryPrice) * p.quantity }
+    SectionCard(id?.let { "Strateji ${it.code} · ${it.title}" } ?: name) {
+        MetricGrid(
+            listOf(
+                Triple("Sanal sermaye", "${formatMoney(equity)} USDT", Color.Unspecified),
+                Triple("Net kâr/zarar", "${formatSignedMoney(summary.allTime.netPnl)} USDT", gainLossColor(summary.allTime.netPnl.compareTo(0.0))),
+                Triple("İşlem", "${summary.allTime.trades}", Color.Unspecified),
+                Triple("Profit factor", formatRatio(summary.profitFactor), Color.Unspecified),
+            ),
+        )
+        state.positions.forEach { p -> KeyValueRow("Açık: ${p.symbol.removeSuffix("USDT")}", "${formatPrice(p.entryPrice)} → ${bids[p.symbol]?.let { formatPrice(it) } ?: "—"}") }
+        state.closedTrades.takeLast(5).reversed().forEach { t ->
+            KeyValueRow("${t.position.symbol.removeSuffix("USDT")} · ${formatDateTime(t.closedAt)}", "${formatSignedMoney(t.netPnl)} · ${t.reason.title}", gainLossColor(t.netPnl.compareTo(0.0)))
+        }
+        if (summary.allTime.trades < 30) Text("30'dan az işlem: sonuç henüz istatistik için yetersiz.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.tertiary)
+    }
+}
+
+/** V3 araştırmasından S1'in ileri testi: ayrı 1.000 USDT sanal portföy, 4H mum kapanışlarıyla güncellenir. */
+@Composable
+private fun ForwardCard(state: com.spotbot.core.research.ForwardState?, busy: Boolean, onRefresh: () -> Unit) {
+    val r = state?.result
+    SectionCard("S1 · Göreceli güç (ileri test)") {
+        Text(
+            "V3 araştırmasında ön kayıtlı ölçütleri geçen tek strateji. Aynı kodla, yalnız takip başladıktan sonra kapanan 4H mumlarında " +
+                "işlem yapar; dolumlar sonraki 4H açılışından ve orta maliyet senaryosuyla hesaplanır. Gerçek emir gönderilmez.",
+            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        when {
+            state == null -> Text(if (busy) "İlk veri indiriliyor…" else "Henüz başlatılmadı. Bot çalışırken otomatik başlar ya da Güncelle'ye basın.", style = MaterialTheme.typography.bodyMedium)
+            else -> {
+                val value = state.capital * (1 + (r?.netReturnPercent ?: 0.0) / 100)
+                MetricGrid(
+                    listOf(
+                        Triple("Sanal değer", "${formatMoney(value)} USDT", Color.Unspecified),
+                        Triple("Net", r?.let { formatPercent(it.netReturnPercent, signed = true, minFractionDigits = 2) } ?: "—", gainLossColor((r?.netReturnPercent ?: 0.0).compareTo(0.0))),
+                        Triple("Kapanan işlem", "${r?.trades ?: 0}", Color.Unspecified),
+                        Triple("Ort. R", r?.takeIf { it.trades > 0 }?.let { "%+.2f".format(it.averageR) } ?: "—", Color.Unspecified),
+                    ),
+                )
+                KeyValueRow("Başlangıç", formatDateTime(state.startedAt))
+                KeyValueRow("Son kapanmış 4H mum", if (state.dataEnd > 0) formatDateTime(state.dataEnd) else "—")
+                KeyValueRow("İşlem yapılabilir parite", "${state.tradableNow} / ${state.symbolsLoaded}")
+                r?.btcBuyHoldPercent?.let { KeyValueRow("BTC al-tut (aynı dönem)", formatPercent(it, signed = true, minFractionDigits = 2)) }
+                r?.open?.forEach { p ->
+                    KeyValueRow("Açık: ${p.symbol.removeSuffix("USDT")}", "${formatPrice(p.entryPrice)} → ${formatPrice(p.lastPrice)} · stop ${formatPrice(p.stop)}", gainLossColor(p.unrealizedPnl.compareTo(0.0)))
+                }
+                r?.tradeList?.takeLast(5)?.reversed()?.forEach { t ->
+                    KeyValueRow("${t.symbol.removeSuffix("USDT")} · ${formatDateTime(t.exitTime)}", "${formatSignedMoney(t.netPnl)} · ${t.reason}", gainLossColor(t.netPnl.compareTo(0.0)))
+                }
+                val status = when {
+                    state.lastError != null -> "Yazılım / veri sorunu: ${state.lastError}"
+                    r == null -> "Henüz yeni 4H mumu kapanmadı; işlem yapılmaması kuralların değil zamanın sonucu."
+                    r.trades == 0 && r.open.isEmpty() -> "Yazılım sağlıklı. Şu ana kadar kural koşulları oluşmadı; işlem açılmaması kuralların kararıdır."
+                    else -> "Yazılım sağlıklı."
+                }
+                Text(status, style = MaterialTheme.typography.bodySmall, color = if (state.lastError != null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
+                if ((r?.trades ?: 0) < 30) Text("30'dan az işlem: sonuç henüz istatistik için yetersiz. Araştırmadaki t değeri de düşüktü (son test t≈0,8).", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.tertiary)
+            }
+        }
+        TextButton(onClick = onRefresh, enabled = !busy) { Text(if (busy) "Güncelleniyor…" else "Güncelle") }
     }
 }
 

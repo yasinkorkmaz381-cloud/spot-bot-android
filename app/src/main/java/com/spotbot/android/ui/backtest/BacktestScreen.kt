@@ -71,8 +71,8 @@ class BacktestViewModel(private val runner: BacktestRunner, private val settings
     }
 
     var mode by mutableStateOf(BacktestMode.SINGLE)
-    /** Sabit %0,05 yerine şu an ölçülen MEXC alış-satış farkı kullanılır (canlıdaki spread filtresi de uygulanır). */
-    var realSpread by mutableStateOf(true)
+    /** Maliyet senaryosu (geçmiş spread verisi olmadığından senaryolarla test edilir). */
+    var cost by mutableStateOf(com.spotbot.android.bot.BacktestCost.MEDIUM)
 
     fun symbolCount() = symbolList().size
 
@@ -85,9 +85,9 @@ class BacktestViewModel(private val runner: BacktestRunner, private val settings
         val capitalValue = parseDecimal(capital) ?: 1_000.0
         val engine = settings.settings.value.engine
         when (mode) {
-            BacktestMode.PROFILES -> runner.compare(list, days, capitalValue, engine, realSpread)
-            BacktestMode.ISOLATED -> runner.isolate(list, days, capitalValue, engine, realSpread)
-            BacktestMode.SINGLE -> if (strategies.isNotEmpty()) runner.run(list, days, capitalValue, strategies, engine, realSpread)
+            BacktestMode.PROFILES -> runner.compare(list, days, capitalValue, engine, cost)
+            BacktestMode.ISOLATED -> runner.isolate(list, days, capitalValue, engine, cost)
+            BacktestMode.SINGLE -> if (strategies.isNotEmpty()) runner.run(list, days, capitalValue, strategies, engine, cost)
         }
     }
 }
@@ -138,15 +138,11 @@ fun BacktestScreen(modifier: Modifier = Modifier, viewModel: BacktestViewModel =
                     }
                 }
             }
+            Text("Maliyet senaryosu", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilterChip(selected = viewModel.realSpread, onClick = { viewModel.realSpread = true }, label = { Text("Ölçülen spread") })
-                FilterChip(selected = !viewModel.realSpread, onClick = { viewModel.realSpread = false }, label = { Text("Sabit %0,05") })
+                com.spotbot.android.bot.BacktestCost.entries.forEach { c -> FilterChip(selected = viewModel.cost == c, onClick = { viewModel.cost = c }, label = { Text(c.title) }) }
             }
-            Text(
-                if (viewModel.realSpread) "MEXC'de şu an ölçülen alış-satış farkı geçmişe uygulanır; farkı %0,20'yi aşan coinler canlıdaki gibi elenir. Geçmiş emir defteri olmadığı için bu bir varsayımdır."
-                else "Tüm coinlerde sabit %0,05 alış-satış farkı varsayılır; MEXC'de çoğu altcoinin gerçek farkı bundan büyüktür, sonuç iyimser çıkar.",
-                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            Text(viewModel.cost.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text(
                 "Canlı motorla aynı tarama, strateji, kural ve risk kodu. Sinyal 15M kapanışında, giriş sonraki mumun açılışında; komisyon, spread ve kayma düşülür.",
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,

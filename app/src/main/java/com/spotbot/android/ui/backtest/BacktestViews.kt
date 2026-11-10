@@ -159,7 +159,7 @@ fun DetailedMetricsCard(r: BacktestReport) {
         KeyValueRow("Spread + kayma", "${formatMoney(r.spreadAndSlippageCost)} USDT")
         KeyValueRow("Piyasada kalma", formatPercent(r.exposurePercent, minFractionDigits = 1))
         KeyValueRow("Profil", r.profile.title)
-        KeyValueRow("Spread modeli", if (r.measuredSpread) "Ölçülen MEXC spread'i (bugünkü ölçüm)" else "Sabit %0,05")
+        KeyValueRow("Spread modeli", if (r.measuredSpread) "Bugünkü ölçüm (senaryo)" else "Sabit %%%.2f".format(r.spreadModelPercent))
         val ib = r.intrabar
         KeyValueRow(
             "Aynı mumda stop + hedef",

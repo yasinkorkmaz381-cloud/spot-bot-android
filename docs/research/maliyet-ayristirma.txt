@@ -1,0 +1,28 @@
+Sabit spread: 194 işlem, net %-20.99 · ölçülen spread: 141 işlem, net %-13.92 · fark +7.06 puan
+Spread > %0.20 nedeniyle ölçülen senaryoda elenen pariteler: DOGEUSDT (%0.282), ENAUSDT (%0.255), INJUSDT (%0.201), NEARUSDT (%0.376)
+
+Ayrıştırma (USDT; sermaye 1000):
+  1) Elenen paritelerdeki işlemler (yalnız sabit senaryoda):  70 işlem, net  -111.59
+  2) Ortak işlemler (aynı parite ve sinyal): 104 işlem · sabit   -67.33 · ölçülen   -71.61 · maliyet farkı   -4.28
+  3) Yol etkisi — yalnız sabit senaryoda açılan diğer işlemler:  20 işlem, net   -30.94
+  4) Yol etkisi — yalnız ölçülen senaryoda açılan işlemler (boşalan yerler):  37 işlem, net   -67.60
+  Kontrol: sabit = 1+2+3 = -209.86 (rapor -209.86) · ölçülen = 2+4 = -139.21 (rapor -139.21)
+
+Parite bazında (sabit → ölçülen):
+  ADAUSDT     16 işlem   -12.70 →  13 işlem   -10.67   spread %0.173
+  AVAXUSDT    14 işlem    -3.69 →  14 işlem    -4.79   spread %0.061
+  BCHUSDT      7 işlem    -5.74 →   7 işlem    -5.31   spread %0.044
+  BNBUSDT      8 işlem    -3.78 →  13 işlem   -15.66   spread %0.019
+  BTCUSDT      6 işlem    +8.31 →  14 işlem    -8.64   spread %0.004
+  DOGEUSDT    10 işlem   -36.13 →   0 işlem    +0.00   spread %0.282
+  ENAUSDT     15 işlem   -12.77 →   0 işlem    +0.00   spread %0.255
+  ETHUSDT     12 işlem    -5.51 →  17 işlem    +0.60   spread %0.014
+  INJUSDT     23 işlem   -50.44 →   0 işlem    +0.00   spread %0.201
+  LTCUSDT      6 işlem   -22.71 →  10 işlem   -36.72   spread %0.080
+  NEARUSDT    22 işlem   -12.26 →   0 işlem    +0.00   spread %0.376
+  SOLUSDT     14 işlem   -18.44 →  12 işlem   -21.42   spread %0.012
+  TRXUSDT      7 işlem    +2.09 →   7 işlem    +2.09   spread %0.031
+  XRPUSDT      8 işlem   -16.24 →   8 işlem   -18.54   spread %0.037
+  ZECUSDT     26 işlem   -19.85 →  26 işlem   -20.15   spread %0.128
+
+İşlem başına maliyet: sabit 0.224 USDT ücret + 0.352 USDT spread/kayma · ölçülen 0.245 + 0.409

@@ -89,4 +89,37 @@ class SignalReplayTest {
         assertTrue(ScanDiagnostics.lastSignal(logs)!!.opened)
         engine.stop()
     }
+
+    @Test
+    fun `a shadow strategy trades in its own virtual portfolio and never touches the active one`() = runBlocking {
+        val backtest = BacktestEngine(BacktestConfig(listOf("NEARUSDT"), 1_789_689_600_000L, data.getValue("NEARUSDT").m15.last().closeTime, scanner = scanner)).run(data, info)
+        val reference = backtest.closedTrades.last { it.position.setup.signalTime > 1_789_689_600_000L + 8L * 24 * 3_600_000 }
+        assertEquals(com.spotbot.core.strategy.StrategyId.TREND_PULLBACK, reference.position.strategy)
+        val signal = reference.position.setup.signalTime
+        val clock = AtomicLong(signal - Timeframe.M15.millis + 5_000)
+        val shadows = InMemoryShadowStore()
+        val engine = TradingEngine(
+            api = ReplayMarketDataApi(data, info, clock::get),
+            webSocket = MexcWebSocketClient(scope, url = "ws://127.0.0.1:9/ws"),
+            scope = scope,
+            store = InMemoryStateStore(),
+            // B gölgede, aktif portföyde yalnız A: B sinyali aktif portföyde işlem açmamalı.
+            config = EngineConfig(scanner = scanner, enabledStrategies = setOf(com.spotbot.core.strategy.StrategyId.BREAKOUT_RETEST), shadowStrategies = setOf(com.spotbot.core.strategy.StrategyId.TREND_PULLBACK)),
+            timeSource = TimeSource { clock.get() },
+            shadowStore = shadows,
+        )
+        engine.start()
+        withTimeout(30_000) { engine.scanLogs.first { it.isNotEmpty() } }
+        clock.set(signal + 1_000)
+        withTimeout(30_000) { engine.prices.first { p -> (p["NEARUSDT"]?.time ?: 0) >= signal } }
+        clock.set(signal + 5_000)
+        withTimeout(30_000) { engine.scanLogs.first { l -> l.any { it.boundary == signal } } }
+        val shadow = withTimeout(30_000) { engine.shadows.first { it["TREND_PULLBACK"]?.positions?.isNotEmpty() == true } }.getValue("TREND_PULLBACK")
+        assertTrue(engine.portfolio.value.positions.isEmpty())
+        assertEquals(reference.position.initialStopPrice, shadow.positions.single().initialStopPrice, 1e-9)
+        assertEquals(reference.position.targetPrice, shadow.positions.single().targetPrice, 1e-9)
+        // Kayıt: gölge portföy ayrı depoya yazılır.
+        assertEquals(1, shadows.load().getValue("TREND_PULLBACK").positions.size)
+        engine.stop()
+    }
 }

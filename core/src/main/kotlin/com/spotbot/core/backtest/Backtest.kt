@@ -142,6 +142,8 @@ data class BacktestReport(
     val regimePolicy: com.spotbot.core.analysis.RegimePolicy = com.spotbot.core.analysis.RegimePolicy.OFF,
     /** Parite başına ölçülen spread kullanıldı mı (yoksa sabit değer). */
     val measuredSpread: Boolean = false,
+    /** Sabit spread kullanıldıysa toplam alış-satış farkı (%). */
+    val spreadModelPercent: Double = 0.05,
 )
 
 /** Tarihsel veriyi MEXC'den indirir (15M, 1H, 4H; BTCUSDT her zaman eklenir). */
@@ -498,10 +500,11 @@ class BacktestEngine(private val config: BacktestConfig, private val ruleConfig:
                 entriesSkippedForDrift = driftSkipped,
                 regimePolicy = config.strategyParams.regimePolicy,
                 measuredSpread = config.halfSpreadBySymbol.isNotEmpty(),
+                spreadModelPercent = config.halfSpread * 200,
                 warnings = buildList {
                     if (trades.size < 30) add("İşlem sayısı (${trades.size}) istatistiksel olarak güvenilir sonuç için az; dönemi ya da coin sayısını artırın.")
                     if (config.halfSpreadBySymbol.isEmpty()) add("Spread sabit (%%%.3f) modellendi; MEXC'de çoğu altcoinin gerçek spread'i daha büyüktür.".format(config.halfSpread * 200))
-                    else add("Spread, ölçüm anındaki MEXC değerleriyle modellendi (geçmişe uygulanan varsayım); geçmiş emir defteri derinliği test edilmedi.")
+                    else add("Spread, tek bir günün MEXC ölçümüyle modellendi: bu bir senaryodur, gerçek geçmiş spread değildir; geçmiş emir defteri derinliği test edilmedi.")
                 },
             )
     }

@@ -128,6 +128,14 @@ class SettingsViewModel(private val engine: TradingEngine, private val repositor
         engine.updateConfig(repository.settings.value.engine)
     }
 
+    fun setShadow(id: StrategyId, enabled: Boolean) {
+        repository.update {
+            val set = if (enabled) it.engine.shadowStrategies + id else it.engine.shadowStrategies - id
+            it.copy(engine = it.engine.copy(shadowStrategies = set))
+        }
+        engine.updateConfig(repository.settings.value.engine)
+    }
+
     fun setProfile(profile: StrategyProfile) {
         repository.update { it.copy(engine = it.engine.copy(profile = profile)) }
         engine.updateConfig(repository.settings.value.engine)
@@ -197,6 +205,9 @@ fun SettingsScreen(modifier: Modifier = Modifier, viewModel: SettingsViewModel =
                     "${id.code} · ${id.title}", id in settings.engine.enabledStrategies,
                     if (id == StrategyId.RANGE) "Ayrı backtest yapılmadan açılmaz" else null,
                 ) { on -> if (on && id == StrategyId.RANGE) confirmC = true else viewModel.setStrategy(id, on) }
+                if (id != StrategyId.RANGE && id !in settings.engine.enabledStrategies) {
+                    ToggleRow("   ${id.code} gölge testte", id in settings.engine.shadowStrategies, "Ayrı sanal portföyde işlem açar; aktif portföyü etkilemez") { viewModel.setShadow(id, it) }
+                }
             }
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             Text("Profil", style = MaterialTheme.typography.titleSmall)

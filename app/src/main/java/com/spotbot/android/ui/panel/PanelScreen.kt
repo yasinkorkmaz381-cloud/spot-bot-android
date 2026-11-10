@@ -171,6 +171,9 @@ private fun StatusHeader(state: PanelUiState) {
             state.health.lastScanAt?.let { "Son tarama ${formatTime(it)} · her 15 dakikada bir" } ?: "Henüz tarama yapılmadı",
             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        state.system?.takeIf { !it.softwareOk }?.let {
+            Text(it.text, style = MaterialTheme.typography.bodySmall, color = SpotBotTheme.tradingColors.loss)
+        }
         state.health.lastError?.let {
             Text("Son hata: $it", style = MaterialTheme.typography.bodySmall, color = SpotBotTheme.tradingColors.loss, maxLines = 2, overflow = TextOverflow.Ellipsis)
         }

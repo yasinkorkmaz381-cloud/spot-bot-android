@@ -80,6 +80,7 @@ data class DiagnosticsView(
     val diagnostics: ScanDiagnostics?,
     val lastSignal: SignalInfo?,
     val market: MarketState?,
+    val system: com.spotbot.core.trading.SystemStatus? = null,
 )
 
 /** Analiz durumu: taramanın coin hakkındaki sonucu. */
@@ -112,7 +113,10 @@ fun ScanScreen(onOpenSymbol: (String) -> Unit, onOpenDecisionLog: () -> Unit, mo
     val report by viewModel.report.collectAsStateWithLifecycle()
     val logs by viewModel.scanLogs.collectAsStateWithLifecycle()
     val health by viewModel.health.collectAsStateWithLifecycle()
-    val view = DiagnosticsView(health, logs.lastOrNull()?.let { ScanDiagnostics.of(it, report?.market) }, ScanDiagnostics.lastSignal(logs), report?.market)
+    val view = DiagnosticsView(
+        health, logs.lastOrNull()?.let { ScanDiagnostics.of(it, report?.market) }, ScanDiagnostics.lastSignal(logs), report?.market,
+        com.spotbot.core.trading.SystemStatus.of(health, System.currentTimeMillis(), logs.lastOrNull()),
+    )
     ScanContent(report, logs.lastOrNull()?.coins?.associateBy { it.symbol }.orEmpty(), onOpenSymbol, modifier, onOpenDecisionLog, view)
 }
 
@@ -217,6 +221,10 @@ fun DiagnosticsCard(v: DiagnosticsView, initiallyExpanded: Boolean = false) {
         else -> d.shortReason!!
     }
     ExpandableCard("Teşhis: neden işlem yok?", subtitle = subtitle, initiallyExpanded = initiallyExpanded) {
+        v.system?.let { s ->
+            StatusPill(if (s.softwareOk) "Yazılım çalışıyor" else "Yazılım / veri sorunu", if (s.softwareOk) colors.gain else colors.loss)
+            Text(s.text, style = MaterialTheme.typography.bodySmall)
+        }
         KeyValueRow(
             "Bot",
             when (h.status) {

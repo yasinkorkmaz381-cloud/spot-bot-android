@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
 import java.io.File
 
@@ -42,12 +43,43 @@ data class AppSettings(
     val engine: EngineConfig = EngineConfig(),
     /** Kullanıcı botu çalışır bıraktıysa yeniden başlatmada (ör. cihaz açılışı) otomatik başlatılır. */
     val botEnabled: Boolean = false,
+    /** Ayar biçimi sürümü; eski kayıtlar açılışta taşınır (bkz. [SettingsRepository.migrate]). */
+    val schemaVersion: Int = 0,
 )
+
+/** Gölge portföyler: shadows.json (strateji adı → sanal hesap). */
+class FileShadowStore(dir: File) : com.spotbot.core.engine.ShadowStore {
+    private val file = JsonFile(File(dir, "shadows.json"), kotlinx.serialization.builtins.MapSerializer(String.serializer(), PortfolioState.serializer()))
+    override fun load(): Map<String, PortfolioState> = file.read().orEmpty()
+    override fun save(shadows: Map<String, PortfolioState>) = file.write(shadows)
+}
+
+/** V3 ileri testi (S1) kalıcı durumu: başlangıç zamanı yeniden başlatmalarda korunur. */
+class FileForwardStore(dir: File) : com.spotbot.core.research.ForwardStore {
+    private val file = JsonFile(File(dir, "forward_s1.json"), com.spotbot.core.research.ForwardState.serializer())
+    override fun load() = file.read()
+    override fun save(state: com.spotbot.core.research.ForwardState) = file.write(state)
+}
 
 class SettingsRepository(dir: File) {
     private val file = JsonFile(File(dir, "settings.json"), AppSettings.serializer())
-    private val _settings = MutableStateFlow(file.read() ?: AppSettings())
+    private val _settings = MutableStateFlow(migrate(file.read() ?: AppSettings()).also { file.write(it) })
     val settings: StateFlow<AppSettings> = _settings.asStateFlow()
+
+    companion object {
+        const val SCHEMA = 2
+
+        /**
+         * Sürüm 2: Strateji A aktif kâğıt işlemden çıkarılır ve gölge teste alınır (B aktif kalır). İşlem geçmişi ve
+         * risk ayarları değişmez. Tekrar uygulanması sonucu değiştirmez.
+         */
+        fun migrate(s: AppSettings): AppSettings {
+            if (s.schemaVersion >= SCHEMA) return s
+            val a = com.spotbot.core.strategy.StrategyId.BREAKOUT_RETEST
+            val active = (s.engine.enabledStrategies - a).ifEmpty { setOf(com.spotbot.core.strategy.StrategyId.TREND_PULLBACK) }
+            return s.copy(engine = s.engine.copy(enabledStrategies = active, shadowStrategies = s.engine.shadowStrategies + a), schemaVersion = SCHEMA)
+        }
+    }
 
     fun update(transform: (AppSettings) -> AppSettings) {
         val updated = transform(_settings.value)

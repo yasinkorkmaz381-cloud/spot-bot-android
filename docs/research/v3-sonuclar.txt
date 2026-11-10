@@ -1,0 +1,181 @@
+Veri: 28 parite · 2020-01-01 → 2026-11-10
+Dönemler: eğitim 2020-08-01→2023-01-01 · doğrulama 2023-01-01→2025-01-01 · son test 2025-01-01→2026-11-10
+İşlem yapılabilir parite sayısı (hacim ≥ 1M USDT/gün, ≥ 210 gün geçmiş): 2020-08-01: 12, 2023-01-01: 14, 2025-01-01: 28, 2026-11-09: 17
+
+════ S1 Göreceli güç (BTC'ye göre) ════
+Eğitim (orta maliyet):
+  L=30 gün                    191 işlem kazanma % 35.6 PF  1.31 ort +0.078R (t=+1.18) net %  +7.35 düşüş % 9.22 ücret    4.1 spread+kayma   10.2 piyasada %  77
+  L=60 gün                    167 işlem kazanma % 31.1 PF  1.20 ort +0.050R (t=+0.79) net %  +3.98 düşüş % 9.78 ücret    3.3 spread+kayma    8.3 piyasada %  78
+  L=90 gün                    163 işlem kazanma % 30.1 PF  1.01 ort +0.004R (t=+0.07) net %  +0.14 düşüş % 7.44 ücret    3.2 spread+kayma    8.0 piyasada %  78
+  → Seçilen: L=30 gün
+Doğrulama (orta maliyet; seçim dışı seçenekler yalnız duyarlılık için):
+  L=30 gün ◀                  156 işlem kazanma % 44.2 PF  2.17 ort +0.263R (t=+1.90) net % +21.62 düşüş % 6.35 ücret    5.5 spread+kayma   13.7 piyasada %  88
+  L=60 gün                    126 işlem kazanma % 36.5 PF  2.17 ort +0.298R (t=+1.68) net % +19.36 düşüş % 7.44 ücret    4.4 spread+kayma   11.0 piyasada %  87
+  L=90 gün                    110 işlem kazanma % 36.4 PF  2.68 ort +0.354R (t=+1.81) net % +20.35 düşüş % 7.30 ücret    3.8 spread+kayma    9.4 piyasada %  85
+Son test (orta maliyet):
+  L=30 gün ◀                  156 işlem kazanma % 29.5 PF  1.75 ort +0.214R (t=+0.82) net % +15.88 düşüş %15.05 ücret    5.6 spread+kayma   14.1 piyasada %  85
+  L=60 gün                    142 işlem kazanma % 28.2 PF  2.00 ort +0.259R (t=+0.94) net % +18.14 düşüş %11.40 ücret    4.9 spread+kayma   12.2 piyasada %  85
+  L=90 gün                    125 işlem kazanma % 24.0 PF  1.82 ort +0.219R (t=+0.92) net % +13.36 düşüş %10.48 ücret    4.2 spread+kayma   10.4 piyasada %  84
+Maliyet duyarlılığı (seçilen seçenek):
+  doğrulama · İyimser         156 işlem kazanma % 44.2 PF  2.22 ort +0.271R (t=+1.95) net % +22.39 düşüş % 6.27 ücret    5.5 spread+kayma    8.3 piyasada %  88
+  son test · İyimser          156 işlem kazanma % 30.1 PF  1.78 ort +0.221R (t=+0.84) net % +16.54 düşüş %14.91 ücret    5.7 spread+kayma    8.6 piyasada %  85
+  doğrulama · Orta            156 işlem kazanma % 44.2 PF  2.17 ort +0.263R (t=+1.90) net % +21.62 düşüş % 6.35 ücret    5.5 spread+kayma   13.7 piyasada %  88
+  son test · Orta             156 işlem kazanma % 29.5 PF  1.75 ort +0.214R (t=+0.82) net % +15.88 düşüş %15.05 ücret    5.6 spread+kayma   14.1 piyasada %  85
+  doğrulama · Kötümser        156 işlem kazanma % 42.9 PF  2.10 ort +0.251R (t=+1.83) net % +20.49 düşüş % 6.48 ücret    5.4 spread+kayma   21.6 piyasada %  88
+  son test · Kötümser         156 işlem kazanma % 29.5 PF  1.69 ort +0.202R (t=+0.78) net % +14.90 düşüş %15.26 ücret    5.5 spread+kayma   22.2 piyasada %  85
+Tüm dönem (orta maliyet): 500 işlem kazanma % 36.6 PF  1.73 ort +0.180R (t=+1.88) net % +51.62 düşüş %15.05 ücret   17.3 spread+kayma   43.2 piyasada %  83
+  BTC al-tut aynı dönem: %+562.3 · USDT'de bekleme: %0
+BTC rejimine göre (tüm dönem, giriş anındaki rejim):
+  düşüş       134 işlem ort +0.006R net    -8.13 USDT
+  veri yok      5 işlem ort +0.279R net    +6.96 USDT  ⚠ <30
+  yatay        59 işlem ort +0.454R net  +152.46 USDT
+  yükseliş    302 işlem ort +0.201R net  +364.94 USDT
+İleri yürüyen test (12 ay eğitim → 6 ay test):
+  2021-08-01→2022-01-28 seçilen L=60 gün   (eğitim +0.29R, 65) · test  38 işlem -0.171R net %-3.22
+  2022-01-28→2022-07-27 seçilen L=30 gün   (eğitim +0.17R, 80) · test  27 işlem -0.144R net %-1.94
+  2022-07-27→2023-01-23 seçilen L=90 gün   (eğitim -0.11R, 66) · test  38 işlem +0.175R net %+3.28
+  2023-01-23→2023-07-22 seçilen L=90 gün   (eğitim +0.08R, 64) · test  26 işlem -0.100R net %-1.30
+  2023-07-22→2024-01-18 seçilen L=90 gün   (eğitim +0.07R, 62) · test  23 işlem +1.095R net %+12.66
+  2024-01-18→2024-07-16 seçilen L=90 gün   (eğitim +0.46R, 48) · test  39 işlem -0.069R net %-1.36
+  2024-07-16→2025-01-12 seçilen L=60 gün   (eğitim +0.38R, 62) · test  30 işlem +0.443R net %+6.63
+  2025-01-12→2025-07-11 seçilen L=30 gün   (eğitim +0.20R, 89) · test  43 işlem -0.041R net %-0.90
+  2025-07-11→2026-01-07 seçilen L=90 gün   (eğitim +0.23R, 52) · test  28 işlem +1.032R net %+14.42
+  2026-01-07→2026-07-06 seçilen L=30 gün   (eğitim +0.51R, 75) · test  41 işlem -0.167R net %-3.41
+  2026-07-06→2026-11-10 seçilen L=60 gün   (eğitim +0.51R, 66) · test  38 işlem +0.187R net %+3.43
+  Birleşik görülmemiş dönem: 371 işlem ort +0.153R (t=+1.51) PF 1.70 · katman getirileri toplamı %+28.30
+Karşılaştırma (seçilen seçenek, orta maliyet): doğrulama %+21.62 · BTC al-tut %+463.7 · USDT %0 | son test %+15.88 · BTC al-tut %-19.8 · USDT %0
+
+════ S2 1D/4H momentum ════
+Eğitim (orta maliyet):
+  N=20 gün                    286 işlem kazanma % 34.6 PF  1.35 ort +0.167R (t=+1.69) net % +25.13 düşüş %13.83 ücret   24.5 spread+kayma   61.1 piyasada %  53
+  N=40 gün                    296 işlem kazanma % 36.5 PF  1.43 ort +0.203R (t=+2.08) net % +32.44 düşüş % 8.94 ücret   24.1 spread+kayma   60.2 piyasada %  60
+  N=60 gün                    310 işlem kazanma % 34.8 PF  1.42 ort +0.209R (t=+1.81) net % +35.10 düşüş %16.55 ücret   25.2 spread+kayma   63.0 piyasada %  63
+  → Seçilen: N=60 gün
+Doğrulama (orta maliyet; seçim dışı seçenekler yalnız duyarlılık için):
+  N=20 gün                    276 işlem kazanma % 31.2 PF  1.36 ort +0.176R (t=+1.53) net % +24.80 düşüş %14.95 ücret   29.9 spread+kayma   74.8 piyasada %  68
+  N=40 gün                    295 işlem kazanma % 32.2 PF  1.53 ort +0.272R (t=+1.91) net % +42.99 düşüş %12.97 ücret   35.0 spread+kayma   87.5 piyasada %  71
+  N=60 gün ◀                  310 işlem kazanma % 32.6 PF  1.03 ort +0.024R (t=+0.28) net %  +2.39 düşüş %15.35 ücret   30.4 spread+kayma   75.9 piyasada %  70
+Son test (orta maliyet):
+  N=20 gün                    256 işlem kazanma % 32.4 PF  1.16 ort +0.079R (t=+0.70) net %  +8.87 düşüş %14.27 ücret   26.4 spread+kayma   66.1 piyasada %  64
+  N=40 gün                    251 işlem kazanma % 35.1 PF  1.15 ort +0.073R (t=+0.80) net %  +7.96 düşüş % 9.25 ücret   25.9 spread+kayma   64.8 piyasada %  65
+  N=60 gün ◀                  243 işlem kazanma % 35.0 PF  1.17 ort +0.090R (t=+0.88) net %  +9.93 düşüş %10.24 ücret   25.3 spread+kayma   63.3 piyasada %  63
+Maliyet duyarlılığı (seçilen seçenek):
+  doğrulama · İyimser         310 işlem kazanma % 33.5 PF  1.08 ort +0.046R (t=+0.53) net %  +5.92 düşüş %14.24 ücret   31.7 spread+kayma   47.5 piyasada %  70
+  son test · İyimser          243 işlem kazanma % 35.0 PF  1.23 ort +0.115R (t=+1.09) net % +13.02 düşüş % 9.62 ücret   26.3 spread+kayma   39.4 piyasada %  63
+  doğrulama · Orta            310 işlem kazanma % 32.6 PF  1.03 ort +0.024R (t=+0.28) net %  +2.39 düşüş %15.35 ücret   30.4 spread+kayma   75.9 piyasada %  70
+  son test · Orta             243 işlem kazanma % 35.0 PF  1.17 ort +0.090R (t=+0.88) net %  +9.93 düşüş %10.24 ücret   25.3 spread+kayma   63.3 piyasada %  63
+  doğrulama · Kötümser        310 işlem kazanma % 31.3 PF  0.97 ort -0.007R (t=-0.08) net %  -2.32 düşüş %16.84 ücret   28.6 spread+kayma  114.5 piyasada %  70
+  son test · Kötümser         243 işlem kazanma % 35.0 PF  1.10 ort +0.056R (t=+0.56) net %  +5.75 düşüş %11.12 ücret   23.9 spread+kayma   95.8 piyasada %  63
+Tüm dönem (orta maliyet): 860 işlem kazanma % 34.2 PF  1.20 ort +0.110R (t=+1.86) net % +52.48 düşüş %21.70 ücret  101.1 spread+kayma  252.8 piyasada %  66
+  BTC al-tut aynı dönem: %+562.3 · USDT'de bekleme: %0
+BTC rejimine göre (tüm dönem, giriş anındaki rejim):
+  düşüş       174 işlem ort +0.067R net   +68.27 USDT
+  veri yok      7 işlem ort +0.813R net   +28.21 USDT  ⚠ <30
+  yatay        95 işlem ort -0.072R net   -58.86 USDT
+  yükseliş    584 işlem ort +0.144R net  +487.17 USDT
+İleri yürüyen test (12 ay eğitim → 6 ay test):
+  2021-08-01→2022-01-28 seçilen N=60 gün   (eğitim +0.58R, 148) · test  76 işlem -0.096R net %-3.66
+  2022-01-28→2022-07-27 seçilen N=20 gün   (eğitim +0.31R, 123) · test  41 işlem -0.259R net %-5.26
+  2022-07-27→2023-01-23 seçilen N=40 gün   (eğitim -0.06R, 98) · test  55 işlem +0.629R net %+17.29
+  2023-01-23→2023-07-22 seçilen N=40 gün   (eğitim +0.32R, 85) · test  80 işlem -0.253R net %-9.71
+  2023-07-22→2024-01-18 seçilen N=40 gün   (eğitim +0.13R, 131) · test  74 işlem +0.398R net %+14.09
+  2024-01-18→2024-07-16 seçilen N=40 gün   (eğitim +0.06R, 153) · test  76 işlem +0.094R net %+3.26
+  2024-07-16→2025-01-12 seçilen N=40 gün   (eğitim +0.25R, 149) · test  70 işlem +0.397R net %+13.72
+  2025-01-12→2025-07-11 seçilen N=40 gün   (eğitim +0.24R, 146) · test  61 işlem +0.063R net %+1.74
+  2025-07-11→2026-01-07 seçilen N=40 gün   (eğitim +0.24R, 131) · test  70 işlem +0.080R net %+2.61
+  2026-01-07→2026-07-06 seçilen N=40 gün   (eğitim +0.10R, 129) · test  57 işlem -0.076R net %-2.52
+  2026-07-06→2026-11-10 seçilen N=60 gün   (eğitim +0.07R, 123) · test  57 işlem +0.130R net %+3.30
+  Birleşik görülmemiş dönem: 717 işlem ort +0.102R (t=+1.50) PF 1.22 · katman getirileri toplamı %+34.86
+Karşılaştırma (seçilen seçenek, orta maliyet): doğrulama %+2.39 · BTC al-tut %+463.7 · USDT %0 | son test %+9.93 · BTC al-tut %-19.8 · USDT %0
+
+════ S3 Daralma + teyitli kırılım ════
+Eğitim (orta maliyet):
+  P=%10                        21 işlem kazanma % 42.9 PF  0.56 ort -0.213R (t=-1.20) net %  -2.23 düşüş % 2.92 ücret    1.6 spread+kayma    4.1 piyasada %   4  ⚠ <30 işlem
+  P=%20                        30 işlem kazanma % 53.3 PF  0.89 ort -0.042R (t=-0.28) net %  -0.66 düşüş % 3.10 ücret    2.1 spread+kayma    5.3 piyasada %   6
+  P=%30                        35 işlem kazanma % 57.1 PF  1.03 ort +0.012R (t=+0.08) net %  +0.17 düşüş % 3.10 ücret    2.4 spread+kayma    6.0 piyasada %   6
+  → Seçilen: P=%30
+Doğrulama (orta maliyet; seçim dışı seçenekler yalnız duyarlılık için):
+  P=%10                        14 işlem kazanma % 64.3 PF  1.17 ort +0.062R (t=+0.28) net %  +0.42 düşüş % 1.11 ücret    1.3 spread+kayma    3.3 piyasada %   2  ⚠ <30 işlem
+  P=%20                        22 işlem kazanma % 59.1 PF  1.01 ort +0.006R (t=+0.03) net %  +0.04 düşüş % 2.62 ücret    1.9 spread+kayma    4.8 piyasada %   4  ⚠ <30 işlem
+  P=%30 ◀                      24 işlem kazanma % 62.5 PF  1.14 ort +0.057R (t=+0.32) net %  +0.65 düşüş % 2.62 ücret    2.1 spread+kayma    5.2 piyasada %   4  ⚠ <30 işlem
+Son test (orta maliyet):
+  P=%10                        33 işlem kazanma % 54.5 PF  0.75 ort -0.107R (t=-0.77) net %  -1.78 düşüş % 3.88 ücret    3.0 spread+kayma    7.4 piyasada %   8
+  P=%20                        43 işlem kazanma % 48.8 PF  0.61 ort -0.191R (t=-1.52) net %  -4.07 düşüş % 4.38 ücret    3.6 spread+kayma    9.0 piyasada %  11
+  P=%30 ◀                      49 işlem kazanma % 44.9 PF  0.55 ort -0.235R (t=-1.98) net %  -5.65 düşüş % 5.95 ücret    3.9 spread+kayma    9.8 piyasada %  13
+Maliyet duyarlılığı (seçilen seçenek):
+  doğrulama · İyimser          24 işlem kazanma % 62.5 PF  1.20 ort +0.077R (t=+0.43) net %  +0.89 düşüş % 2.59 ücret    2.1 spread+kayma    3.2 piyasada %   4  ⚠ <30 işlem
+  son test · İyimser           49 işlem kazanma % 44.9 PF  0.58 ort -0.220R (t=-1.83) net %  -5.32 düşüş % 5.64 ücret    4.0 spread+kayma    6.0 piyasada %  13
+  doğrulama · Orta             24 işlem kazanma % 62.5 PF  1.14 ort +0.057R (t=+0.32) net %  +0.65 düşüş % 2.62 ücret    2.1 spread+kayma    5.2 piyasada %   4  ⚠ <30 işlem
+  son test · Orta              49 işlem kazanma % 44.9 PF  0.55 ort -0.235R (t=-1.98) net %  -5.65 düşüş % 5.95 ücret    3.9 spread+kayma    9.8 piyasada %  13
+  doğrulama · Kötümser         24 işlem kazanma % 62.5 PF  1.07 ort +0.028R (t=+0.16) net %  +0.31 düşüş % 2.66 ücret    2.0 spread+kayma    8.0 piyasada %   4  ⚠ <30 işlem
+  son test · Kötümser          49 işlem kazanma % 44.9 PF  0.51 ort -0.255R (t=-2.21) net %  -6.12 düşüş % 6.40 ücret    3.8 spread+kayma   15.2 piyasada %  13
+Tüm dönem (orta maliyet): 108 işlem kazanma % 52.8 PF  0.78 ort -0.097R (t=-1.20) net %  -5.22 düşüş % 8.22 ücret    8.4 spread+kayma   21.0 piyasada %   8
+  BTC al-tut aynı dönem: %+562.3 · USDT'de bekleme: %0
+BTC rejimine göre (tüm dönem, giriş anındaki rejim):
+  düşüş        37 işlem ort -0.029R net    -5.80 USDT
+  yatay         9 işlem ort -0.061R net    -3.17 USDT  ⚠ <30
+  yükseliş     62 işlem ort -0.143R net   -43.19 USDT
+İleri yürüyen test (12 ay eğitim → 6 ay test):
+  2021-08-01→2022-01-28 seçilen P=%30      (eğitim +0.29R, 18) · test   4 işlem -1.000R net %-1.99
+  2022-01-28→2022-07-27 seçilen P=%30      (eğitim +0.10R, 17) · test   9 işlem +0.122R net %+0.54
+  2022-07-27→2023-01-23 seçilen P=%30      (eğitim -0.22R, 13) · test   4 işlem -0.678R net %-1.35
+  2023-01-23→2023-07-22 seçilen P=%30      (eğitim -0.12R, 13) · test   5 işlem +0.322R net %+0.80
+  2023-07-22→2024-01-18 seçilen P=%10      (eğitim -0.12R, 9) · test   0 işlem +0.000R net %+0.00
+  2024-01-18→2024-07-16 seçilen P=%30      (eğitim +0.33R, 10) · test   8 işlem -0.397R net %-1.58
+  2024-07-16→2025-01-12 seçilen P=%30      (eğitim -0.11R, 13) · test   6 işlem +0.199R net %+0.59
+  2025-01-12→2025-07-11 seçilen P=%20      (eğitim -0.14R, 14) · test  15 işlem -0.452R net %-3.36
+  2025-07-11→2026-01-07 seçilen P=%20      (eğitim -0.27R, 21) · test   3 işlem +0.307R net %+0.46
+  2026-01-07→2026-07-06 seçilen P=%30      (eğitim -0.34R, 23) · test  18 işlem +0.167R net %+1.50
+  2026-07-06→2026-11-10 seçilen P=%30      (eğitim -0.00R, 25) · test   9 işlem -0.521R net %-2.33
+  Birleşik görülmemiş dönem: 81 işlem ort -0.167R (t=-1.81) PF 0.66 · katman getirileri toplamı %-6.72
+Karşılaştırma (seçilen seçenek, orta maliyet): doğrulama %+0.65 · BTC al-tut %+463.7 · USDT %0 | son test %-5.65 · BTC al-tut %-19.8 · USDT %0
+
+════ S4 Güçlü trendde geri çekilme ════
+Eğitim (orta maliyet):
+  T=30                         20 işlem kazanma % 40.0 PF  1.20 ort +0.084R (t=+0.35) net %  +0.81 düşüş % 2.00 ücret    1.0 spread+kayma    2.6 piyasada %   6  ⚠ <30 işlem
+  T=35                         64 işlem kazanma % 37.5 PF  0.93 ort -0.028R (t=-0.21) net %  -1.02 düşüş % 4.90 ücret    3.5 spread+kayma    8.8 piyasada %  16
+  T=40                        139 işlem kazanma % 41.0 PF  0.99 ort +0.001R (t=+0.01) net %  -0.30 düşüş % 5.48 ücret   10.0 spread+kayma   24.9 piyasada %  27
+  → Seçilen: T=40
+Doğrulama (orta maliyet; seçim dışı seçenekler yalnız duyarlılık için):
+  T=30                         18 işlem kazanma % 66.7 PF  1.03 ort +0.002R (t=+0.01) net %  +0.09 düşüş % 1.30 ücret    1.7 spread+kayma    4.3 piyasada %   7  ⚠ <30 işlem
+  T=35                         81 işlem kazanma % 44.4 PF  0.95 ort -0.026R (t=-0.21) net %  -1.04 düşüş % 7.06 ücret    8.8 spread+kayma   21.9 piyasada %  19
+  T=40 ◀                      171 işlem kazanma % 37.4 PF  0.81 ort -0.107R (t=-1.26) net %  -8.77 düşüş %14.02 ücret   18.5 spread+kayma   46.2 piyasada %  32
+Son test (orta maliyet):
+  T=30                          8 işlem kazanma % 25.0 PF  0.61 ort -0.235R (t=-0.59) net %  -0.95 düşüş % 2.17 ücret    1.1 spread+kayma    2.7 piyasada %   2  ⚠ <30 işlem
+  T=35                         50 işlem kazanma % 36.0 PF  0.79 ort -0.109R (t=-0.69) net %  -2.92 düşüş % 4.49 ücret    5.6 spread+kayma   14.0 piyasada %  14
+  T=40 ◀                      130 işlem kazanma % 33.1 PF  0.73 ort -0.157R (t=-1.55) net % -10.32 düşüş %18.02 ücret   14.3 spread+kayma   35.7 piyasada %  26
+Maliyet duyarlılığı (seçilen seçenek):
+  doğrulama · İyimser         171 işlem kazanma % 37.4 PF  0.84 ort -0.088R (t=-1.01) net %  -7.11 düşüş %12.92 ücret   19.1 spread+kayma   28.6 piyasada %  32
+  son test · İyimser          129 işlem kazanma % 32.6 PF  0.74 ort -0.147R (t=-1.42) net %  -9.78 düşüş %18.05 ücret   14.5 spread+kayma   21.8 piyasada %  26
+  doğrulama · Orta            171 işlem kazanma % 37.4 PF  0.81 ort -0.107R (t=-1.26) net %  -8.77 düşüş %14.02 ücret   18.5 spread+kayma   46.2 piyasada %  32
+  son test · Orta             130 işlem kazanma % 33.1 PF  0.73 ort -0.157R (t=-1.55) net % -10.32 düşüş %18.02 ücret   14.3 spread+kayma   35.7 piyasada %  26
+  doğrulama · Kötümser        171 işlem kazanma % 36.3 PF  0.76 ort -0.134R (t=-1.63) net % -11.01 düşüş %15.82 ücret   17.6 spread+kayma   70.4 piyasada %  32
+  son test · Kötümser         129 işlem kazanma % 31.8 PF  0.66 ort -0.202R (t=-2.08) net % -12.63 düşüş %19.42 ücret   13.4 spread+kayma   53.6 piyasada %  26
+Tüm dönem (orta maliyet): 439 işlem kazanma % 37.1 PF  0.83 ort -0.092R (t=-1.72) net % -19.03 düşüş %26.56 ücret   41.1 spread+kayma  102.9 piyasada %  29
+  BTC al-tut aynı dönem: %+562.3 · USDT'de bekleme: %0
+BTC rejimine göre (tüm dönem, giriş anındaki rejim):
+  düşüş        71 işlem ort -0.252R net   -78.59 USDT
+  veri yok      1 işlem ort +0.019R net    +0.09 USDT  ⚠ <30
+  yatay        53 işlem ort -0.034R net    -4.08 USDT
+  yükseliş    314 işlem ort -0.065R net  -107.72 USDT
+İleri yürüyen test (12 ay eğitim → 6 ay test):
+  2021-08-01→2022-01-28 seçilen T=40       (eğitim -0.02R, 66) · test  36 işlem +0.073R net %+1.22
+  2022-01-28→2022-07-27 seçilen T=40       (eğitim +0.09R, 65) · test  11 işlem +0.076R net %+0.41
+  2022-07-27→2023-01-23 seçilen T=40       (eğitim +0.07R, 47) · test  31 işlem +0.064R net %+0.90
+  2023-01-23→2023-07-22 seçilen T=40       (eğitim +0.09R, 42) · test  41 işlem -0.158R net %-3.29
+  2023-07-22→2024-01-18 seçilen T=40       (eğitim -0.11R, 72) · test  56 işlem +0.065R net %+1.70
+  2024-01-18→2024-07-16 seçilen T=40       (eğitim -0.03R, 97) · test  27 işlem -0.442R net %-5.84
+  2024-07-16→2025-01-12 seçilen T=35       (eğitim -0.08R, 41) · test  20 işlem +0.197R net %+2.04
+  2025-01-12→2025-07-11 seçilen T=35       (eğitim +0.05R, 32) · test   9 işlem +0.079R net %+0.34
+  2025-07-11→2026-01-07 seçilen T=40       (eğitim -0.01R, 65) · test  44 işlem -0.411R net %-8.72
+  2026-01-07→2026-07-06 seçilen T=40       (eğitim -0.19R, 68) · test  28 işlem -0.408R net %-5.72
+  2026-07-06→2026-11-10 seçilen T=40       (eğitim -0.41R, 72) · test  34 işlem +0.116R net %+1.69
+  Birleşik görülmemiş dönem: 337 işlem ort -0.090R (t=-1.47) PF 0.83 · katman getirileri toplamı %-15.28
+Karşılaştırma (seçilen seçenek, orta maliyet): doğrulama %-8.77 · BTC al-tut %+463.7 · USDT %0 | son test %-10.32 · BTC al-tut %-19.8 · USDT %0
+
+════ SONUÇ (ön kayıtlı ölçüt: orta maliyette ort R > 0, PF ≥ 1,1, ≥ 30 işlem) ════
+  S1 Göreceli güç (BTC'ye göre) [L=30 gün]: UMUT VERİCİ · doğrulama +0.263R PF 2.17 (156) · son test +0.214R PF 1.75 (156) · ileri yürüyen +0.153R (371)
+  S2 1D/4H momentum [N=60 gün]: BAŞARISIZ (doğrulamayı geçemedi) · doğrulama +0.024R PF 1.03 (310) · son test +0.090R PF 1.17 (243) · ileri yürüyen +0.102R (717)
+  S3 Daralma + teyitli kırılım [P=%30]: BAŞARISIZ (doğrulamayı geçemedi) · doğrulama +0.057R PF 1.14 (24) · son test -0.235R PF 0.55 (49) · ileri yürüyen -0.167R (81)
+  S4 Güçlü trendde geri çekilme [T=40]: BAŞARISIZ (doğrulamayı geçemedi) · doğrulama -0.107R PF 0.81 (171) · son test -0.157R PF 0.73 (130) · ileri yürüyen -0.090R (337)
+Rapor: v3.json

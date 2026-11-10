@@ -290,6 +290,20 @@ open class ScreenshotTest {
     @Test
     fun closedTrades() = capture("5-kapanmis-islemler") { TradesContent(portfolio, emptyMap(), {}, initialTab = TradesTab.HISTORY) }
 
+    /** Gölge test sekmesi: S1 ileri test kartı (temsili sayılar; yalnız düzen kontrolü). */
+    @Test
+    fun shadowTab() {
+        val start = 1_793_000_000_000L
+        val result = com.spotbot.core.research.V3Result(
+            "S1 Göreceli güç (BTC'ye göre)", "L=30 gün", "Orta", start, start + 6 * 86_400_000L, 1, 0, 0.0, 0.0, -0.4, 0.0, -0.21, 0.6,
+            0.3, 0.5, 40.0, -1.8, emptyList(),
+            listOf(com.spotbot.core.research.V3Trade("SOLUSDT", start + 86_400_000L, start + 4 * 86_400_000L, 180.0, 176.4, 1.0, -2.1, -0.4, 0.18, 0.3, "İz süren stop", "yatay")),
+            listOf(com.spotbot.core.research.V3OpenPosition("ZECUSDT", start + 5 * 86_400_000L, 410.0, 0.5, 380.0, 415.0, 2.0)),
+        )
+        val state = com.spotbot.core.research.ForwardState(result.strategy, result.option, start, 1_000.0, start + 6 * 86_400_000L, start + 6 * 86_400_000L, result, 28, 17)
+        capture("5b-golge-test") { TradesContent(portfolio, emptyMap(), {}, initialTab = TradesTab.SHADOW, forward = state) }
+    }
+
     private val scanLog: com.spotbot.core.trading.ScanLog by lazy {
         val t = btc.candles.last().closeTime
         val stamp = com.spotbot.core.trading.DataStamp(t, t, t - 3_600_000, t + 2_000)

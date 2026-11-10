@@ -172,3 +172,47 @@ suspend fun study(options: Map<String, String>) {
 
 private const val MIN_TRAIN = 15
 private const val MIN_TRAIN_WF = 8
+
+/** −%20,99 (sabit spread) ile ölçülen spread sonucunun farkını işlem evreni, maliyet ve yol etkisine ayırır. */
+suspend fun costSplit(options: Map<String, String>) {
+    val dir = File(options["data"] ?: error("--data klasörü gerekli"))
+    val data = dir.listFiles { f -> f.name.endsWith("USDT.json") }!!.sorted().associate { f ->
+        val d = studyJson.decodeFromString(HistoricalDataset.serializer(), f.readText()); d.symbol to d
+    }
+    val spreads: Map<String, Double> = studyJson.decodeFromString(MapSerializer(String.serializer(), Double.serializer()), File(dir, "spreads.json").readText())
+    val info: Map<String, SymbolInfo> = runCatching { MexcRestClient().exchangeInfo().associateBy { it.symbol } }.getOrDefault(emptyMap())
+    val start = data.values.maxOf { it.m15.first().openTime } + 2 * 24 * 3_600_000L
+    val end = data.values.minOf { it.m15.last().closeTime }
+    val base = BacktestConfig(data.keys.toList(), start, end, scanner = ScannerConfig(extraCoins = 0))
+    val std = BacktestEngine(base).run(data, info)
+    val mea = BacktestEngine(base.copy(halfSpreadBySymbol = spreads)).run(data, info)
+    val excluded = spreads.filterValues { it * 200 > base.scanner.maxSpreadPercent }.keys.sorted()
+    fun key(t: com.spotbot.core.trading.ClosedTrade) = t.position.symbol to t.position.setup.signalTime
+    val sMap = std.closedTrades.associateBy(::key)
+    val mMap = mea.closedTrades.associateBy(::key)
+    val common = sMap.keys intersect mMap.keys
+    val onlyStd = std.closedTrades.filter { key(it) !in mMap }
+    val onlyMea = mea.closedTrades.filter { key(it) !in sMap }
+    println("Sabit spread: ${std.trades} işlem, net %%%+.2f · ölçülen spread: ${mea.trades} işlem, net %%%+.2f · fark %+.2f puan".format(std.netReturnPercent, mea.netReturnPercent, mea.netReturnPercent - std.netReturnPercent))
+    println("Spread > %%%.2f nedeniyle ölçülen senaryoda elenen pariteler: %s".format(base.scanner.maxSpreadPercent, excluded.joinToString { "%s (%%%.3f)".format(it, spreads.getValue(it) * 200) }))
+    val stdExcluded = onlyStd.filter { it.position.symbol in excluded }
+    val stdOther = onlyStd.filter { it.position.symbol !in excluded }
+    val commonStd = common.sumOf { sMap.getValue(it).netPnl }
+    val commonMea = common.sumOf { mMap.getValue(it).netPnl }
+    println("\nAyrıştırma (USDT; sermaye 1000):")
+    println("  1) Elenen paritelerdeki işlemler (yalnız sabit senaryoda): %3d işlem, net %+8.2f".format(stdExcluded.size, stdExcluded.sumOf { it.netPnl }))
+    println("  2) Ortak işlemler (aynı parite ve sinyal): %3d işlem · sabit %+8.2f · ölçülen %+8.2f · maliyet farkı %+7.2f".format(common.size, commonStd, commonMea, commonMea - commonStd))
+    println("  3) Yol etkisi — yalnız sabit senaryoda açılan diğer işlemler: %3d işlem, net %+8.2f".format(stdOther.size, stdOther.sumOf { it.netPnl }))
+    println("  4) Yol etkisi — yalnız ölçülen senaryoda açılan işlemler (boşalan yerler): %3d işlem, net %+8.2f".format(onlyMea.size, onlyMea.sumOf { it.netPnl }))
+    println("  Kontrol: sabit = 1+2+3 = %+.2f (rapor %+.2f) · ölçülen = 2+4 = %+.2f (rapor %+.2f)".format(
+        stdExcluded.sumOf { it.netPnl } + commonStd + stdOther.sumOf { it.netPnl }, std.finalEquity - std.initialCapital,
+        commonMea + onlyMea.sumOf { it.netPnl }, mea.finalEquity - mea.initialCapital))
+    println("\nParite bazında (sabit → ölçülen):")
+    data.keys.sorted().forEach { s ->
+        val a = std.closedTrades.filter { it.position.symbol == s }
+        val b = mea.closedTrades.filter { it.position.symbol == s }
+        if (a.isNotEmpty() || b.isNotEmpty()) println("  %-10s %3d işlem %+8.2f → %3d işlem %+8.2f   spread %%%.3f".format(s, a.size, a.sumOf { it.netPnl }, b.size, b.sumOf { it.netPnl }, (spreads[s] ?: 0.0) * 200))
+    }
+    println("\nİşlem başına maliyet: sabit %.3f USDT ücret + %.3f USDT spread/kayma · ölçülen %.3f + %.3f".format(
+        std.totalFees / std.trades, std.spreadAndSlippageCost / std.trades, mea.totalFees / mea.trades, mea.spreadAndSlippageCost / mea.trades))
+}

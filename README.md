@@ -3,11 +3,34 @@
 MEXC spot piyasasında (USDT pariteleri) çalışan, **kontrollü risk** ve **sistematik karar** odaklı otomatik
 işlem botu. Android uygulaması (Türkçe kumanda paneli) + platformdan bağımsız Kotlin çekirdeği + komut satırı.
 
-> **Durum: V2.3 — sanal işlem (paper trading).** MEXC canlı verisi kullanılır, **gerçek emir gönderilmez**,
+> **Durum: V2.4 — sanal işlem (paper trading).** MEXC canlı verisi kullanılır, **gerçek emir gönderilmez**,
 > API anahtarı istenmez. Aşağıdaki backtest sonuçları stratejilerin henüz kâr avantajı göstermediğini
 > söylüyor; bu yüzden gerçek parayla kullanım (V2) için hazır değildir.
 
 **Kalite > İşlem sayısı · Risk kontrolü > Kâr beklentisi · Kanıtlanmış strateji > Tahmin**
+
+## V2.4: strateji araştırması V3 (10 Kasım 2026)
+
+Ön kayıt: [`docs/STRATEJI-V3-ONKAYIT.md`](docs/STRATEJI-V3-ONKAYIT.md) (testlerden önce commit edildi). Sonuçlar:
+[`docs/STRATEJI-V3.md`](docs/STRATEJI-V3.md). Ham çıktılar: [`docs/research/`](docs/research/).
+
+- Dört bağımsız strateji, 2020-08 → 2026-11 arasında 4H veriyle test edildi:
+  - Eğitim, doğrulama ve dokunulmamış son test dönemleri.
+  - Üç maliyet senaryosu.
+  - İleri yürüyen test.
+- **S1 (BTC'ye göre göreceli güç)** ön kayıtlı ölçütleri geçti. Doğrulama +0,26R, son test +0,21R.
+- **S1'in kanıtı zayıf:**
+  - t istatistiği düşük.
+  - Son testteki kârın tamamı tek pariteden (ZEC) geliyor.
+  - Evrende hayatta kalma yanlılığı var.
+  - Tüm dönemde BTC al-tut'un çok gerisinde.
+- **S2, S3 ve S4 başarısız.**
+- **S1 yalnız ayrı bir sanal portföyde ileri teste alındı:** İşlemler → Gölge test.
+- **Strateji A** aktif kâğıt işlemden çıkarıldı ve gölge teste alındı. B aktif profil olarak kaldı. Risk limitleri ve
+  işlem kayıtları değişmedi.
+- Uygulama artık "kurallar işlem açmadı" ile "yazılım/veri sorunu" durumlarını ayrı gösteriyor.
+- Backtest varsayılan olarak "Orta" maliyet senaryosunu kullanıyor. Önceki −%13,92 sonucunun bir maliyet avantajı değil,
+  evren farkı olduğu ayrıştırıldı.
 
 ## V2.3: kritik sorunlar incelemesi (10 Kasım 2026)
 

@@ -104,3 +104,37 @@ data class ScanDiagnostics(
         }
     }
 }
+
+/**
+ * Sistemin işlem açabilecek durumda olup olmadığı. [softwareOk] false ise işlem açılmaması bir yazılım/veri sorunudur;
+ * true ise yazılım çalışıyor ve işlem açılmaması kuralların (piyasa, strateji, risk) kararıdır.
+ */
+@Serializable
+data class SystemStatus(val running: Boolean, val softwareOk: Boolean, val text: String) {
+    companion object {
+        private const val MINUTE = 60_000L
+
+        fun of(health: com.spotbot.core.engine.EngineHealth, now: Long, last: ScanLog?): SystemStatus {
+            val feed = health.feed
+            return when (health.status) {
+                com.spotbot.core.engine.EngineStatus.STOPPED -> SystemStatus(false, true, "Bot durdurulmuş: tarama ve işlem yok (yazılım hatası değil).")
+                com.spotbot.core.engine.EngineStatus.STARTING -> SystemStatus(true, true, "Başlatılıyor: geçmiş mumlar yükleniyor.")
+                com.spotbot.core.engine.EngineStatus.ERROR -> SystemStatus(true, false, "Yazılım/bağlantı sorunu: ${health.message ?: health.lastError ?: "bilinmiyor"}")
+                com.spotbot.core.engine.EngineStatus.RUNNING -> {
+                    val scanAge = health.lastScanAt?.let { (now - it) / MINUTE }
+                    val priceAge = feed.lastUpdateAt?.let { (now - it) / MINUTE }
+                    val stale = last?.coins?.count { it.outcome == CoinOutcome.STALE_DATA } ?: 0
+                    val failed = last?.coins?.filter { it.outcome == CoinOutcome.ENTRY_FAILED }.orEmpty()
+                    when {
+                        scanAge == null -> SystemStatus(true, true, "İlk tarama bekleniyor.")
+                        scanAge > 20 -> SystemStatus(true, false, "Yazılım/bağlantı sorunu: son tarama $scanAge dk önce (15 dakikada bir olmalı).")
+                        priceAge == null || priceAge > 2 -> SystemStatus(true, false, "Veri sorunu: canlı fiyat ${priceAge?.let { "$it dk" } ?: "hiç"} alınamadı.")
+                        stale > 0 -> SystemStatus(true, false, "Veri sorunu: $stale coinde mum ya da fiyat güncel değil; bu coinlerde işlem açılmadı.")
+                        failed.isNotEmpty() -> SystemStatus(true, false, "Emir simülasyonu başarısız: ${failed.first().symbol} — ${failed.first().reasons.firstOrNull() ?: ""}")
+                        else -> SystemStatus(true, true, "Yazılım sağlıklı: tarama zamanında, veri güncel. İşlem açılmaması kuralların kararıdır.")
+                    }
+                }
+            }
+        }
+    }
+}

@@ -27,7 +27,7 @@ object AppViewModels {
         initializer { PanelViewModel(container().engine, container().settings, BotController(application())) }
         initializer { ScanViewModel(container().engine) }
         initializer { CoinDetailViewModel(container().engine, container().api, createSavedStateHandle()) }
-        initializer { TradesViewModel(container().engine) }
+        initializer { TradesViewModel(container().engine, container().forward) }
         initializer { com.spotbot.android.ui.trades.TradeDetailViewModel(container().engine, container().api, createSavedStateHandle()) }
         initializer { com.spotbot.android.ui.trades.EventsViewModel(container().engine) }
         initializer { com.spotbot.android.ui.scan.DecisionLogViewModel(container().engine) }

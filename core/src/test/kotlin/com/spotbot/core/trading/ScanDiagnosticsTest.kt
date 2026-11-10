@@ -99,4 +99,24 @@ class ScanDiagnosticsTest {
         // Filtreden geçen her işlem koşulu sağlar (15M hacim ≥ 1,5× ortalama).
         assertTrue(filtered.entryFeatures.all { it.volumeRatio15m >= 1.5 })
     }
+
+    @Test
+    fun `system status separates software problems from rule decisions`() {
+        val now = 10_000_000L
+        val ok = com.spotbot.core.engine.EngineHealth(
+            status = com.spotbot.core.engine.EngineStatus.RUNNING, lastScanAt = now - 60_000,
+            feed = com.spotbot.core.exchange.FeedHealth(lastUpdateAt = now - 5_000),
+        )
+        val healthy = SystemStatus.of(ok, now, log(10, false, *coins))
+        assertTrue(healthy.softwareOk)
+        assertTrue(healthy.text.contains("kuralların kararı"))
+        assertFalse(SystemStatus.of(ok.copy(lastScanAt = now - 40 * 60_000), now, null).softwareOk)
+        assertFalse(SystemStatus.of(ok.copy(feed = ok.feed.copy(lastUpdateAt = now - 10 * 60_000)), now, null).softwareOk)
+        assertFalse(SystemStatus.of(ok, now, log(10, true, CoinDecision("XUSDT", CoinOutcome.STALE_DATA, "", emptyList(), 1, stamp))).softwareOk)
+        assertFalse(SystemStatus.of(ok, now, log(10, true, CoinDecision("XUSDT", CoinOutcome.ENTRY_FAILED, "", listOf("Bakiye yetersiz"), 1, stamp))).softwareOk)
+        assertFalse(SystemStatus.of(ok.copy(status = com.spotbot.core.engine.EngineStatus.ERROR, message = "ağ yok"), now, null).softwareOk)
+        val stopped = SystemStatus.of(ok.copy(status = com.spotbot.core.engine.EngineStatus.STOPPED), now, null)
+        assertFalse(stopped.running)
+        assertTrue(stopped.softwareOk)
+    }
 }

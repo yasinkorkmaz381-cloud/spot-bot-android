@@ -83,7 +83,16 @@ data class EngineConfig(
     val risk: RiskConfig = RiskConfig(),
     val strategyParams: StrategyParams = StrategyParams(),
     val analysis: AnalysisConfig = AnalysisConfig(),
-    val enabledStrategies: Set<StrategyId> = setOf(StrategyId.BREAKOUT_RETEST, StrategyId.TREND_PULLBACK),
+    /**
+     * Aktif kâğıt işlem portföyündeki stratejiler. Varsayılan yalnız B: A bir yıllık testte her dilimde zarar ettiği
+     * için aktif portföyden çıkarıldı ve gölge teste alındı (docs/STRATEJI-V3.md).
+     */
+    val enabledStrategies: Set<StrategyId> = setOf(StrategyId.TREND_PULLBACK),
+    /**
+     * Gölge testteki stratejiler: aynı tarama, kural ve risk koduyla ayrı sanal portföyde işlem açar; aktif portföyü
+     * etkilemez. Veri toplamak içindir.
+     */
+    val shadowStrategies: Set<StrategyId> = setOf(StrategyId.BREAKOUT_RETEST),
     val slippage: Double = 0.0005,
     /** Canlı spread bilinmiyorsa kullanılacak yarım spread oranı. */
     val fallbackHalfSpread: Double = 0.00025,
@@ -110,6 +119,17 @@ data class EngineConfig(
 interface StateStore {
     fun load(): PortfolioState?
     fun save(state: PortfolioState)
+}
+
+/** Gölge (test) portföylerinin kaydı: strateji kimliği → ayrı sanal hesap. */
+interface ShadowStore {
+    fun load(): Map<String, PortfolioState>
+    fun save(shadows: Map<String, PortfolioState>)
+}
+
+class InMemoryShadowStore(private var shadows: Map<String, PortfolioState> = emptyMap()) : ShadowStore {
+    @Synchronized override fun load() = shadows
+    @Synchronized override fun save(shadows: Map<String, PortfolioState>) { this.shadows = shadows }
 }
 
 class InMemoryStateStore(private var state: PortfolioState? = null) : StateStore {
@@ -166,6 +186,7 @@ class TradingEngine(
     private val timeSource: TimeSource = TimeSource.System,
     private val decisionLog: DecisionLogStore = InMemoryDecisionLogStore(),
     runLocation: String = "Sunucu / bilgisayar (komut satırı)",
+    private val shadowStore: ShadowStore = InMemoryShadowStore(),
 ) {
     var config: EngineConfig = config
         private set
@@ -176,6 +197,11 @@ class TradingEngine(
 
     private val _portfolio = MutableStateFlow(store.load() ?: PortfolioState.create(config.initialCapital))
     val portfolio: StateFlow<PortfolioState> = _portfolio.asStateFlow()
+
+    private val _shadows = MutableStateFlow(runCatching { shadowStore.load() }.getOrDefault(emptyMap()))
+    /** Gölge portföyler (strateji adı → sanal hesap); aktif portföyden tamamen bağımsız. */
+    val shadows: StateFlow<Map<String, PortfolioState>> = _shadows.asStateFlow()
+    private val shadowPipelines = HashMap<StrategyId, DecisionPipeline>()
 
     private val _lastScan = MutableStateFlow<ScanReport?>(null)
     val lastScan: StateFlow<ScanReport?> = _lastScan.asStateFlow()
@@ -269,6 +295,7 @@ class TradingEngine(
     fun resetPaperAccount(capital: Double) {
         scope.launch(dispatcher) {
             config = config.copy(initialCapital = capital)
+            publishShadows(emptyMap())
             publish(PortfolioState.create(capital).copy(firstStartedAt = now(), lastHeartbeat = now()))
             publishPending()
             refreshRisk()
@@ -521,6 +548,8 @@ class TradingEngine(
         )
         val dataIssue = freshnessIssue(stamp, boundary)
         val decision = pipeline.evaluate(Candidate(mtf, scan, symbols[symbol], costsFor(symbol), dataIssue), context)
+        if (mode != Mode.OBSERVE) runCatching { shadowDecide(symbol, Candidate(mtf, scan, symbols[symbol], costsFor(symbol), dataIssue), report) }
+            .onFailure { problem("Gölge portföy hatası: ${it.message}", it) }
         val checks = DecisionLogs.strategyChecks(decision.evaluations)
         return when (decision) {
             is CandidateDecision.NoSetup -> {
@@ -599,6 +628,7 @@ class TradingEngine(
 
     private fun onPrices(prices: Map<String, BookTicker>) {
         fillPendingOrders(prices)
+        shadowExits(prices)
         for (position in _portfolio.value.positions.toList()) {
             val quote = prices[position.symbol] ?: continue
             if (quote.bid <= 0) continue
@@ -671,7 +701,89 @@ class TradingEngine(
         _health.update { h -> h.copy(pendingOrders = _portfolio.value.pendingOrders.map { "${it.symbol} @ ${"%.6g".format(it.limitPrice)}" }) }
     }
 
+    // ---------------- Gölge portföyler ----------------
+
+    private fun publishShadows(shadows: Map<String, PortfolioState>) {
+        _shadows.value = shadows
+        runCatching { shadowStore.save(shadows) }.onFailure { _health.update { h -> h.copy(lastError = "Gölge kayıt hatası: ${it.message}") } }
+    }
+
+    private fun shadowState(id: StrategyId): PortfolioState =
+        _shadows.value[id.name] ?: PortfolioState.create(config.initialCapital).copy(firstStartedAt = now())
+
+    /** Gölge stratejiler için aynı adayı kendi sanal hesaplarıyla değerlendirir; aktif portföye dokunmaz. */
+    private fun shadowDecide(symbol: String, candidate: Candidate, report: ScanReport) {
+        val active = config.shadowStrategies - config.enabledStrategies
+        if (active.isEmpty()) return
+        for (id in active) {
+            var state = shadowState(id)
+            val pipe = shadowPipelines.getOrPut(id) {
+                DecisionPipeline(RuleEngine(ruleConfig), config.risk, setOf(id), config.strategyParams, config.execution, StrategyProfile.ADAPTIVE)
+            }
+            val equity = currentEquity(state)
+            val context = DecisionContext(
+                now = now(), equity = equity, availableQuote = state.availableCash, openPositions = state.positions,
+                dailyPnlPercent = (equity - state.dayStartEquity) / state.dayStartEquity * 100, market = report.market,
+                btc = analysis("BTCUSDT"), hourlyCloses = hourlyCloses(), closedTrades = state.closedTrades,
+            )
+            val decision = pipe.evaluate(candidate, context) as? CandidateDecision.Enter ?: continue
+            if (decision.setup.strategy != id) continue
+            val quote = feed.prices.value[symbol] ?: continue
+            if ((now() - quote.time) / 1000 > config.maxPriceAgeSeconds) continue
+            val fill = when (val r = FillModel.marketFromQuote(OrderSide.BUY, decision.sizing.quantity, quote.ask, costsFor(symbol), symbols[symbol])) {
+                is FillResult.Filled -> r.fill
+                is FillResult.Rejected -> continue
+            }
+            if ((fill.averagePrice / decision.setup.entryPrice - 1) * 100 > config.maxEntryDriftPercent || fill.averagePrice <= decision.setup.stopPrice) continue
+            state = PaperAccount.openWithFill(state, decision.setup, fill, decision.sizing.riskAmount, decision.report.qualityScore, decision.rationale, decision.report, now())
+            publishShadows(_shadows.value + (id.name to state))
+        }
+    }
+
+    private fun shadowExits(prices: Map<String, BookTicker>) {
+        val current = _shadows.value
+        if (current.isEmpty()) return
+        var changed = false
+        val updated = current.mapValues { (_, start) ->
+            var state = start
+            for (position in start.positions) {
+                val quote = prices[position.symbol] ?: continue
+                if (quote.bid <= 0) continue
+                for (action in ExitManager.onPrice(position, quote.bid, now(), config.execution)) {
+                    if (state.positions.none { it.id == position.id }) break
+                    state = when (action) {
+                        is ExitAction.Close -> PaperAccount.close(state, position.id, quote.bid, action.reason, action.note, costsFor(position.symbol), now())
+                        is ExitAction.PartialClose -> PaperAccount.partialClose(state, position.id, action.fraction, quote.bid, false, action.note, costsFor(position.symbol), now())
+                        is ExitAction.MoveStop -> PaperAccount.moveStop(state, position.id, action.price, action.note, now())
+                    }
+                    changed = true
+                }
+            }
+            state
+        }
+        if (changed) publishShadows(updated)
+    }
+
+    private fun shadowInvalidations() {
+        val current = _shadows.value
+        if (current.isEmpty()) return
+        val updated = current.mapValues { (_, start) ->
+            var state = start
+            for (position in start.positions) {
+                val last = candles[position.symbol]?.get(Timeframe.H1)?.lastOrNull() ?: continue
+                val quote = feed.prices.value[position.symbol] ?: continue
+                if (ExitRules.onHourlyClose(position, last.close)) {
+                    state = PaperAccount.close(state, position.id, quote.bid, ExitReason.INVALIDATION, "1H kapanış geçersizlik seviyesinin altında", costsFor(position.symbol), now())
+                }
+            }
+            val equity = currentEquity(state)
+            PaperAccount.rollDay(state, now(), equity)
+        }
+        if (updated != current) publishShadows(updated)
+    }
+
     private suspend fun checkInvalidations() {
+        shadowInvalidations()
         for (position in _portfolio.value.positions.toList()) {
             val last = candles[position.symbol]?.get(Timeframe.H1)?.lastOrNull() ?: continue
             if (ExitRules.onHourlyClose(position, last.close)) {

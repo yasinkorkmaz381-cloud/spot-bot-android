@@ -43,6 +43,10 @@ fun main(args: Array<String>) = runBlocking {
         "compare" -> compare(options)
         "analyze" -> analyze(options)
         "study" -> study(options)
+        "v3" -> v3(options)
+        "costsplit" -> costSplit(options)
+        "forward" -> forward(options)
+        "v3concentration" -> v3Concentration(options)
         else -> println(
             """
             CryptoScan Pro — MEXC spot botu (sanal işlem)
@@ -61,6 +65,7 @@ fun main(args: Array<String>) = runBlocking {
               research --data klasör       Önceden tanımlı seçenekleri ilk/ikinci yarıda, ileri yürüyen testte,
                        [--out rapor.json]  Monte Carlo ve gölge işlemlerle karşılaştırır
               compare --data klasör        Adaptif / Trend / Seçici profillerini aynı koşullarda karşılaştırır
+              v3 --data klasör             Strateji araştırması V3 (4H/1D, çok yıllı, ön kayıtlı protokol)
               study --data klasör          A/B filtrelerini eğitim/test ve ileri yürüyen testle doğrular; 3 yapılandırma
               analyze --data klasör        A ve B ayrı, rejim filtresi açık/kapalı, kayıp analizi ve önceden
                       [--out rapor.json]   tanımlı filtreler (ilk/ikinci yarı ayrı)
