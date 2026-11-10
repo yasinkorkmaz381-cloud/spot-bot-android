@@ -3,7 +3,7 @@
 MEXC spot piyasasında (USDT pariteleri) çalışan, **kontrollü risk** ve **sistematik karar** odaklı otomatik
 işlem botu. Android uygulaması (Türkçe kumanda paneli) + platformdan bağımsız Kotlin çekirdeği + komut satırı.
 
-> **Durum: V2.1 — sanal işlem (paper trading).** MEXC canlı verisi kullanılır, **gerçek emir gönderilmez**,
+> **Durum: V2.2 — sanal işlem (paper trading).** MEXC canlı verisi kullanılır, **gerçek emir gönderilmez**,
 > API anahtarı istenmez. Aşağıdaki backtest sonuçları stratejilerin henüz kâr avantajı göstermediğini
 > söylüyor; bu yüzden gerçek parayla kullanım (V2) için hazır değildir.
 
@@ -77,17 +77,21 @@ işlem başına beklenti (−0,27R) Adaptif'ten (−0,29R) anlamlı biçimde iyi
 Çekirdek Android'den bağımsız olduğu için motor, ileride telefondan bağımsız bir sunucuda da aynı kodla
 çalıştırılabilir. Gerçek parayla 7/24 işlemde telefonun tek yürütücü olması bağlantı/uyku riski taşır.
 
-## Ekranlar
+## Ekranlar (V2.2 sade arayüz)
 
-Gerçek MEXC verisiyle (BTC/NEAR) Robolectric üzerinde çizilmiş görüntüler (`docs/screenshots`):
+Gerçek MEXC verisiyle (BTC/NEAR) Robolectric üzerinde çizilmiş görüntüler. Uygulama koyu temayla açılır.
+Küçük telefon (320 × 640 dp) görüntüleri: `docs/screenshots/kucuk-ekran`. Değişikliklerin ayrıntısı:
+[`docs/ARAYUZ.md`](docs/ARAYUZ.md).
+
+![Önce / sonra](docs/screenshots/once-sonra.png)
 
 | Panel | Tarama | Coin detayı |
 | --- | --- | --- |
 | ![Panel](docs/screenshots/1-panel.png) | ![Tarama](docs/screenshots/2-tarama.png) | ![Coin detayı](docs/screenshots/3-coin-detay.png) |
-| **İşlem gerekçesi ve kurallar** | **Backtest** | **Koyu tema** |
-| ![İşlemler](docs/screenshots/4-islemler.png) | ![Backtest](docs/screenshots/6-backtest.png) | ![Koyu tema](docs/screenshots/1-panel-dark.png) |
-| **Karar günlüğü** | **İşlem grafiği** | **Profil karşılaştırma** |
-| ![Karar günlüğü](docs/screenshots/7-karar-gunlugu.png) | ![İşlem grafiği](docs/screenshots/8-islem-grafigi.png) | ![Profil karşılaştırma](docs/screenshots/9-profil-karsilastirma.png) |
+| **Açık işlemler** | **Geçmiş** | **İşlem ayrıntısı** |
+| ![Açık işlemler](docs/screenshots/4-islemler.png) | ![Geçmiş](docs/screenshots/5-kapanmis-islemler.png) | ![İşlem ayrıntısı](docs/screenshots/8-islem-grafigi.png) |
+| **Backtest** | **Karar günlüğü** | **Ayarlar** |
+| ![Backtest](docs/screenshots/6-backtest.png) | ![Karar günlüğü](docs/screenshots/7-karar-gunlugu.png) | ![Ayarlar](docs/screenshots/12-ayarlar.png) |
 
 ## Akış
 

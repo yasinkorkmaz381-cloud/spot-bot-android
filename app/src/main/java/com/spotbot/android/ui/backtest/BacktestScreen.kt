@@ -1,7 +1,11 @@
 package com.spotbot.android.ui.backtest
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.heightIn
+import com.spotbot.android.ui.common.ExpandableCard
+import com.spotbot.android.ui.common.Spacing
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.material3.TextButton
@@ -68,6 +72,8 @@ class BacktestViewModel(private val runner: BacktestRunner, private val settings
 
     var mode by mutableStateOf(BacktestMode.SINGLE)
 
+    fun symbolCount() = symbolList().size
+
     private fun symbolList() = symbols.split(',', ' ').map { it.trim().uppercase() }.filter { it.isNotEmpty() }
         .map { if (it.endsWith("USDT")) it else it + "USDT" }.distinct()
 
@@ -86,6 +92,7 @@ class BacktestViewModel(private val runner: BacktestRunner, private val settings
 
 enum class BacktestMode(val title: String) { SINGLE("Tek test"), ISOLATED("A ve B ayrı"), PROFILES("Profiller") }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun BacktestScreen(modifier: Modifier = Modifier, viewModel: BacktestViewModel = viewModel(factory = AppViewModels.Factory)) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -94,38 +101,48 @@ fun BacktestScreen(modifier: Modifier = Modifier, viewModel: BacktestViewModel =
     selected?.let { trade ->
         if (done != null) TradeDetailDialog(trade, done) { selected = null }
     }
-    Column(modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        InfoBanner("Backtest canlı motorla aynı tarama, strateji, kural ve risk kodunu kullanır. Sinyal 15M kapanışında oluşur, giriş sonraki mumun açılışından yapılır; komisyon, spread ve kayma düşülür.")
-        SectionCard("Test ayarları") {
+    val hasResult = state is BacktestState.Done || state is BacktestState.Compared || state is BacktestState.Isolated
+    Column(modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(Spacing.screen), verticalArrangement = Arrangement.spacedBy(Spacing.cards)) {
+        // Sonuç varken ayarlar kısa özet olarak kapalı durur; dokununca açılır.
+        ExpandableCard(
+            "Test ayarları",
+            subtitle = "${viewModel.mode.title} · ${viewModel.days} gün · ${viewModel.symbolCount()} coin · ${viewModel.capital} USDT",
+            initiallyExpanded = !hasResult,
+        ) {
             OutlinedTextField(viewModel.symbols, { viewModel.symbols = it }, label = { Text("Coinler (virgülle)") }, modifier = Modifier.fillMaxWidth())
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 listOf(30, 90, 180).forEach { d -> FilterChip(selected = viewModel.days == d, onClick = { viewModel.days = d }, label = { Text("$d gün") }) }
             }
             OutlinedTextField(
                 viewModel.capital, { viewModel.capital = it }, label = { Text("Başlangıç sermayesi") }, suffix = { Text("USDT") },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), singleLine = true, modifier = Modifier.fillMaxWidth(),
             )
-            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Test türü", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 BacktestMode.entries.forEach { m -> FilterChip(selected = viewModel.mode == m, onClick = { viewModel.mode = m }, label = { Text(m.title) }) }
             }
             when (viewModel.mode) {
                 BacktestMode.PROFILES -> Text(
                     "Adaptif, Trend ve Seçici profilleri aynı veri, dönem, maliyet, risk ve emir modeliyle çalıştırılır; dönem ikiye bölünerek iki yarıdaki tutarlılık gösterilir.",
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 BacktestMode.ISOLATED -> Text(
                     "A+B, yalnız A ve yalnız B aynı veri, ücret, kayma, sermaye ve dönemle ayrı ayrı çalıştırılır (tüm dönem, ilk ve ikinci yarı).",
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                BacktestMode.SINGLE -> Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                BacktestMode.SINGLE -> FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     StrategyId.entries.forEach { id ->
                         FilterChip(selected = id in viewModel.strategies, onClick = { viewModel.toggle(id) }, label = { Text("${id.code} ${id.title}") })
                     }
                 }
             }
-            val running = state is BacktestState.Running
-            Button(onClick = viewModel::run, enabled = !running, modifier = Modifier.fillMaxWidth()) { Text(if (running) "Çalışıyor…" else "Backtest başlat") }
+            Text(
+                "Canlı motorla aynı tarama, strateji, kural ve risk kodu. Sinyal 15M kapanışında, giriş sonraki mumun açılışında; komisyon, spread ve kayma düşülür.",
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
+        val running = state is BacktestState.Running
+        Button(onClick = viewModel::run, enabled = !running, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text(if (running) "Çalışıyor…" else "Backtest başlat") }
         when (val s = state) {
             is BacktestState.Running -> {
                 Text(s.message)
@@ -160,10 +177,11 @@ private fun TradeDetailDialog(trade: ClosedTrade, done: BacktestState.Done, onDi
 @Composable
 fun BacktestReportContent(r: BacktestReport, onOpenTrade: (ClosedTrade) -> Unit = {}) {
     BacktestSummaryCard(r)
+    EquityCard(r)
     StrategyCompareCard(r)
-    MonthlyReturnsCard(r)
     TradeHistoryCard(r, onOpenTrade)
-    SectionCard("Ek ayrıntılar") {
+    DetailedMetricsCard(r)
+    ExpandableCard("Çıkış nedenleri ve engelleyen kurallar", subtitle = "Uyarılar, gerçekleşmeyen emirler") {
         if (r.limitOrdersNotFilled > 0) KeyValueRow("Dolmayan limit giriş emri", "${r.limitOrdersNotFilled}")
         r.rejectedOrders.forEach { (reason, count) -> KeyValueRow("Gerçekleşmeyen emir: $reason", "$count") }
         r.exitReasons.forEach { (k, v) -> KeyValueRow("Çıkış: $k", "$v") }
@@ -171,7 +189,7 @@ fun BacktestReportContent(r: BacktestReport, onOpenTrade: (ClosedTrade) -> Unit 
         r.warnings.forEach { Text("⚠ $it", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.tertiary) }
     }
     r.shadow?.let { sh ->
-        SectionCard("Kural katkısı (gölge işlemler)") {
+        ExpandableCard("Kural katkısı (gölge işlemler)", subtitle = "${sh.trades} kurulumun bağımsız sonucu") {
             Text(
                 "Bulunan ${sh.trades} kurulumun her biri (alınsın ya da reddedilsin) tek başına simüle edildi. Pozitif katkı: kural geçtiğinde sonuç daha iyi.",
                 style = MaterialTheme.typography.bodySmall,

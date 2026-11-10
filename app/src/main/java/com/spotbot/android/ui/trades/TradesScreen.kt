@@ -1,50 +1,62 @@
 package com.spotbot.android.ui.trades
 
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.material3.Card
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.spotbot.android.ui.AppViewModels
+import com.spotbot.android.ui.common.AppCard
 import com.spotbot.android.ui.common.CandleChart
 import com.spotbot.android.ui.common.EmptyText
+import com.spotbot.android.ui.common.ExpandableCard
 import com.spotbot.android.ui.common.KeyValueRow
+import com.spotbot.android.ui.common.MetricGrid
+import com.spotbot.android.ui.common.NavRow
 import com.spotbot.android.ui.common.PriceMarker
 import com.spotbot.android.ui.common.SectionCard
+import com.spotbot.android.ui.common.SegmentedTabs
+import com.spotbot.android.ui.common.Spacing
+import com.spotbot.android.ui.common.StatusPill
 import com.spotbot.android.ui.common.Tag
 import com.spotbot.android.ui.common.TimeMarker
 import com.spotbot.android.ui.common.formatDateTime
 import com.spotbot.android.ui.common.formatMoney
 import com.spotbot.android.ui.common.formatPercent
 import com.spotbot.android.ui.common.formatPrice
+import com.spotbot.android.ui.common.formatQuantity
 import com.spotbot.android.ui.common.formatRatio
 import com.spotbot.android.ui.common.formatSignedMoney
 import com.spotbot.android.ui.common.formatTime
@@ -55,34 +67,29 @@ import com.spotbot.core.engine.TradingEngine
 import com.spotbot.core.exchange.MarketDataApi
 import com.spotbot.core.model.Candle
 import com.spotbot.core.model.Timeframe
+import com.spotbot.core.risk.CostModel
 import com.spotbot.core.rules.RuleGroup
 import com.spotbot.core.rules.RuleReport
 import com.spotbot.core.trading.ClosedTrade
-import com.spotbot.core.trading.CoinDecision
-import com.spotbot.core.trading.CoinOutcome
-import com.spotbot.core.trading.DataStamp
 import com.spotbot.core.trading.Performance
 import com.spotbot.core.trading.PortfolioState
 import com.spotbot.core.trading.Position
-import com.spotbot.core.trading.ScanLog
 import com.spotbot.core.trading.TradeRationale
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-class TradesViewModel(engine: TradingEngine, private val api: MarketDataApi) : ViewModel() {
-    val portfolio = engine.portfolio
-    val scanLogs = engine.scanLogs
-
+/** İşlem çevresindeki kapanmış 15M mumları REST'ten yükler (işlem kimliği → mumlar). */
+class TradeChartLoader(private val api: MarketDataApi, private val scope: CoroutineScope) {
     private val _charts = MutableStateFlow<Map<String, List<Candle>>>(emptyMap())
-    /** İşlem kimliği → işlem çevresindeki kapanmış 15M mumlar. */
     val charts: StateFlow<Map<String, List<Candle>>> = _charts.asStateFlow()
 
-    fun loadChart(position: Position, closedAt: Long?) {
+    fun load(position: Position, closedAt: Long?) {
         if (_charts.value.containsKey(position.id)) return
-        viewModelScope.launch {
+        scope.launch {
             val now = runCatching { api.serverTime() }.getOrDefault(System.currentTimeMillis())
             val start = position.openedAt - 8 * Timeframe.H1.millis
             val end = minOf(now, (closedAt ?: now) + 2 * Timeframe.H1.millis)
@@ -93,233 +100,242 @@ class TradesViewModel(engine: TradingEngine, private val api: MarketDataApi) : V
     }
 }
 
-private enum class Tab(val title: String) { OPEN("Açık"), CLOSED("Kapanmış"), DECISIONS("Karar günlüğü"), EVENTS("Olaylar") }
+class TradesViewModel(private val engine: TradingEngine) : ViewModel() {
+    val portfolio = engine.portfolio
+    val prices = engine.prices
+
+    fun cancelPending(symbol: String) = engine.cancelPendingOrder(symbol)
+}
+
+enum class TradesTab(val title: String) { OPEN("Açık işlemler"), HISTORY("Geçmiş") }
 
 @Composable
-fun TradesScreen(modifier: Modifier = Modifier, viewModel: TradesViewModel = viewModel(factory = AppViewModels.Factory)) {
+fun TradesScreen(onOpenTrade: (String) -> Unit, onOpenEvents: () -> Unit, modifier: Modifier = Modifier, viewModel: TradesViewModel = viewModel(factory = AppViewModels.Factory)) {
     val portfolio by viewModel.portfolio.collectAsStateWithLifecycle()
-    val logs by viewModel.scanLogs.collectAsStateWithLifecycle()
-    val charts by viewModel.charts.collectAsStateWithLifecycle()
-    TradesContent(portfolio, modifier, scanLogs = logs, charts = charts, onLoadChart = viewModel::loadChart)
+    val prices by viewModel.prices.collectAsStateWithLifecycle()
+    TradesContent(portfolio, prices.mapValues { it.value.bid }, onOpenTrade, modifier, onOpenEvents, viewModel::cancelPending)
 }
 
 @Composable
 fun TradesContent(
     portfolio: PortfolioState,
+    bids: Map<String, Double>,
+    onOpenTrade: (String) -> Unit,
     modifier: Modifier = Modifier,
-    initialTab: Int = 0,
-    expanded: Boolean = false,
-    scanLogs: List<ScanLog> = emptyList(),
-    charts: Map<String, List<Candle>> = emptyMap(),
-    onLoadChart: (Position, Long?) -> Unit = { _, _ -> },
+    onOpenEvents: () -> Unit = {},
+    onCancelPending: (String) -> Unit = {},
+    initialTab: TradesTab = TradesTab.OPEN,
 ) {
-    var tab by rememberSaveable { mutableStateOf(Tab.entries[initialTab]) }
-    var coinFilter by rememberSaveable { mutableStateOf<String?>(null) }
-    val summary = Performance.summarize(portfolio, System.currentTimeMillis())
-
-    LazyColumn(modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    var tab by rememberSaveable { mutableStateOf(initialTab) }
+    LazyColumn(modifier.fillMaxSize(), contentPadding = PaddingValues(Spacing.screen), verticalArrangement = Arrangement.spacedBy(Spacing.cards)) {
         item {
-            SectionCard("Özet") {
-                KeyValueRow("Kapanmış işlem", "${summary.allTime.trades}")
-                KeyValueRow("Net K/Z", "${formatSignedMoney(summary.allTime.netPnl)} USDT", gainLossColor(summary.allTime.netPnl.compareTo(0.0)))
-                KeyValueRow("Kazanma oranı", formatPercent(summary.winRatePercent))
-                KeyValueRow("Profit factor", formatRatio(summary.profitFactor))
-                KeyValueRow("Ortalama R", "%+.2f".format(summary.averageR))
-            }
-        }
-        item {
-            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Tab.entries.forEach { t -> FilterChip(selected = tab == t, onClick = { tab = t }, label = { Text(t.title) }) }
-            }
+            SegmentedTabs(
+                TradesTab.entries, tab,
+                label = { if (it == TradesTab.OPEN) "${it.title} (${portfolio.positions.size})" else it.title },
+                onSelect = { tab = it },
+            )
         }
         when (tab) {
-            Tab.OPEN -> {
-                if (portfolio.positions.isEmpty()) item { EmptyText("Açık işlem yok.") }
-                items(portfolio.positions, key = { it.id }) { p -> OpenCard(p, expanded, charts[p.id]) { onLoadChart(p, null) } }
+            TradesTab.OPEN -> {
+                if (portfolio.positions.isEmpty() && portfolio.pendingOrders.isEmpty()) item { EmptyText("Açık işlem yok.", Modifier.padding(4.dp)) }
+                items(portfolio.positions, key = { it.id }) { p -> OpenPositionCard(p, bids[p.symbol]) { onOpenTrade(p.id) } }
+                items(portfolio.pendingOrders, key = { "pending-${it.symbol}" }) { order ->
+                    AppCard {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Column(Modifier.weight(1f)) {
+                                Text("${order.symbol.removeSuffix("USDT")} · bekleyen limit alış", style = MaterialTheme.typography.titleSmall)
+                                Text("Limit ${formatPrice(order.limitPrice)} · son ${formatTime(order.expiresAt)} · ayrılan ${formatMoney(order.reservedQuote)} USDT", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            TextButton(onClick = { onCancelPending(order.symbol) }) { Text("İptal") }
+                        }
+                    }
+                }
             }
-            Tab.CLOSED -> {
-                if (portfolio.closedTrades.isEmpty()) item { EmptyText("Henüz kapanmış işlem yok.") }
-                items(portfolio.closedTrades.reversed(), key = { it.position.id }) { t -> ClosedCard(t, expanded, charts[t.position.id]) { onLoadChart(t.position, t.closedAt) } }
-            }
-            Tab.DECISIONS -> {
-                val symbols = scanLogs.lastOrNull()?.coins?.map { it.symbol }.orEmpty()
+            TradesTab.HISTORY -> {
+                val summary = Performance.summarize(portfolio, System.currentTimeMillis())
                 item {
-                    Text(
-                        "Her 15M taramasında her coin için karar, gerekçe, kuralların sonucu ve kullanılan verinin zamanı. Ayrıntılı strateji ve kural incelemesi tasarım notu gereği yalnız en iyi 2–4 adaya yapılır.",
-                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                if (symbols.isNotEmpty()) {
-                    item {
-                        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            FilterChip(selected = coinFilter == null, onClick = { coinFilter = null }, label = { Text("Tümü") })
-                            symbols.forEach { s -> FilterChip(selected = coinFilter == s, onClick = { coinFilter = s }, label = { Text(s.removeSuffix("USDT")) }) }
-                        }
+                    AppCard {
+                        MetricGrid(
+                            listOf(
+                                Triple("Net kâr/zarar", "${formatSignedMoney(summary.allTime.netPnl)} USDT", gainLossColor(summary.allTime.netPnl.compareTo(0.0))),
+                                Triple("İşlem", "${summary.allTime.trades}", Color.Unspecified),
+                                Triple("Kazanma oranı", formatPercent(summary.winRatePercent), Color.Unspecified),
+                                Triple("Profit factor", formatRatio(summary.profitFactor), Color.Unspecified),
+                            ),
+                        )
                     }
                 }
-                if (scanLogs.isEmpty()) item { EmptyText("Henüz tarama kaydı yok.") }
-                items(scanLogs.reversed(), key = { it.time }) { log -> ScanLogCard(log, coinFilter, expanded) }
+                if (portfolio.closedTrades.isEmpty()) item { EmptyText("Henüz kapanmış işlem yok.", Modifier.padding(4.dp)) }
+                items(portfolio.closedTrades.reversed(), key = { it.position.id }) { t -> ClosedTradeCard(t) { onOpenTrade(t.position.id) } }
+                item { AppCard { NavRow("Olay günlüğü", subtitle = "Açılan, kapanan ve reddedilen tüm kararlar", onClick = onOpenEvents) } }
             }
-            Tab.EVENTS -> items(portfolio.decisions.reversed()) { DecisionItem(it) }
         }
     }
 }
 
 @Composable
-private fun ScanLogCard(log: ScanLog, coinFilter: String?, expanded: Boolean) {
-    val coins = log.coins.filter { coinFilter == null || it.symbol == coinFilter }
-    if (coins.isEmpty()) return
-    SectionCard(
-        "Tarama ${formatDateTime(log.boundary)}",
-        trailing = { Tag(if (log.marketAllowsLongs) "PİYASA UYGUN" else "PİYASA FİLTRESİ", if (log.marketAllowsLongs) SpotBotTheme.tradingColors.gain else SpotBotTheme.tradingColors.loss) },
-    ) {
-        Text(
-            "Profil: ${log.profile.title} · karar anı ${formatTime(log.time)}${if (log.entriesPaused) " · yeni işlemler duraklatılmıştı" else ""}",
-            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        if (!log.marketAllowsLongs) Text(log.marketReasons.joinToString(), style = MaterialTheme.typography.bodySmall)
-        coins.sortedBy { it.outcome.ordinal }.forEach { CoinRow(it, expanded || coinFilter != null) }
-    }
-}
-
-@Composable
-private fun CoinRow(coin: CoinDecision, initiallyExpanded: Boolean) {
-    var open by rememberSaveable(coin.symbol, coin.data.m15Close) { mutableStateOf(initiallyExpanded && coin.strategies.isNotEmpty()) }
-    val colors = SpotBotTheme.tradingColors
-    val color = when (coin.outcome) {
-        CoinOutcome.OPENED, CoinOutcome.ORDER_PLACED -> colors.gain
-        CoinOutcome.REJECTED, CoinOutcome.ENTRY_FAILED, CoinOutcome.STALE_DATA -> colors.loss
-        CoinOutcome.ELIMINATED, CoinOutcome.FLAGGED -> MaterialTheme.colorScheme.tertiary
-        else -> MaterialTheme.colorScheme.outline
-    }
-    Column(Modifier.fillMaxWidth().clickable { open = !open }, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+private fun OpenPositionCard(p: Position, bid: Double?, onClick: () -> Unit) {
+    val pnl = bid?.let { p.unrealizedPnl(it, CostModel()) }
+    AppCard(onClick = onClick) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(coin.symbol.removeSuffix("USDT"), fontWeight = FontWeight.SemiBold)
-            Tag(coin.outcome.title, color)
-            coin.preScore?.let { Text("puan $it", style = MaterialTheme.typography.labelSmall) }
+            Text(p.symbol.removeSuffix("USDT"), style = MaterialTheme.typography.titleMedium)
+            Tag(p.strategy.code, MaterialTheme.colorScheme.primary)
+            Text(
+                pnl?.let { "${formatSignedMoney(it)} USDT" } ?: "—", style = MaterialTheme.typography.titleMedium,
+                color = gainLossColor((pnl ?: 0.0).compareTo(0.0)), modifier = Modifier.weight(1f), textAlign = androidx.compose.ui.text.style.TextAlign.End, maxLines = 1,
+            )
         }
-        Text(coin.summary, style = MaterialTheme.typography.bodySmall)
-        if (open) {
-            coin.reasons.forEach { Text("• $it", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-            DataStampText(coin.data)
-            coin.strategies.forEach { s ->
-                Text(
-                    "${s.strategy.code} ${s.strategy.title}: " + when {
-                        !s.applicable -> "değerlendirilmedi"
-                        !s.setupFound -> "kurulum yok"
-                        else -> "giriş ${formatPrice(s.entry ?: 0.0)}, stop ${formatPrice(s.stop ?: 0.0)}, hedef ${formatPrice(s.target ?: 0.0)}, net R:R %.2f, kalite %.0f".format(s.netRiskReward ?: 0.0, s.qualityScore ?: 0.0)
-                    },
-                    style = MaterialTheme.typography.labelLarge,
-                )
-                s.reasons.forEach { Text("   – $it", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-                s.rules.sortedBy { !it.mandatory }.forEach { r ->
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text(if (r.passed) "✓" else "✗", color = if (r.passed) colors.gain else colors.loss, fontWeight = FontWeight.Bold)
-                        Column {
-                            Text("${r.id} ${r.title}${if (r.mandatory) " (zorunlu)" else ""}", style = MaterialTheme.typography.bodySmall)
-                            Text(r.detail, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                    }
-                }
-            }
-        } else if (coin.strategies.isNotEmpty() || coin.reasons.isNotEmpty()) {
-            Text("Ayrıntı için dokunun", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
-        }
-        HorizontalDivider(color = Color.Transparent)
+        MetricGrid(
+            listOf(
+                Triple("Alış", formatPrice(p.entryPrice), Color.Unspecified),
+                Triple("Güncel", bid?.let { formatPrice(it) } ?: "—", Color.Unspecified),
+                Triple("Stop", formatPrice(p.stopPrice), SpotBotTheme.tradingColors.loss),
+                Triple("Hedef", formatPrice(p.targetPrice), SpotBotTheme.tradingColors.gain),
+            ),
+        )
     }
 }
 
 @Composable
-private fun DataStampText(d: DataStamp) {
-    fun t(v: Long?) = v?.let { formatDateTime(it) } ?: "—"
-    Text(
-        "Veri zamanı — 15M: ${t(d.m15Close)} · 1H: ${t(d.h1Close)} · 4H: ${t(d.h4Close)} · fiyat: ${d.priceTime?.let { formatTime(it) } ?: "—"}",
-        style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+private fun ClosedTradeCard(t: ClosedTrade, onClick: () -> Unit) {
+    AppCard(onClick = onClick) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(t.position.symbol.removeSuffix("USDT"), style = MaterialTheme.typography.titleMedium)
+            Tag(t.position.strategy.code, MaterialTheme.colorScheme.primary)
+            Text(
+                "${formatSignedMoney(t.netPnl)} USDT", style = MaterialTheme.typography.titleMedium, color = gainLossColor(t.netPnl.compareTo(0.0)),
+                modifier = Modifier.weight(1f), textAlign = androidx.compose.ui.text.style.TextAlign.End, maxLines = 1,
+            )
+        }
+        Text("${formatDateTime(t.position.openedAt)} → ${formatDateTime(t.closedAt)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("${formatPrice(t.position.entryPrice)} → ${formatPrice(t.averageExitPrice)} · ${t.reason.title} · %+.2fR".format(t.rMultiple), style = MaterialTheme.typography.bodySmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+// ---- İşlem ayrıntısı (alt sayfa) ----
+
+class TradeDetailViewModel(private val engine: TradingEngine, api: MarketDataApi, handle: SavedStateHandle) : ViewModel() {
+    val id: String = handle["id"] ?: ""
+    val portfolio = engine.portfolio
+    val prices = engine.prices
+    private val loader = TradeChartLoader(api, viewModelScope)
+    val chart = loader.charts
+
+    fun loadChart(position: Position, closedAt: Long?) = loader.load(position, closedAt)
+    fun close(positionId: String) = engine.closePosition(positionId)
+}
+
+@Composable
+fun TradeDetailScreen(onOpenSymbol: (String) -> Unit, modifier: Modifier = Modifier, viewModel: TradeDetailViewModel = viewModel(factory = AppViewModels.Factory)) {
+    val portfolio by viewModel.portfolio.collectAsStateWithLifecycle()
+    val prices by viewModel.prices.collectAsStateWithLifecycle()
+    val charts by viewModel.chart.collectAsStateWithLifecycle()
+    val open = portfolio.positions.firstOrNull { it.id == viewModel.id }
+    val closed = portfolio.closedTrades.lastOrNull { it.position.id == viewModel.id }
+    val position = open ?: closed?.position
+    if (position == null) {
+        EmptyText("İşlem bulunamadı (hesap sıfırlanmış olabilir).", modifier.padding(Spacing.screen))
+        return
+    }
+    LaunchedEffect(position.id) { viewModel.loadChart(position, closed?.closedAt) }
+    TradeDetailContent(
+        position, if (open != null) null else closed, prices[position.symbol]?.bid, charts[position.id],
+        onClose = { viewModel.close(position.id) }, onOpenSymbol = { onOpenSymbol(position.symbol) }, modifier = modifier,
     )
 }
 
 @Composable
-private fun OpenCard(p: Position, expanded: Boolean, chart: List<Candle>?, onLoadChart: () -> Unit) {
-    ExpandableCard(
-        initiallyExpanded = expanded,
-        header = {
-            Text(p.symbol, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
-            Tag(p.strategy.title, MaterialTheme.colorScheme.primary)
-        },
-        summary = "Giriş ${formatPrice(p.entryPrice)} · Stop ${formatPrice(p.stopPrice)} · Hedef ${formatPrice(p.targetPrice)} · Risk ${formatMoney(p.openRisk)} USDT",
-    ) {
-        TradeChart(p, null, null, chart, onLoadChart)
-        Rationale(p.rationale)
-        p.ruleReport?.let { Rules(it) }
-    }
-}
-
-@Composable
-private fun ClosedCard(t: ClosedTrade, expanded: Boolean, chart: List<Candle>?, onLoadChart: () -> Unit) {
-    ExpandableCard(
-        initiallyExpanded = expanded,
-        header = {
-            Text(t.position.symbol, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
-            Text("${formatSignedMoney(t.netPnl)} USDT (${"%+.2f".format(t.rMultiple)}R)", color = gainLossColor(t.netPnl.compareTo(0.0)), fontWeight = FontWeight.SemiBold)
-        },
-        summary = "${t.position.strategy.title} · ${t.reason.title} · ${formatDateTime(t.position.openedAt)} → ${formatDateTime(t.closedAt)}",
-    ) {
-        TradeChart(t.position, t.closedAt, t.exitPrice, chart, onLoadChart)
-        KeyValueRow("Giriş / çıkış", "${formatPrice(t.position.entryPrice)} → ${formatPrice(t.exitPrice)}")
-        KeyValueRow("Komisyon", "${formatMoney(t.fees)} USDT")
-        KeyValueRow("Kapanış gerekçesi", t.note)
-        Rationale(t.position.rationale)
-        t.position.ruleReport?.let { Rules(it) }
-    }
-}
-
-@Composable
-private fun TradeChart(p: Position, closedAt: Long?, exitPrice: Double?, chart: List<Candle>?, onLoad: () -> Unit) {
-    val colors = SpotBotTheme.tradingColors
-    when {
-        chart == null -> OutlinedButton(onClick = onLoad) { Text("İşlem grafiğini göster (15M)") }
-        chart.isEmpty() -> EmptyText("Grafik verisi alınamadı.")
-        else -> CandleChart(
-            candles = chart.takeLast(120),
-            markers = listOfNotNull(
-                PriceMarker(p.entryPrice, MaterialTheme.colorScheme.primary, "Giriş"),
-                PriceMarker(p.initialStopPrice, colors.loss, "Stop"),
-                PriceMarker(p.targetPrice, colors.gain, "Hedef"),
-                exitPrice?.let { PriceMarker(it, MaterialTheme.colorScheme.tertiary, "Çıkış") },
-            ),
-            timeMarkers = listOfNotNull(
-                TimeMarker(p.openedAt, MaterialTheme.colorScheme.primary, "Giriş"),
-                closedAt?.let { TimeMarker(it, MaterialTheme.colorScheme.tertiary, "Çıkış") },
-            ),
-        )
-    }
-}
-
-@Composable
-private fun ExpandableCard(
-    initiallyExpanded: Boolean,
-    header: @Composable RowScope.() -> Unit,
-    summary: String,
-    details: @Composable () -> Unit,
+fun TradeDetailContent(
+    p: Position,
+    closed: ClosedTrade?,
+    bid: Double?,
+    chart: List<Candle>?,
+    onClose: () -> Unit,
+    onOpenSymbol: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
-    var expanded by rememberSaveable { mutableStateOf(initiallyExpanded) }
-    Card(Modifier.fillMaxWidth().clickable { expanded = !expanded }) {
-        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp), content = header)
-            Text(summary, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            if (expanded) {
-                HorizontalDivider()
-                details()
-            } else {
-                Text("Gerekçeleri ve grafiği görmek için dokunun", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+    var confirmClose by remember { mutableStateOf(false) }
+    val colors = SpotBotTheme.tradingColors
+    val pnl = closed?.netPnl ?: bid?.let { p.unrealizedPnl(it, CostModel()) }
+    val r = if (p.riskAmount > 0) pnl?.div(p.riskAmount) else null
+    Column(
+        modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(Spacing.screen),
+        verticalArrangement = Arrangement.spacedBy(Spacing.cards),
+    ) {
+        AppCard {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(p.symbol.removeSuffix("USDT"), style = MaterialTheme.typography.titleLarge)
+                Tag("${p.strategy.code} ${p.strategy.title}", MaterialTheme.colorScheme.primary)
+            }
+            StatusPill(closed?.let { "Kapandı · ${it.reason.title}" } ?: "Açık", if (closed == null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(
+                pnl?.let { "${formatSignedMoney(it)} USDT" + (r?.let { v -> "  (%+.2fR)".format(v) } ?: "") } ?: "—",
+                style = MaterialTheme.typography.headlineSmall, color = gainLossColor((pnl ?: 0.0).compareTo(0.0)),
+            )
+            MetricGrid(
+                listOf(
+                    Triple("Alış", formatPrice(p.entryPrice), Color.Unspecified),
+                    Triple(if (closed != null) "Satış (ort.)" else "Güncel", (closed?.averageExitPrice ?: bid)?.let { formatPrice(it) } ?: "—", Color.Unspecified),
+                    Triple("Stop", formatPrice(p.stopPrice), colors.loss),
+                    Triple("Hedef", formatPrice(p.targetPrice), colors.gain),
+                    Triple("Açılış", formatDateTime(p.openedAt), Color.Unspecified),
+                    Triple(if (closed != null) "Kapanış" else "Risk", closed?.let { formatDateTime(it.closedAt) } ?: "${formatMoney(p.openRisk)} USDT", Color.Unspecified),
+                ),
+            )
+        }
+        SectionCard("Grafik (15M)") {
+            when {
+                chart == null -> EmptyText("Grafik yükleniyor…")
+                chart.isEmpty() -> EmptyText("Grafik verisi alınamadı.")
+                else -> CandleChart(
+                    candles = chart.takeLast(120),
+                    markers = listOfNotNull(
+                        PriceMarker(p.entryPrice, MaterialTheme.colorScheme.primary, "Giriş"),
+                        PriceMarker(p.initialStopPrice, colors.loss, "Stop"),
+                        PriceMarker(p.targetPrice, colors.gain, "Hedef"),
+                        closed?.let { PriceMarker(it.exitPrice, MaterialTheme.colorScheme.tertiary, "Çıkış") },
+                    ),
+                    timeMarkers = listOfNotNull(
+                        TimeMarker(p.openedAt, MaterialTheme.colorScheme.primary, "Giriş"),
+                        closed?.let { TimeMarker(it.closedAt, MaterialTheme.colorScheme.tertiary, "Çıkış") },
+                    ),
+                )
             }
         }
+        ExpandableCard("İşlem gerekçesi", subtitle = "Altı soru: neden bu coin, neden şimdi, stop, R:R, iptal", initiallyExpanded = true) { Rationale(p.rationale) }
+        ExpandableCard("Ayrıntılar", subtitle = "Miktar, ücret, kapanış notu") {
+            KeyValueRow("Miktar", formatQuantity(p.initialQuantity))
+            KeyValueRow("Kalite puanı", "%.0f / 100".format(p.qualityScore))
+            KeyValueRow("Risk (başlangıç)", "${formatMoney(p.riskAmount)} USDT")
+            closed?.let {
+                KeyValueRow("Komisyon", "${formatMoney(it.fees)} USDT")
+                KeyValueRow("Kapanış notu", it.note)
+            }
+        }
+        p.ruleReport?.let { report -> ExpandableCard("Kurallar", subtitle = "Kalite puanı %.0f · zorunlu ve kalite kuralları".format(report.qualityScore)) { Rules(report) } }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FilledTonalButton(onClick = onOpenSymbol, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Text("Coin analizi", maxLines = 1) }
+            if (closed == null) {
+                OutlinedButton(
+                    onClick = { confirmClose = true }, modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = colors.loss),
+                ) { Text("Manuel kapat", maxLines = 1) }
+            }
+        }
+    }
+    if (confirmClose) {
+        AlertDialog(
+            onDismissRequest = { confirmClose = false },
+            title = { Text("${p.symbol} kapatılsın mı?") },
+            text = { Text("Pozisyon anlık alış fiyatından (sanal) kapatılır. Bu manuel müdahale olarak kaydedilir.") },
+            confirmButton = { TextButton(onClick = { onClose(); confirmClose = false }) { Text("Kapat") } },
+            dismissButton = { TextButton(onClick = { confirmClose = false }) { Text("Vazgeç") } },
+        )
     }
 }
 
 @Composable
 private fun Rationale(r: TradeRationale) {
-    Text("İşlem gerekçesi", style = MaterialTheme.typography.titleSmall)
     listOf(
         "Neden bu coin?" to r.whyCoin,
         "Neden bu giriş?" to r.whyEntry,
@@ -328,14 +344,15 @@ private fun Rationale(r: TradeRationale) {
         "Net risk/getiri" to r.riskReward,
         "Ne zaman geçersiz olur?" to r.invalidation,
     ).forEach { (q, a) ->
-        Text(q, style = MaterialTheme.typography.labelLarge)
-        Text(a, style = MaterialTheme.typography.bodySmall)
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(q, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(a, style = MaterialTheme.typography.bodyMedium)
+        }
     }
 }
 
 @Composable
 private fun Rules(report: RuleReport) {
-    Text("Kurallar · kalite puanı %.0f".format(report.qualityScore), style = MaterialTheme.typography.titleSmall)
     report.outcomes.sortedBy { it.group }.forEach { o ->
         val color = if (o.passed) SpotBotTheme.tradingColors.gain else SpotBotTheme.tradingColors.loss
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -345,5 +362,20 @@ private fun Rules(report: RuleReport) {
                 Text(o.detail, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
+    }
+}
+
+// ---- Olay günlüğü (alt sayfa) ----
+
+class EventsViewModel(engine: TradingEngine) : ViewModel() {
+    val portfolio = engine.portfolio
+}
+
+@Composable
+fun EventsScreen(modifier: Modifier = Modifier, viewModel: EventsViewModel = viewModel(factory = AppViewModels.Factory)) {
+    val portfolio by viewModel.portfolio.collectAsStateWithLifecycle()
+    LazyColumn(modifier.fillMaxSize(), contentPadding = PaddingValues(Spacing.screen), verticalArrangement = Arrangement.spacedBy(Spacing.cards)) {
+        if (portfolio.decisions.isEmpty()) item { EmptyText("Henüz kayıt yok.") }
+        items(portfolio.decisions.reversed()) { AppCard { DecisionItem(it) } }
     }
 }

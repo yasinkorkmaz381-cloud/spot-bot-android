@@ -35,7 +35,15 @@ data class PanelUiState(
     val equityHistory: List<Double> = emptyList(),
     val risk: com.spotbot.core.trading.RiskStatus = com.spotbot.core.trading.RiskStatus(),
     val pendingOrders: List<com.spotbot.core.trading.PendingOrder> = emptyList(),
+    /** Gün başı (UTC) özsermayesi; günlük değişim buna göre hesaplanır. */
+    val dayStartEquity: Double = 0.0,
+    /** Son kapanan işlemler (en yenisi önce). */
+    val recentTrades: List<com.spotbot.core.trading.ClosedTrade> = emptyList(),
 ) {
+    val dailyChange: Double get() = if (dayStartEquity > 0) equity - dayStartEquity else 0.0
+    val dailyChangePercent: Double get() = if (dayStartEquity > 0) dailyChange / dayStartEquity * 100 else 0.0
+    val totalPnl: Double get() = equity - initialCapital
+    val totalPnlPercent: Double get() = if (initialCapital > 0) totalPnl / initialCapital * 100 else 0.0
     val isActive: Boolean get() = health.status == EngineStatus.RUNNING || health.status == EngineStatus.STARTING
 }
 
@@ -74,6 +82,8 @@ class PanelViewModel(
             equityHistory = portfolio.equityHistory.takeLast(24 * 30).map { it.equity },
             risk = risk,
             pendingOrders = portfolio.pendingOrders,
+            dayStartEquity = portfolio.dayStartEquity,
+            recentTrades = portfolio.closedTrades.takeLast(3).reversed(),
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), PanelUiState())
 

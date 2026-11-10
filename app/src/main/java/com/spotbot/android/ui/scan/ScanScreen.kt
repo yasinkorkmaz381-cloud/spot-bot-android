@@ -3,32 +3,48 @@ package com.spotbot.android.ui.scan
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.Card
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.spotbot.android.ui.AppViewModels
+import com.spotbot.android.ui.common.AppCard
 import com.spotbot.android.ui.common.EmptyText
 import com.spotbot.android.ui.common.InfoBanner
-import com.spotbot.android.ui.common.KeyValueRow
+import com.spotbot.android.ui.common.NavRow
 import com.spotbot.android.ui.common.SectionCard
+import com.spotbot.android.ui.common.SectionLabel
+import com.spotbot.android.ui.common.Spacing
+import com.spotbot.android.ui.common.StatusPill
 import com.spotbot.android.ui.common.Tag
-import com.spotbot.android.ui.common.formatCompact
+import com.spotbot.android.ui.common.formatDateTime
 import com.spotbot.android.ui.common.formatPercent
 import com.spotbot.android.ui.common.formatPrice
 import com.spotbot.android.ui.common.formatTime
@@ -38,76 +54,228 @@ import com.spotbot.core.engine.TradingEngine
 import com.spotbot.core.scanner.CoinScan
 import com.spotbot.core.scanner.CoinStatus
 import com.spotbot.core.scanner.ScanReport
+import com.spotbot.core.trading.CoinDecision
+import com.spotbot.core.trading.CoinOutcome
+import com.spotbot.core.trading.DataStamp
+import com.spotbot.core.trading.ScanLog
 
 class ScanViewModel(engine: TradingEngine) : ViewModel() {
     val report = engine.lastScan
-    val health = engine.health
+    val scanLogs = engine.scanLogs
+}
+
+/** Analiz durumu: taramanın coin hakkındaki sonucu. */
+@Composable
+fun analysisLabel(status: CoinStatus): Pair<String, Color> = when (status) {
+    CoinStatus.CANDIDATE -> "Aday" to MaterialTheme.colorScheme.primary
+    CoinStatus.PASSED -> "Filtreyi geçti" to MaterialTheme.colorScheme.onSurfaceVariant
+    CoinStatus.FLAGGED -> "Riskli" to MaterialTheme.colorScheme.tertiary
+    CoinStatus.ELIMINATED -> "Elendi" to MaterialTheme.colorScheme.onSurfaceVariant
+}
+
+/** İşlem uygunluğu: son taramadaki kararın kısa hali. Yeşil yalnız kuralların geçtiği durumda. */
+@Composable
+fun eligibilityLabel(outcome: CoinOutcome?): Pair<String, Color> {
+    val gain = SpotBotTheme.tradingColors.gain
+    val neutral = MaterialTheme.colorScheme.onSurfaceVariant
+    return when (outcome) {
+        CoinOutcome.OPENED, CoinOutcome.ORDER_PLACED -> "İşlemde" to gain
+        CoinOutcome.OBSERVE_ONLY, CoinOutcome.PAUSED, CoinOutcome.ENTRY_FAILED -> "Uygun" to gain
+        CoinOutcome.REJECTED, CoinOutcome.STALE_DATA, CoinOutcome.ELIMINATED -> "Uygun değil" to neutral
+        CoinOutcome.FLAGGED -> "Riskli" to MaterialTheme.colorScheme.tertiary
+        CoinOutcome.NO_SETUP -> "Kurulum yok" to neutral
+        CoinOutcome.NOT_SELECTED -> "İzleniyor" to neutral
+        null -> "—" to neutral
+    }
 }
 
 @Composable
-fun ScanScreen(onOpenSymbol: (String) -> Unit, modifier: Modifier = Modifier, viewModel: ScanViewModel = viewModel(factory = AppViewModels.Factory)) {
+fun ScanScreen(onOpenSymbol: (String) -> Unit, onOpenDecisionLog: () -> Unit, modifier: Modifier = Modifier, viewModel: ScanViewModel = viewModel(factory = AppViewModels.Factory)) {
     val report by viewModel.report.collectAsStateWithLifecycle()
-    ScanContent(report, onOpenSymbol, modifier)
+    val logs by viewModel.scanLogs.collectAsStateWithLifecycle()
+    ScanContent(report, logs.lastOrNull()?.coins?.associateBy { it.symbol }.orEmpty(), onOpenSymbol, modifier, onOpenDecisionLog)
 }
 
 @Composable
-fun ScanContent(r: ScanReport?, onOpenSymbol: (String) -> Unit, modifier: Modifier = Modifier) {
-    LazyColumn(modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+fun ScanContent(
+    r: ScanReport?,
+    decisions: Map<String, CoinDecision>,
+    onOpenSymbol: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    onOpenDecisionLog: () -> Unit = {},
+) {
+    LazyColumn(modifier.fillMaxSize(), contentPadding = PaddingValues(Spacing.screen), verticalArrangement = Arrangement.spacedBy(Spacing.cards)) {
         if (r == null) {
-            item { InfoBanner("Henüz tarama yok. Botu başlattığınızda ilk tarama hemen, sonrakiler her 15M mum kapanışında yapılır.") }
+            item { InfoBanner("Henüz tarama yok. Botu başlattığınızda ilk tarama hemen, sonrakiler her 15 dakikalık mum kapanışında yapılır.") }
+            item { AppCard { NavRow("Karar günlüğü", subtitle = "Önceki taramaların kayıtları", onClick = onOpenDecisionLog) } }
             return@LazyColumn
         }
-        item {
-            val market = r.market
-            SectionCard(
-                "Piyasa filtresi",
-                trailing = { Tag(if (market.allowsLongs) "ALIMA UYGUN" else "ALIM YOK", if (market.allowsLongs) SpotBotTheme.tradingColors.gain else SpotBotTheme.tradingColors.loss) },
-            ) {
-                KeyValueRow("Tarama zamanı", formatTime(r.time))
-                KeyValueRow("BTC 4H rejimi", market.btcRegime?.name ?: "—")
-                market.btcChange4hPercent?.let { KeyValueRow("BTC son 4 saat", formatPercent(it, signed = true, minFractionDigits = 2), gainLossColor(it.compareTo(0.0))) }
-                market.breadthPercent?.let { KeyValueRow("4H EMA55 üzerindeki coinler", formatPercent(it)) }
-                market.reasons.forEach { Text("• $it", style = MaterialTheme.typography.bodySmall) }
-            }
+        item { MarketCard(r) }
+        item { SectionLabel("Coinler", trailing = { Text("${r.coins.size}", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant) }) }
+        item { ListHeader() }
+        items(r.coins, key = { it.symbol }) { coin ->
+            CoinRow(coin, decisions[coin.symbol]?.outcome) { onOpenSymbol(coin.symbol) }
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
         }
-        item {
-            SectionCard("Ayrıntılı incelenen adaylar") {
-                if (r.candidates.isEmpty()) EmptyText("Uygun aday yok: bu taramada işlem açılmaz.")
-                else Text(r.candidates.joinToString(" · "), fontWeight = FontWeight.SemiBold)
-            }
-        }
-        item { Text("Tüm coinler (${r.coins.size})", style = MaterialTheme.typography.titleMedium) }
-        items(r.coins, key = { it.symbol }) { coin -> CoinRow(coin) { onOpenSymbol(coin.symbol) } }
+        item { AppCard { NavRow("Karar günlüğü", subtitle = "Her taramada her coin için karar ve kural sonuçları", onClick = onOpenDecisionLog) } }
     }
 }
 
 @Composable
-private fun CoinRow(coin: CoinScan, onClick: () -> Unit) {
+private fun MarketCard(r: ScanReport) {
+    val market = r.market
     val colors = SpotBotTheme.tradingColors
-    val (label, color) = when (coin.status) {
-        CoinStatus.CANDIDATE -> "ADAY" to colors.gain
-        CoinStatus.PASSED -> "GEÇTİ" to MaterialTheme.colorScheme.primary
-        CoinStatus.FLAGGED -> "RİSKLİ" to MaterialTheme.colorScheme.tertiary
-        CoinStatus.ELIMINATED -> "ELENDİ" to colors.loss
+    AppCard {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            StatusPill(if (market.allowsLongs) "Piyasa alıma uygun" else "Piyasa filtresi: alım yok", if (market.allowsLongs) colors.gain else colors.loss)
+        }
+        Text(
+            buildString {
+                append("BTC 4H ${market.btcRegime?.name ?: "—"}")
+                market.btcChange4hPercent?.let { append(" · son 4s ${formatPercent(it, signed = true, minFractionDigits = 2)}") }
+                append(" · ${r.candidates.size} aday · ${formatTime(r.time)}")
+            },
+            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        if (!market.allowsLongs) market.reasons.take(2).forEach { Text("• $it", style = MaterialTheme.typography.bodySmall) }
     }
-    Card(Modifier.fillMaxWidth().clickable(onClick = onClick)) {
-        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(coin.symbol.removeSuffix("USDT"), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                Tag(label, color)
-                Text("Puan ${coin.preScore}", style = MaterialTheme.typography.labelMedium, modifier = Modifier.weight(1f))
-                Text(formatPercent(coin.change24hPercent, signed = true, minFractionDigits = 2), color = gainLossColor(coin.change24hPercent.compareTo(0.0)))
-            }
+}
+
+@Composable
+private fun ListHeader() {
+    val style = MaterialTheme.typography.labelMedium
+    val color = MaterialTheme.colorScheme.onSurfaceVariant
+    Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp)) {
+        Text("Coin / analiz", style = style, color = color, modifier = Modifier.weight(1f))
+        Text("Fiyat / 24s", style = style, color = color, textAlign = TextAlign.End, modifier = Modifier.width(96.dp))
+        Text("İşlem", style = style, color = color, textAlign = TextAlign.End, modifier = Modifier.width(100.dp))
+    }
+}
+
+@Composable
+private fun CoinRow(coin: CoinScan, outcome: CoinOutcome?, onClick: () -> Unit) {
+    val (status, statusColor) = analysisLabel(coin.status)
+    val (eligibility, eligibilityColor) = eligibilityLabel(outcome)
+    Row(
+        Modifier.fillMaxWidth().heightIn(min = 60.dp).clickable(role = Role.Button, onClick = onClick).padding(horizontal = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(coin.symbol.removeSuffix("USDT"), style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(status, style = MaterialTheme.typography.bodySmall, color = statusColor, maxLines = 1)
+        }
+        Column(Modifier.width(96.dp), horizontalAlignment = Alignment.End) {
+            Text(formatPrice(coin.price), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, maxLines = 1)
+            Text(formatPercent(coin.change24hPercent, signed = true, minFractionDigits = 2), style = MaterialTheme.typography.bodySmall, color = gainLossColor(coin.change24hPercent.compareTo(0.0)), maxLines = 1)
+        }
+        Row(Modifier.width(100.dp), horizontalArrangement = Arrangement.End) { Tag(eligibility, eligibilityColor) }
+    }
+}
+
+// ---- Karar günlüğü (alt sayfa) ----
+
+class DecisionLogViewModel(engine: TradingEngine) : ViewModel() {
+    val scanLogs = engine.scanLogs
+}
+
+@Composable
+fun DecisionLogScreen(modifier: Modifier = Modifier, viewModel: DecisionLogViewModel = viewModel(factory = AppViewModels.Factory)) {
+    val logs by viewModel.scanLogs.collectAsStateWithLifecycle()
+    DecisionLogContent(logs, modifier)
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun DecisionLogContent(scanLogs: List<ScanLog>, modifier: Modifier = Modifier, expanded: Boolean = false) {
+    var coinFilter by rememberSaveable { mutableStateOf<String?>(null) }
+    val symbols = scanLogs.lastOrNull()?.coins?.map { it.symbol }.orEmpty()
+    LazyColumn(modifier.fillMaxSize(), contentPadding = PaddingValues(Spacing.screen), verticalArrangement = Arrangement.spacedBy(Spacing.cards)) {
+        item {
             Text(
-                "Fiyat ${formatPrice(coin.price)} · Hacim ${formatCompact(coin.quoteVolume24h)} USDT · Spread ${coin.spreadPercent?.let { formatPercent(it, minFractionDigits = 3) } ?: "—"}",
-                style = MaterialTheme.typography.bodySmall,
-            )
-            Text(
-                "4H ${coin.h4Regime ?: "—"} · 1H yapı ${coin.h1Trend ?: "—"}" +
-                    (coin.relativeStrength7dPercent?.let { " · BTC'ye göre ${formatPercent(it, signed = true)}" } ?: ""),
+                "Her 15 dakikalık taramada her coin için karar, gerekçe ve kullanılan verinin zamanı. Strateji ve kural incelemesi yalnız en iyi 2–4 adaya yapılır. Ayrıntı için satıra dokunun.",
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            coin.reasons.forEach { Text("• $it", style = MaterialTheme.typography.bodySmall, color = color) }
+        }
+        if (symbols.isNotEmpty()) {
+            item {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(selected = coinFilter == null, onClick = { coinFilter = null }, label = { Text("Tümü") })
+                    symbols.forEach { s -> FilterChip(selected = coinFilter == s, onClick = { coinFilter = s }, label = { Text(s.removeSuffix("USDT")) }) }
+                }
+            }
+        }
+        if (scanLogs.isEmpty()) item { EmptyText("Henüz tarama kaydı yok.") }
+        items(scanLogs.reversed(), key = { it.time }) { log -> ScanLogCard(log, coinFilter, expanded) }
+    }
+}
+
+@Composable
+private fun ScanLogCard(log: ScanLog, coinFilter: String?, expanded: Boolean) {
+    val coins = log.coins.filter { coinFilter == null || it.symbol == coinFilter }
+    if (coins.isEmpty()) return
+    SectionCard(
+        "Tarama ${formatDateTime(log.boundary)}",
+        trailing = { StatusPill(if (log.marketAllowsLongs) "Piyasa uygun" else "Piyasa filtresi", if (log.marketAllowsLongs) SpotBotTheme.tradingColors.gain else SpotBotTheme.tradingColors.loss) },
+    ) {
+        Text(
+            "Profil: ${log.profile.title} · karar anı ${formatTime(log.time)}${if (log.entriesPaused) " · yeni işlemler duraklatılmıştı" else ""}",
+            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        if (!log.marketAllowsLongs) Text(log.marketReasons.joinToString(), style = MaterialTheme.typography.bodySmall)
+        coins.sortedBy { it.outcome.ordinal }.forEach { DecisionRow(it, expanded || coinFilter != null) }
+    }
+}
+
+@Composable
+private fun DecisionRow(coin: CoinDecision, initiallyExpanded: Boolean) {
+    var open by rememberSaveable(coin.symbol, coin.data.m15Close) { mutableStateOf(initiallyExpanded && coin.strategies.isNotEmpty()) }
+    val (label, color) = eligibilityLabel(coin.outcome)
+    Column(
+        Modifier.fillMaxWidth().heightIn(min = 48.dp).clickable(role = Role.Button) { open = !open }.padding(vertical = 4.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(coin.symbol.removeSuffix("USDT"), style = MaterialTheme.typography.titleSmall)
+            Tag(label, color)
+            Text(coin.outcome.title, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+        Text(coin.summary, style = MaterialTheme.typography.bodySmall)
+        if (open) {
+            coin.reasons.forEach { Text("• $it", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            DataStampText(coin.data)
+            coin.strategies.forEach { StrategyCheckView(it) }
         }
     }
+}
+
+@Composable
+fun StrategyCheckView(s: com.spotbot.core.trading.StrategyCheck) {
+    val colors = SpotBotTheme.tradingColors
+    Text(
+        "${s.strategy.code} ${s.strategy.title}: " + when {
+            !s.applicable -> "değerlendirilmedi"
+            !s.setupFound -> "kurulum yok"
+            else -> "giriş ${formatPrice(s.entry ?: 0.0)}, stop ${formatPrice(s.stop ?: 0.0)}, hedef ${formatPrice(s.target ?: 0.0)}, net R:R %.2f, kalite %.0f".format(s.netRiskReward ?: 0.0, s.qualityScore ?: 0.0)
+        },
+        style = MaterialTheme.typography.labelLarge,
+    )
+    s.reasons.forEach { Text("   – $it", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+    s.rules.sortedBy { !it.mandatory }.forEach { r ->
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(if (r.passed) "✓" else "✗", color = if (r.passed) colors.gain else colors.loss, fontWeight = FontWeight.Bold)
+            Column {
+                Text("${r.id} ${r.title}${if (r.mandatory) " (zorunlu)" else ""}", style = MaterialTheme.typography.bodySmall)
+                Text(r.detail, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    }
+}
+
+@Composable
+private fun DataStampText(d: DataStamp) {
+    fun t(v: Long?) = v?.let { formatDateTime(it) } ?: "—"
+    Text(
+        "Veri zamanı — 15M: ${t(d.m15Close)} · 1H: ${t(d.h1Close)} · 4H: ${t(d.h4Close)} · fiyat: ${d.priceTime?.let { formatTime(it) } ?: "—"}",
+        style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
 }

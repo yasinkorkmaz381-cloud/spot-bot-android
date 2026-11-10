@@ -1,25 +1,30 @@
 package com.spotbot.android.ui.panel
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -30,17 +35,23 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.spotbot.android.ui.AppViewModels
+import com.spotbot.android.ui.common.AppCard
 import com.spotbot.android.ui.common.EmptyText
-import com.spotbot.android.ui.common.InfoBanner
+import com.spotbot.android.ui.common.ExpandableCard
 import com.spotbot.android.ui.common.KeyValueRow
-import com.spotbot.android.ui.common.LabeledValue
 import com.spotbot.android.ui.common.LineChart
+import com.spotbot.android.ui.common.MetricGrid
+import com.spotbot.android.ui.common.NavRow
 import com.spotbot.android.ui.common.SectionCard
+import com.spotbot.android.ui.common.Spacing
+import com.spotbot.android.ui.common.StatusPill
 import com.spotbot.android.ui.common.Tag
 import com.spotbot.android.ui.common.formatDateTime
 import com.spotbot.android.ui.common.formatMoney
@@ -53,6 +64,7 @@ import com.spotbot.android.ui.theme.gainLossColor
 import com.spotbot.core.engine.EngineStatus
 import com.spotbot.core.exchange.mexc.ConnectionStatus
 import com.spotbot.core.strategy.StrategyId
+import com.spotbot.core.trading.ClosedTrade
 import com.spotbot.core.trading.Decision
 import com.spotbot.core.trading.DecisionOutcome
 import com.spotbot.core.trading.PeriodResult
@@ -64,238 +76,305 @@ class PanelActions(
     val closePosition: (String) -> Unit,
     val openSymbol: (String) -> Unit,
     val cancelPending: (String) -> Unit = {},
+    val openTrade: (String) -> Unit = {},
+    val openEvents: () -> Unit = {},
 )
 
 @Composable
-fun PanelScreen(onOpenSymbol: (String) -> Unit, modifier: Modifier = Modifier, viewModel: PanelViewModel = viewModel(factory = AppViewModels.Factory)) {
+fun PanelScreen(
+    onOpenSymbol: (String) -> Unit,
+    onOpenTrade: (String) -> Unit,
+    onOpenEvents: () -> Unit,
+    modifier: Modifier = Modifier,
+    viewModel: PanelViewModel = viewModel(factory = AppViewModels.Factory),
+) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    PanelContent(state, PanelActions(viewModel::startBot, viewModel::stopBot, viewModel::setEntriesPaused, viewModel::closePosition, onOpenSymbol, viewModel::cancelPending), modifier)
+    PanelContent(
+        state,
+        PanelActions(viewModel::startBot, viewModel::stopBot, viewModel::setEntriesPaused, viewModel::closePosition, onOpenSymbol, viewModel::cancelPending, onOpenTrade, onOpenEvents),
+        modifier,
+    )
+}
+
+/** Botun ekrandaki durumu: çalışıyor / duraklatıldı / durduruldu / hata. */
+@Composable
+fun botStatus(state: PanelUiState): Pair<String, Color> {
+    val colors = SpotBotTheme.tradingColors
+    val h = state.health
+    return when (h.status) {
+        EngineStatus.RUNNING -> if (h.entriesPaused) "Duraklatıldı" to MaterialTheme.colorScheme.tertiary else "Çalışıyor" to colors.gain
+        EngineStatus.STARTING -> "Başlatılıyor" to MaterialTheme.colorScheme.tertiary
+        EngineStatus.ERROR -> "Hata" to colors.loss
+        EngineStatus.STOPPED -> "Durduruldu" to MaterialTheme.colorScheme.onSurfaceVariant
+    }
+}
+
+/** MEXC bağlantı göstergesi (WebSocket, REST yedeği). */
+@Composable
+fun mexcStatus(state: PanelUiState): Pair<String, Color> {
+    val colors = SpotBotTheme.tradingColors
+    val feed = state.health.feed
+    return when {
+        !state.isActive -> "MEXC bağlı değil" to MaterialTheme.colorScheme.onSurfaceVariant
+        feed.webSocket == ConnectionStatus.CONNECTED && !feed.restFallbackActive -> "MEXC bağlı" to colors.gain
+        feed.restFallbackActive -> "MEXC · REST yedeği" to MaterialTheme.colorScheme.tertiary
+        feed.webSocket == ConnectionStatus.CONNECTING || feed.webSocket == ConnectionStatus.RECONNECTING -> "MEXC bağlanıyor" to MaterialTheme.colorScheme.tertiary
+        else -> "MEXC bağlantısı yok" to colors.loss
+    }
 }
 
 @Composable
 fun PanelContent(state: PanelUiState, actions: PanelActions, modifier: Modifier = Modifier) {
-    val onOpenSymbol = actions.openSymbol
-    var closing by remember { mutableStateOf<PositionRow?>(null) }
+    var confirmStop by remember { mutableStateOf(false) }
 
-    LazyColumn(modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        item { InfoBanner("Sanal işlem (paper trading): MEXC canlı verisi kullanılır, gerçek emir gönderilmez.") }
-        item { BotCard(state, actions) }
-        item { RiskCard(state) }
-        item { ReliabilityCard(state) }
+    LazyColumn(modifier.fillMaxSize(), contentPadding = PaddingValues(Spacing.screen), verticalArrangement = Arrangement.spacedBy(Spacing.cards)) {
+        item { StatusHeader(state) }
         item { CapitalCard(state) }
-        item {
-            SectionCard("Açık işlemler (${state.positions.size})") {
-                if (state.positions.isEmpty()) EmptyText("Açık işlem yok. Kurallar sağlanmadığında işlem açmamak da doğru bir karardır.")
-                state.positions.forEach { row -> PositionItem(row, onOpenSymbol) { closing = row } }
-                state.pendingOrders.forEach { order ->
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Column(Modifier.weight(1f)) {
-                            Text("${order.symbol} · bekleyen limit alış", fontWeight = FontWeight.SemiBold)
-                            Text(
-                                "Limit ${formatPrice(order.limitPrice)} · ${order.quantity} adet · son ${formatTime(order.expiresAt)} · ayrılan ${formatMoney(order.reservedQuote)} USDT",
-                                style = MaterialTheme.typography.bodySmall,
-                            )
-                        }
-                        TextButton(onClick = { actions.cancelPending(order.symbol) }) { Text("İptal") }
-                    }
-                }
-            }
-        }
-        item { StrategiesCard(state.enabledStrategies) }
-        item {
-            SectionCard("Son kararlar") {
-                if (state.decisions.isEmpty()) EmptyText("Henüz kayıt yok.")
-                state.decisions.forEach { DecisionItem(it) }
-            }
-        }
+        item { ControlCard(state, actions) { confirmStop = true } }
+        item { OpenPositionsCard(state, actions) }
+        item { RecentTradesCard(state.recentTrades, actions) }
+        item { DetailsCard(state) }
     }
 
-    closing?.let { row ->
+    if (confirmStop) {
         AlertDialog(
-            onDismissRequest = { closing = null },
-            title = { Text("${row.position.symbol} kapatılsın mı?") },
-            text = { Text("Pozisyon anlık alış fiyatından (sanal) kapatılır. Bu manuel müdahale olarak kaydedilir.") },
-            confirmButton = { TextButton(onClick = { actions.closePosition(row.position.id); closing = null }) { Text("Kapat") } },
-            dismissButton = { TextButton(onClick = { closing = null }) { Text("Vazgeç") } },
+            onDismissRequest = { confirmStop = false },
+            title = { Text("Bot durdurulsun mu?") },
+            text = {
+                Text(
+                    if (state.positions.isNotEmpty()) {
+                        "Açık pozisyonların stop ve hedef takibi de durur. MEXC spot API'sinde borsa tarafı stop emri olmadığı için koruma yazılımdadır. Yalnız yeni işlemleri durdurmak için Duraklat'ı kullanın."
+                    } else {
+                        "Tarama ve fiyat takibi durur. Açık pozisyon yok."
+                    },
+                )
+            },
+            confirmButton = { TextButton(onClick = { actions.stop(); confirmStop = false }) { Text("Durdur") } },
+            dismissButton = { TextButton(onClick = { confirmStop = false }) { Text("Vazgeç") } },
+        )
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun StatusHeader(state: PanelUiState) {
+    val (status, statusColor) = botStatus(state)
+    val (mexc, mexcColor) = mexcStatus(state)
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            StatusPill(status, statusColor)
+            StatusPill(mexc, mexcColor)
+        }
+        Text(
+            state.health.lastScanAt?.let { "Son tarama ${formatTime(it)} · her 15 dakikada bir" } ?: "Henüz tarama yapılmadı",
+            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        state.health.lastError?.let {
+            Text("Son hata: $it", style = MaterialTheme.typography.bodySmall, color = SpotBotTheme.tradingColors.loss, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        }
+    }
+}
+
+@Composable
+private fun CapitalCard(state: PanelUiState) {
+    AppCard {
+        Text("Toplam sermaye", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Row(verticalAlignment = Alignment.Bottom) {
+            Text(formatMoney(state.equity), style = MaterialTheme.typography.headlineMedium, maxLines = 1)
+            Text(" USDT", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 4.dp))
+        }
+        MetricGrid(
+            listOf(
+                Triple(
+                    "Toplam kâr/zarar",
+                    "${formatSignedMoney(state.totalPnl)} (${formatPercent(state.totalPnlPercent, signed = true, minFractionDigits = 2)})",
+                    gainLossColor(state.totalPnl.compareTo(0.0)),
+                ),
+                Triple(
+                    "Bugün",
+                    "${formatSignedMoney(state.dailyChange)} (${formatPercent(state.dailyChangePercent, signed = true, minFractionDigits = 2)})",
+                    gainLossColor(state.dailyChange.compareTo(0.0)),
+                ),
+                Triple("Kullanılabilir USDT", formatMoney(state.cash), Color.Unspecified),
+                Triple("Açık pozisyon K/Z", formatSignedMoney(state.unrealized), gainLossColor(state.unrealized.compareTo(0.0))),
+            ),
         )
     }
 }
 
 @Composable
-private fun BotCard(state: PanelUiState, actions: PanelActions) {
-    val health = state.health
-    val colors = SpotBotTheme.tradingColors
-    val (statusText, statusColor) = when (health.status) {
-        EngineStatus.RUNNING -> (if (health.entriesPaused) "Çalışıyor · yeni işlemler duraklatıldı" else "Çalışıyor") to colors.gain
-        EngineStatus.STARTING -> "Başlatılıyor" to MaterialTheme.colorScheme.tertiary
-        EngineStatus.ERROR -> "Hata" to colors.loss
-        EngineStatus.STOPPED -> "Durduruldu" to MaterialTheme.colorScheme.outline
-    }
-    SectionCard("Bot", trailing = { Tag(statusText, statusColor) }) {
-        val ws = when (health.feed.webSocket) {
-            ConnectionStatus.CONNECTED -> "WebSocket bağlı"
-            ConnectionStatus.CONNECTING -> "WebSocket bağlanıyor"
-            ConnectionStatus.RECONNECTING -> "WebSocket yeniden bağlanıyor"
-            ConnectionStatus.STOPPED -> "WebSocket kapalı"
-        }
-        KeyValueRow("Veri bağlantısı", ws + if (health.feed.restFallbackActive) " · REST yedeği aktif" else "")
-        health.feed.lastUpdateAt?.let { KeyValueRow("Son fiyat verisi", formatTime(it)) }
-        health.lastScanAt?.let { KeyValueRow("Son tarama", formatTime(it)) }
-        health.feed.lastMaxDeviationPercent?.let { KeyValueRow("WS/REST fiyat sapması", formatPercent(it, minFractionDigits = 3)) }
-        if (health.universe.isNotEmpty()) KeyValueRow("İzlenen coin", "${health.universe.size}")
-        if (health.pendingOrders.isNotEmpty()) KeyValueRow("Bekleyen limit emir", health.pendingOrders.joinToString())
-        health.lastError?.let { Text("Son hata: $it", style = MaterialTheme.typography.bodySmall, color = colors.loss) }
-        if (state.isActive) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text("Yeni işlemleri duraklat", style = MaterialTheme.typography.bodyLarge)
-                    Text("Açık pozisyonların stop/hedef takibi sürer.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                Switch(checked = health.entriesPaused, onCheckedChange = actions.setPaused)
-            }
+private fun ControlCard(state: PanelUiState, actions: PanelActions, onStop: () -> Unit) {
+    val paused = state.health.entriesPaused
+    val active = state.isActive
+    AppCard {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            // Üç düğme küçük ekranda da sığsın diye iç boşluk azaltıldı (dokunma alanı en az 48 dp).
+            val padding = PaddingValues(horizontal = 8.dp, vertical = 8.dp)
+            Button(
+                onClick = { if (active) actions.setPaused(false) else actions.start() },
+                enabled = !active || paused,
+                contentPadding = padding,
+                modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+            ) { Text("Başlat", maxLines = 1, softWrap = false) }
+            FilledTonalButton(
+                onClick = { actions.setPaused(true) },
+                enabled = active && !paused,
+                contentPadding = padding,
+                modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+            ) { Text("Duraklat", maxLines = 1, softWrap = false) }
             OutlinedButton(
-                onClick = actions.stop,
-                modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
-            ) { Text("Botu kapat") }
-            if (state.positions.isNotEmpty()) {
-                Text(
-                    "Uyarı: Bot kapatılırsa açık pozisyonların stop takibi de durur. MEXC spot API borsa tarafında stop emri sunmadığı için koruma yazılımdadır.",
-                    style = MaterialTheme.typography.bodySmall, color = colors.loss,
-                )
-            }
-        } else {
-            Button(onClick = actions.start, modifier = Modifier.fillMaxWidth()) {
-                Icon(Icons.Filled.PlayArrow, contentDescription = null)
-                Spacer(Modifier.width(8.dp))
-                Text("Botu başlat")
+                onClick = onStop,
+                enabled = active,
+                contentPadding = padding,
+                modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = SpotBotTheme.tradingColors.loss),
+            ) { Text("Durdur", maxLines = 1, softWrap = false) }
+        }
+        Text(
+            when {
+                !active -> "Bot kapalı. Başlat ile tarama ve sanal işlem başlar."
+                paused -> "Yeni işlem açılmıyor; açık pozisyonların stop ve hedef takibi sürüyor."
+                state.risk.entriesBlockedReason != null -> "Yeni işlem şu an engelli: ${state.risk.entriesBlockedReason}"
+                else -> "Her 15 dakikada tarar; kurallar sağlanırsa sanal işlem açar."
+            },
+            style = MaterialTheme.typography.bodySmall,
+            color = if (active && !paused && state.risk.entriesBlockedReason != null) SpotBotTheme.tradingColors.loss else MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
+private fun OpenPositionsCard(state: PanelUiState, actions: PanelActions) {
+    SectionCard("Açık pozisyonlar", trailing = { Text("${state.positions.size} / ${state.risk.maxOpenPositions}", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant) }) {
+        if (state.positions.isEmpty() && state.pendingOrders.isEmpty()) {
+            EmptyText("Açık pozisyon yok. Kurallar sağlanmadığında işlem açmamak da doğru bir karardır.")
+        }
+        state.positions.forEachIndexed { i, row ->
+            if (i > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            PositionLine(row) { actions.openTrade(row.position.id) }
+        }
+        state.pendingOrders.forEach { order ->
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Row(Modifier.fillMaxWidth().heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("${order.symbol.removeSuffix("USDT")} · bekleyen limit alış", style = MaterialTheme.typography.titleSmall)
+                    Text("Limit ${formatPrice(order.limitPrice)} · son ${formatTime(order.expiresAt)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                TextButton(onClick = { actions.cancelPending(order.symbol) }) {
+                    Icon(Icons.Filled.Close, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Text("İptal")
+                }
             }
         }
     }
 }
 
 @Composable
-private fun RiskCard(state: PanelUiState) {
-    val r = state.risk
-    val colors = SpotBotTheme.tradingColors
-    SectionCard(
-        "Risk durumu",
-        trailing = { Tag(if (r.entriesBlockedReason == null) "YENİ İŞLEME AÇIK" else "YENİ İŞLEM YOK", if (r.entriesBlockedReason == null) colors.gain else colors.loss) },
+private fun PositionLine(row: PositionRow, onClick: () -> Unit) {
+    val p = row.position
+    Row(
+        Modifier.fillMaxWidth().heightIn(min = 56.dp).clickable(role = Role.Button, onClick = onClick),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        r.entriesBlockedReason?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = colors.loss) }
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(p.symbol.removeSuffix("USDT"), style = MaterialTheme.typography.titleMedium)
+                Tag(p.strategy.code, MaterialTheme.colorScheme.primary)
+            }
+            Text(
+                "${formatPrice(p.entryPrice)} → ${row.bid?.let { formatPrice(it) } ?: "—"}",
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1,
+            )
+        }
+        Column(horizontalAlignment = Alignment.End) {
+            val pnl = row.pnl
+            Text(pnl?.let { formatSignedMoney(it) } ?: "—", style = MaterialTheme.typography.titleMedium, color = gainLossColor((pnl ?: 0.0).compareTo(0.0)), maxLines = 1)
+            Text(row.r?.let { "%+.2fR".format(it) } ?: "", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+@Composable
+private fun RecentTradesCard(trades: List<ClosedTrade>, actions: PanelActions) {
+    SectionCard("Son işlemler") {
+        if (trades.isEmpty()) EmptyText("Henüz kapanmış işlem yok.")
+        trades.forEachIndexed { i, t ->
+            if (i > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Row(
+                Modifier.fillMaxWidth().heightIn(min = 52.dp).clickable(role = Role.Button) { actions.openTrade(t.position.id) },
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text("${t.position.symbol.removeSuffix("USDT")} · ${t.position.strategy.code}", style = MaterialTheme.typography.titleSmall)
+                    Text("${t.reason.title} · ${formatDateTime(t.closedAt)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+                Text(formatSignedMoney(t.netPnl), style = MaterialTheme.typography.titleSmall, color = gainLossColor(t.netPnl.compareTo(0.0)))
+            }
+        }
+        NavRow("Olay günlüğü", subtitle = "Açılan, kapanan ve reddedilen tüm kararlar", onClick = actions.openEvents)
+    }
+}
+
+/** Ayrıntılı risk, sistem ve performans bilgileri: varsayılan kapalı. */
+@Composable
+private fun DetailsCard(state: PanelUiState) {
+    val r = state.risk
+    val h = state.health
+    val colors = SpotBotTheme.tradingColors
+    ExpandableCard("Risk ve sistem ayrıntıları", subtitle = if (r.entriesBlockedReason == null) "Yeni işleme açık" else "Yeni işlem yok: ${r.entriesBlockedReason}") {
+        Text("Risk", style = MaterialTheme.typography.titleSmall)
         KeyValueRow("Strateji profili", r.profile.title)
         KeyValueRow("Toplam açık risk", "%s / %s".format(formatPercent(r.openRiskPercent, minFractionDigits = 2), formatPercent(r.maxTotalOpenRiskPercent)))
         KeyValueRow(
-            "Bugünkü sonuç / günlük limit", "%s / -%s".format(formatPercent(r.dailyPnlPercent, signed = true, minFractionDigits = 2), formatPercent(r.dailyLossLimitPercent)),
+            "Bugün / günlük limit", "%s / -%s".format(formatPercent(r.dailyPnlPercent, signed = true, minFractionDigits = 2), formatPercent(r.dailyLossLimitPercent)),
             gainLossColor(r.dailyPnlPercent.compareTo(0.0)),
         )
         KeyValueRow("Açık işlem + bekleyen emir", "${r.openPositions} + ${r.pendingOrders} / ${r.maxOpenPositions}")
         KeyValueRow("İşlem başına risk", formatPercent(r.riskPerTradePercent))
         KeyValueRow("Stop yöntemi", r.atrStopMode.title)
         if (r.correlatedPairs.isNotEmpty()) KeyValueRow("İlişkili pozisyonlar", r.correlatedPairs.joinToString())
-    }
-}
+        KeyValueRow("Etkin stratejiler", StrategyId.entries.filter { it in state.enabledStrategies }.joinToString { it.code }.ifEmpty { "—" })
 
-@Composable
-private fun ReliabilityCard(state: PanelUiState) {
-    val h = state.health
-    val colors = SpotBotTheme.tradingColors
-    SectionCard("Çalışma güvenilirliği") {
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+        Text("Performans", style = MaterialTheme.typography.titleSmall)
+        state.performance?.let { p ->
+            Period("Bugün", p.today)
+            Period("7 gün", p.week)
+            Period("30 gün", p.month)
+            KeyValueRow("Kazanma oranı · ort. R", "%s · %+.2fR".format(formatPercent(p.winRatePercent), p.averageR))
+            KeyValueRow("Toplam komisyon", "${formatMoney(p.totalFees)} USDT")
+        }
+        if (state.equityHistory.size >= 2) LineChart(state.equityHistory)
+
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+        Text("Sistem", style = MaterialTheme.typography.titleSmall)
         KeyValueRow("Çalıştığı yer", h.runLocation)
-        h.uptime24hPercent?.let { KeyValueRow("Son 24 saatte çalışma oranı", formatPercent(it, minFractionDigits = 1), if (it >= 99) colors.gain else colors.loss) }
-        KeyValueRow("WebSocket yeniden bağlanma", "${h.feed.reconnects}")
+        h.uptime24hPercent?.let { KeyValueRow("Son 24 saatte çalışma", formatPercent(it, minFractionDigits = 1), if (it >= 99) colors.gain else colors.loss) }
+        h.feed.lastUpdateAt?.let { KeyValueRow("Son fiyat verisi", formatTime(it)) }
+        KeyValueRow("Veri yolu", if (h.feed.restFallbackActive) "REST yedeği" else "WebSocket")
+        h.feed.lastMaxDeviationPercent?.let { KeyValueRow("WS/REST fiyat sapması", formatPercent(it, minFractionDigits = 3)) }
+        KeyValueRow("Yeniden bağlanma", "${h.feed.reconnects}")
+        if (h.universe.isNotEmpty()) KeyValueRow("İzlenen coin", "${h.universe.size}")
         h.lastDowntime?.let { d ->
             KeyValueRow("Son kesinti", "${formatDateTime(d.from)} → ${formatTime(d.to)} (${(d.to - d.from) / 60_000} dk)")
             Text(d.note, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         if (h.staleSymbols.isNotEmpty()) {
-            Text("Son taramada verisi güncel olmayan coinler (işlem açılmadı): ${h.staleSymbols.joinToString()}", style = MaterialTheme.typography.bodySmall, color = colors.loss)
+            Text("Verisi güncel olmayan coinler (işlem açılmadı): ${h.staleSymbols.joinToString()}", style = MaterialTheme.typography.bodySmall, color = colors.loss)
         }
         Text(
-            "Bot telefonda çalışırken telefon kapanır, internet kesilir ya da Android uygulamayı durdurursa izleme durur. MEXC spot API'sinde borsa tarafı stop emri olmadığından bu sürede pozisyonlar korumasızdır.",
+            "Bot telefonda çalışır: telefon kapanır, internet kesilir ya da Android uygulamayı durdurursa izleme durur ve bu sürede pozisyonlar korumasızdır.",
             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 }
 
 @Composable
-private fun CapitalCard(state: PanelUiState) {
-    SectionCard("Sermaye ve performans") {
-        Column {
-            Text("Toplam sermaye", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text("${formatMoney(state.equity)} USDT", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
-            val total = state.equity - state.initialCapital
-            Text(
-                "Başlangıca göre ${formatSignedMoney(total)} USDT (${formatPercent(if (state.initialCapital > 0) total / state.initialCapital * 100 else 0.0, signed = true, minFractionDigits = 2)})",
-                style = MaterialTheme.typography.bodySmall, color = gainLossColor(total.compareTo(0.0)),
-            )
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            LabeledValue("Kullanılabilir USDT", formatMoney(state.cash), Modifier.weight(1f))
-            LabeledValue("Gerçekleşmemiş K/Z", formatSignedMoney(state.unrealized), Modifier.weight(1f), gainLossColor(state.unrealized.compareTo(0.0)))
-        }
-        state.performance?.let { p ->
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Period("Bugün", p.today, Modifier.weight(1f))
-                Period("7 gün", p.week, Modifier.weight(1f))
-                Period("30 gün", p.month, Modifier.weight(1f))
-            }
-            Text(
-                "Toplam ${p.allTime.trades} işlem · kazanma %s · ort. %+.2fR · komisyon %s USDT".format(
-                    formatPercent(p.winRatePercent), p.averageR, formatMoney(p.totalFees),
-                ),
-                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        if (state.equityHistory.size >= 2) LineChart(state.equityHistory)
-    }
+private fun Period(label: String, result: PeriodResult) {
+    KeyValueRow(label, "${formatSignedMoney(result.netPnl)} USDT · ${result.trades} işlem", gainLossColor(result.netPnl.compareTo(0.0)))
 }
 
-@Composable
-private fun Period(label: String, result: PeriodResult, modifier: Modifier) {
-    LabeledValue(label, "${formatSignedMoney(result.netPnl)} (${result.trades})", modifier, gainLossColor(result.netPnl.compareTo(0.0)))
-}
-
-@Composable
-private fun PositionItem(row: PositionRow, onOpenSymbol: (String) -> Unit, onClose: () -> Unit) {
-    val p = row.position
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            TextButton(onClick = { onOpenSymbol(p.symbol) }) { Text(p.symbol, fontWeight = FontWeight.SemiBold) }
-            Tag(p.strategy.code, MaterialTheme.colorScheme.primary)
-            Spacer(Modifier.weight(1f))
-            row.pnl?.let {
-                Text("${formatSignedMoney(it)} USDT (${"%+.2f".format(row.r ?: 0.0)}R)", color = gainLossColor(it.compareTo(0.0)), fontWeight = FontWeight.SemiBold)
-            }
-        }
-        Text(
-            "Giriş ${formatPrice(p.entryPrice)} · Anlık ${row.bid?.let { formatPrice(it) } ?: "—"} · Stop ${formatPrice(p.stopPrice)} · Hedef ${formatPrice(p.targetPrice)}",
-            style = MaterialTheme.typography.bodySmall,
-        )
-        Text("Açılış ${formatDateTime(p.openedAt)} · Kalite puanı %.0f".format(p.qualityScore), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        OutlinedButton(onClick = onClose) { Text("Manuel kapat") }
-        HorizontalDivider()
-    }
-}
-
-@Composable
-private fun StrategiesCard(enabled: Set<StrategyId>) {
-    SectionCard("Stratejiler") {
-        StrategyId.entries.forEach { id ->
-            val on = id in enabled
-            KeyValueRow(
-                "${id.code} · ${id.title}",
-                when {
-                    on -> "Etkin"
-                    id == StrategyId.RANGE -> "Kapalı (ayrı backtest bekliyor)"
-                    else -> "Kapalı"
-                },
-                if (on) SpotBotTheme.tradingColors.gain else MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
-}
-
+/** Olay günlüğü satırı (İşlemler → Olay günlüğü). */
 @Composable
 fun DecisionItem(decision: Decision) {
     val colors = SpotBotTheme.tradingColors
@@ -303,18 +382,17 @@ fun DecisionItem(decision: Decision) {
         DecisionOutcome.OPENED -> "AÇILDI" to colors.gain
         DecisionOutcome.CLOSED -> "KAPANDI" to MaterialTheme.colorScheme.primary
         DecisionOutcome.REJECTED -> "RED" to colors.loss
-        DecisionOutcome.NO_SETUP -> "KURULUM YOK" to MaterialTheme.colorScheme.outline
-        DecisionOutcome.INFO -> "BİLGİ" to MaterialTheme.colorScheme.outline
+        DecisionOutcome.NO_SETUP -> "KURULUM YOK" to MaterialTheme.colorScheme.onSurfaceVariant
+        DecisionOutcome.INFO -> "BİLGİ" to MaterialTheme.colorScheme.onSurfaceVariant
     }
-    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+    Column(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Tag(label, color)
-            Text(formatDateTime(decision.time), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(formatDateTime(decision.time), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        Text(decision.summary, style = MaterialTheme.typography.bodyMedium)
+        Text(decision.summary, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
         decision.details.take(4).forEach {
             Text("• $it", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
-    HorizontalDivider(color = Color.Transparent)
 }

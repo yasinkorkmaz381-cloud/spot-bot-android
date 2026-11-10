@@ -15,7 +15,12 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
 import com.github.takahirom.roborazzi.captureRoboImage
 import com.spotbot.android.ui.backtest.BacktestReportContent
-import com.spotbot.android.ui.detail.DetailContent
+import com.spotbot.android.ui.detail.CoinDetailContent
+import com.spotbot.android.ui.detail.CoinDetailViewModel
+import com.spotbot.android.ui.detail.DetailState
+import com.spotbot.android.ui.scan.DecisionLogContent
+import com.spotbot.android.ui.trades.TradeDetailContent
+import com.spotbot.android.ui.trades.TradesTab
 import com.spotbot.android.ui.panel.PanelActions
 import com.spotbot.android.ui.panel.PanelContent
 import com.spotbot.android.ui.panel.PanelUiState
@@ -74,7 +79,10 @@ import java.util.zip.GZIPInputStream
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [36], qualifiers = "w400dp-h1500dp-xhdpi")
-class ScreenshotTest {
+open class ScreenshotTest {
+
+    /** Dosya adı öneki; küçük ekran sınıfı aynı ekranları "k-" önekiyle kaydeder. */
+    protected open val prefix: String = ""
 
     @get:Rule
     val compose = createComposeRule()
@@ -136,13 +144,13 @@ class ScreenshotTest {
         state
     }
 
-    private fun capture(name: String, dark: Boolean = false, content: @Composable () -> Unit) {
+    private fun capture(name: String, dark: Boolean = true, content: @Composable () -> Unit) {
         compose.setContent {
             SpotBotTheme(darkTheme = dark) {
                 Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) { content() }
             }
         }
-        compose.onRoot().captureRoboImage("build/outputs/roborazzi/$name.png")
+        compose.onRoot().captureRoboImage("build/outputs/roborazzi/$prefix$name.png")
     }
 
     private fun panelState(): PanelUiState {
@@ -171,6 +179,8 @@ class ScreenshotTest {
                 portfolio.copy(dayStartEquity = 1_010.0), portfolio.cash + position.marketValue(bid, costs), RiskConfig(),
                 com.spotbot.core.trading.StrategyProfile.ADAPTIVE, false, true, listOf("ETH ~ SOL (0.82)"),
             ),
+            dayStartEquity = 1_004.2,
+            recentTrades = portfolio.closedTrades.takeLast(3).reversed(),
         )
     }
 
@@ -180,10 +190,9 @@ class ScreenshotTest {
     fun panel() = capture("1-panel") { PanelContent(panelState(), actions) }
 
     @Test
-    fun panelDark() = capture("1-panel-dark", dark = true) { PanelContent(panelState(), actions) }
+    fun panelLight() = capture("1-panel-acik-tema", dark = false) { PanelContent(panelState(), actions) }
 
-    @Test
-    fun scan() {
+    private val scanReport by lazy {
         val symbols = listOf("ETHUSDT" to 6e7, "SOLUSDT" to 1.8e7, "NEARUSDT" to 3e5, "ZECUSDT" to 1.3e6, "INJUSDT" to 1.9e6, "AVAXUSDT" to 2.4e5)
         val coins = symbols.mapIndexed { i, (s, volume) ->
             val price = btc.close.last()
@@ -195,24 +204,37 @@ class ScreenshotTest {
                 MultiTimeframe(s, btc.analyze(), btc.analyze(), btc.analyze()),
             )
         }
-        val report = Scanner.scan(coins, mtf, ScannerConfig(), btc.candles.last().closeTime)
-        assertTrue(report.coins.any { it.status == CoinStatus.ELIMINATED })
-        capture("2-tarama") { ScanContent(report, {}) }
+        Scanner.scan(coins, mtf, ScannerConfig(), btc.candles.last().closeTime)
     }
 
     @Test
-    fun detail() = capture("3-coin-detay") {
-        // Uygulamadaki gibi: içerik kaydırılabilir bir sütunun içinde çizilir.
-        Column(Modifier.verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            DetailContent(btc.analyze(), portfolio.positions.single())
-        }
+    fun scan() {
+        assertTrue(scanReport.coins.any { it.status == CoinStatus.ELIMINATED })
+        capture("2-tarama") { ScanContent(scanReport, scanLog.coins.associateBy { it.symbol }, {}) }
     }
 
-    @Test
-    fun trades() = capture("4-islemler") { TradesContent(portfolio, initialTab = 0, expanded = true) }
+    private fun detailState() = DetailState(
+        symbol = "BTCUSDT",
+        analysis = btc.analyze(),
+        mtf = mtf,
+        plans = CoinDetailViewModel.plans(mtf, com.spotbot.core.strategy.StrategyParams(), costs),
+        scan = scanReport.coins.first().copy(symbol = "BTCUSDT"),
+        decision = scanLog.coins.first().copy(symbol = "BTCUSDT"),
+        decisionTime = scanLog.boundary,
+        position = portfolio.positions.single(),
+        loading = false,
+    )
 
     @Test
-    fun closedTrades() = capture("5-kapanmis-islemler") { TradesContent(portfolio, initialTab = 1) }
+    fun detail() = capture("3-coin-detay") { CoinDetailContent(detailState(), {}) }
+
+    private fun bid() = portfolio.positions.single().entryPrice * 1.006
+
+    @Test
+    fun trades() = capture("4-islemler") { TradesContent(portfolio, mapOf("BTCUSDT" to bid()), {}) }
+
+    @Test
+    fun closedTrades() = capture("5-kapanmis-islemler") { TradesContent(portfolio, emptyMap(), {}, initialTab = TradesTab.HISTORY) }
 
     private val scanLog: com.spotbot.core.trading.ScanLog by lazy {
         val t = btc.candles.last().closeTime
@@ -230,19 +252,30 @@ class ScreenshotTest {
                 com.spotbot.core.trading.CoinDecision("XRPUSDT", com.spotbot.core.trading.CoinOutcome.NOT_SELECTED, "Ön puan 0: en iyi 4 aday arasında değil (ya da puan ≤ 0)", emptyList(), 0, stamp),
                 com.spotbot.core.trading.CoinDecision("NEARUSDT", com.spotbot.core.trading.CoinOutcome.ELIMINATED, "Tarama filtresinde elendi", listOf("24s hacim düşük (300,000 USDT)", "Spread yüksek (%0.300)"), 0, stamp),
                 com.spotbot.core.trading.CoinDecision("INJUSDT", com.spotbot.core.trading.CoinOutcome.STALE_DATA, "Veri güncel değil", listOf("Z17: Canlı fiyat 95 sn eski"), 2, stamp.copy(priceTime = t - 95_000)),
+                com.spotbot.core.trading.CoinDecision("ZECUSDT", com.spotbot.core.trading.CoinOutcome.OPENED, "İşlem açıldı @ 410.2", emptyList(), 5, stamp),
             ),
         )
     }
 
     @Test
-    fun decisionLog() = capture("7-karar-gunlugu") { TradesContent(portfolio, initialTab = 2, expanded = true, scanLogs = listOf(scanLog)) }
+    fun decisionLog() = capture("7-karar-gunlugu") { DecisionLogContent(listOf(scanLog), expanded = true) }
 
     @Test
     fun tradeChart() {
         val position = portfolio.positions.single()
-        capture("8-islem-grafigi") {
-            TradesContent(portfolio, initialTab = 0, expanded = true, charts = mapOf(position.id to btc.candles.takeLast(60)))
-        }
+        capture("8-islem-grafigi") { TradeDetailContent(position, null, bid(), btc.candles.takeLast(60), {}, {}) }
+    }
+
+    @Test
+    fun settings() {
+        val dir = java.nio.file.Files.createTempDirectory("ayarlar").toFile()
+        val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Unconfined)
+        val engine = com.spotbot.core.engine.TradingEngine(
+            com.spotbot.core.exchange.mexc.MexcRestClient(), com.spotbot.core.exchange.mexc.MexcWebSocketClient(scope), scope,
+            com.spotbot.android.data.FileStateStore(dir),
+        )
+        val viewModel = com.spotbot.android.ui.settings.SettingsViewModel(engine, com.spotbot.android.data.SettingsRepository(dir))
+        capture("12-ayarlar") { com.spotbot.android.ui.settings.SettingsScreen(viewModel = viewModel) }
     }
 
     @Test
@@ -307,3 +340,10 @@ class ScreenshotTest {
     }
 }
 
+/** Aynı ekranlar küçük telefon boyutunda (320 × 640 dp): taşma ve yatay kaydırma olmamalı. */
+@RunWith(RobolectricTestRunner::class)
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
+@Config(sdk = [36], qualifiers = "w320dp-h640dp-xhdpi")
+class SmallScreenTest : ScreenshotTest() {
+    override val prefix = "k-"
+}

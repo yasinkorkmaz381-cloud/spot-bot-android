@@ -1,6 +1,11 @@
 package com.spotbot.android.ui.backtest
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import com.spotbot.android.ui.common.AppCard
+import com.spotbot.android.ui.common.ExpandableCard
+import com.spotbot.android.ui.common.MetricGrid
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -99,58 +104,61 @@ object TradeCharts {
     }
 }
 
-@Composable
-private fun Metric(label: String, value: String, modifier: Modifier = Modifier, color: Color = Color.Unspecified) {
-    Column(modifier.padding(vertical = 6.dp)) {
-        Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        Text(value, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = color, maxLines = 1, overflow = TextOverflow.Ellipsis)
-    }
-}
-
-@Composable
-private fun MetricGrid(items: List<Triple<String, String, Color>>) {
-    items.chunked(2).forEach { row ->
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            row.forEach { (label, value, color) -> Metric(label, value, Modifier.weight(1f), color) }
-            if (row.size == 1) Spacer(Modifier.weight(1f))
-        }
-    }
-}
-
 private fun r(value: Double) = "%+.2fR".format(value)
 
-/** Üst bölüm: sermaye, net sonuç, işlem, kazanma oranı, PF, düşüş, ortalama R, ücretler. */
+/** Üst bölüm: yalnız beş ana ölçü (net sonuç, kazanma oranı, PF, maksimum düşüş, işlem sayısı). */
 @Composable
 fun BacktestSummaryCard(r: BacktestReport) {
-    val o = r.overall
     val net = r.finalEquity - r.initialCapital
-    val neutral = Color.Unspecified
-    SectionCard("Özet") {
+    AppCard {
         Text(
-            "${formatDateTime(r.startTime)} → ${formatDateTime(r.endTime)} · ${r.symbols.size} coin · profil ${r.profile.title}",
+            "${formatDateTime(r.startTime)} → ${formatDateTime(r.endTime)} · ${r.symbols.size} coin",
             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text("Net kâr / zarar", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(
+            "${formatSignedMoney(net)} USDT  (${formatPercent(r.netReturnPercent, signed = true, minFractionDigits = 2)})",
+            style = MaterialTheme.typography.headlineSmall, color = gainLossColor(net.compareTo(0.0)), maxLines = 1,
         )
         MetricGrid(
             listOf(
-                Triple("Başlangıç sermayesi", "${formatMoney(r.initialCapital)} USDT", neutral),
-                Triple("Bitiş sermayesi", "${formatMoney(r.finalEquity)} USDT", neutral),
-                Triple("Net kâr / zarar", "${formatSignedMoney(net)} USDT", gainLossColor(net.compareTo(0.0))),
-                Triple("Net getiri", formatPercent(r.netReturnPercent, signed = true, minFractionDigits = 2), gainLossColor(net.compareTo(0.0))),
-                Triple("İşlem sayısı", "${r.trades} (${o.wins} K / ${o.losses} Z)", neutral),
-                Triple("Kazanma oranı", formatPercent(r.winRatePercent, minFractionDigits = 1), neutral),
-                Triple("Profit factor", formatRatio(r.profitFactor), neutral),
+                Triple("Kazanma oranı", formatPercent(r.winRatePercent, minFractionDigits = 1), Color.Unspecified),
+                Triple("Profit factor", formatRatio(r.profitFactor), Color.Unspecified),
                 Triple("Maks. düşüş", formatPercent(r.maxDrawdownPercent, minFractionDigits = 2), SpotBotTheme.tradingColors.loss),
-                Triple("Ortalama R", r(r.expectancyR), gainLossColor(r.expectancyR.compareTo(0.0))),
-                Triple("Toplam ücret", "${formatMoney(r.totalFees)} USDT", neutral),
+                Triple("Toplam işlem", "${r.trades}", Color.Unspecified),
             ),
         )
-        HorizontalDivider()
+    }
+}
+
+/** Sermaye performans grafiği. */
+@Composable
+fun EquityCard(r: BacktestReport) {
+    if (r.equityCurve.size < 2) return
+    SectionCard("Sermaye performansı") {
+        LineChart(r.equityCurve.map { it.second })
+        Text(
+            "${formatMoney(r.initialCapital)} → ${formatMoney(r.finalEquity)} USDT · BTC al-tut ${r.btcBuyAndHoldPercent?.let { formatPercent(it, signed = true, minFractionDigits = 2) } ?: "—"}",
+            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+/** Ayrıntılı ölçüler: varsayılan kapalı. */
+@Composable
+fun DetailedMetricsCard(r: BacktestReport) {
+    val o = r.overall
+    ExpandableCard("Ayrıntılı ölçüler", subtitle = "Brüt kâr/zarar, ortalama R, ücretler, aylık değişim") {
+        KeyValueRow("Başlangıç → bitiş sermayesi", "${formatMoney(r.initialCapital)} → ${formatMoney(r.finalEquity)}")
+        KeyValueRow("Kazanan / kaybeden", "${o.wins} / ${o.losses}")
         KeyValueRow("Brüt kâr / brüt zarar", "${formatMoney(o.grossProfit)} / ${formatMoney(o.grossLoss)}")
         KeyValueRow("Ort. kazanç / kayıp", "${formatSignedMoney(r.averageWin)} / ${formatSignedMoney(r.averageLoss)}")
         KeyValueRow("İşlem başına beklenen", "${formatSignedMoney(r.expectancy)} USDT")
+        KeyValueRow("Ortalama R", r(r.expectancyR), gainLossColor(r.expectancyR.compareTo(0.0)))
+        KeyValueRow("Toplam ücret", "${formatMoney(r.totalFees)} USDT")
         KeyValueRow("Spread + kayma", "${formatMoney(r.spreadAndSlippageCost)} USDT")
-        KeyValueRow("BTC al-tut", r.btcBuyAndHoldPercent?.let { formatPercent(it, signed = true, minFractionDigits = 2) } ?: "—")
         KeyValueRow("Piyasada kalma", formatPercent(r.exposurePercent, minFractionDigits = 1))
+        KeyValueRow("Profil", r.profile.title)
         val ib = r.intrabar
         KeyValueRow(
             "Aynı mumda stop + hedef",
@@ -158,17 +166,30 @@ fun BacktestSummaryCard(r: BacktestReport) {
         )
         if (r.entriesSkippedForDrift > 0) KeyValueRow("Fiyat kayması nedeniyle girilmedi", "${r.entriesSkippedForDrift}")
         if (r.partialFills > 0) KeyValueRow("Kısmi gerçekleşen emir (likidite)", "${r.partialFills}")
-        if (r.equityCurve.size >= 2) LineChart(r.equityCurve.map { it.second })
+        if (r.monthlyReturns.isNotEmpty()) {
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Text("Aylık özsermaye değişimi", style = MaterialTheme.typography.titleSmall)
+            r.monthlyReturns.forEach { m ->
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text(m.label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                    Text("${m.tradesClosed} işlem", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.width(72.dp), textAlign = TextAlign.End)
+                    Text(
+                        formatPercent(m.changePercent, signed = true, minFractionDigits = 2), style = MaterialTheme.typography.bodyMedium,
+                        color = gainLossColor(m.changePercent.compareTo(0.0)), textAlign = TextAlign.End, modifier = Modifier.width(88.dp),
+                    )
+                }
+            }
+        }
     }
 }
 
 /** Ölçü tablosu: satırlar ölçüler, sütunlar stratejiler/çalıştırmalar. Değerler kısa tutulur, sağa hizalanır. */
 @Composable
-fun StatsTable(columns: List<Pair<String, PerformanceStats?>>) {
-    val rows: List<Pair<String, (PerformanceStats) -> Pair<String, Color>>> = listOf(
+fun StatsTable(columns: List<Pair<String, PerformanceStats?>>, keyOnly: Boolean = false) {
+    val all: List<Pair<String, (PerformanceStats) -> Pair<String, Color>>> = listOf(
         "İşlem" to { s -> "${s.trades}" to Color.Unspecified },
         "K / Z işlem" to { s -> "${s.wins} / ${s.losses}" to Color.Unspecified },
-        "Kazanma oranı" to { s -> formatPercent(s.winRatePercent, minFractionDigits = 1) to Color.Unspecified },
+        "Kazanma" to { s -> formatPercent(s.winRatePercent, minFractionDigits = 1) to Color.Unspecified },
         "Ort. kazanç" to { s -> formatSignedMoney(s.averageWin) to Color.Unspecified },
         "Ort. kayıp" to { s -> formatSignedMoney(s.averageLoss) to Color.Unspecified },
         "Profit factor" to { s -> formatRatio(s.profitFactor) to Color.Unspecified },
@@ -179,6 +200,8 @@ fun StatsTable(columns: List<Pair<String, PerformanceStats?>>) {
         "Net sonuç" to { s -> formatSignedMoney(s.netPnl) to Color.Unspecified },
         "Net getiri" to { s -> formatPercent(s.netReturnPercent, signed = true, minFractionDigits = 2) to Color.Unspecified },
     )
+    val keyRows = setOf("İşlem", "Kazanma", "Profit factor", "Maks. düşüş", "Net getiri")
+    val rows = if (keyOnly) all.filter { it.first in keyRows } else all
     Row(Modifier.fillMaxWidth()) {
         Spacer(Modifier.weight(1.3f))
         columns.forEach { (title, _) ->
@@ -201,47 +224,50 @@ fun StatsTable(columns: List<Pair<String, PerformanceStats?>>) {
     }
 }
 
-/** Orta bölüm: aynı çalıştırmada A ve B. */
+/** Orta bölüm: aynı çalıştırmada A ve B (kısa); tüm ölçüler açılır bölümde. */
 @Composable
 fun StrategyCompareCard(r: BacktestReport) {
+    val byId = r.perStrategy.associate { it.strategy to it.stats }
     SectionCard("Strateji A ve B") {
-        Text(
-            "Aynı çalıştırmadan: iki strateji aynı sermayeyi ve pozisyon sınırını paylaşır. Bağımsız karşılaştırma için \"A ve B ayrı\" modunu kullanın.",
-            style = MaterialTheme.typography.bodySmall,
-        )
-        val byId = r.perStrategy.associate { it.strategy to it.stats }
-        StatsTable(listOf("A" to byId[StrategyId.BREAKOUT_RETEST], "B" to byId[StrategyId.TREND_PULLBACK]))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf(StrategyId.BREAKOUT_RETEST, StrategyId.TREND_PULLBACK).forEach { id ->
+                StrategyTile(id, byId[id], Modifier.weight(1f))
+            }
+        }
         val small = r.perStrategy.filter { it.stats.trades < 30 }
         if (small.isNotEmpty()) {
             Text(
-                "⚠ ${small.joinToString { it.strategy.code }}: işlem sayısı 30'un altında; sonuç rastlantıya çok açık.",
+                "${small.joinToString { it.strategy.code }}: 30'dan az işlem; sonuç rastlantıya çok açık.",
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.tertiary,
             )
         }
     }
+    ExpandableCard("A ve B: tüm ölçüler", subtitle = "Aynı çalıştırma; iki strateji sermayeyi ve pozisyon sınırını paylaşır") {
+        StatsTable(listOf("A" to byId[StrategyId.BREAKOUT_RETEST], "B" to byId[StrategyId.TREND_PULLBACK]))
+    }
 }
 
 @Composable
-fun MonthlyReturnsCard(r: BacktestReport) {
-    if (r.monthlyReturns.isEmpty()) return
-    SectionCard("Aylık özsermaye değişimi") {
-        r.monthlyReturns.forEach { m ->
-            Row(Modifier.fillMaxWidth().padding(vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text(m.label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
-                Text("${m.tradesClosed} işlem", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.width(72.dp), textAlign = TextAlign.End)
-                Text(
-                    formatPercent(m.changePercent, signed = true, minFractionDigits = 2), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium,
-                    color = gainLossColor(m.changePercent.compareTo(0.0)), textAlign = TextAlign.End, modifier = Modifier.width(88.dp),
-                )
+private fun StrategyTile(id: StrategyId, s: PerformanceStats?, modifier: Modifier = Modifier) {
+    androidx.compose.material3.Surface(color = MaterialTheme.colorScheme.surfaceContainerHigh, shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp), modifier = modifier) {
+        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text("Strateji ${id.code}", style = MaterialTheme.typography.labelLarge, maxLines = 1)
+            Text(id.title, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (s == null || s.trades == 0) {
+                Text("İşlem yok", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            } else {
+                Text(formatSignedMoney(s.netPnl), style = MaterialTheme.typography.titleMedium, color = gainLossColor(s.netPnl.compareTo(0.0)), maxLines = 1)
+                Text("${s.trades} işlem · ${formatPercent(s.winRatePercent)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                Text("PF ${formatRatio(s.profitFactor)} · ${r(s.averageR)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
             }
         }
-        Text("Ay sonu özsermayesi açık pozisyonların o anki değerini içerir.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
 private fun monthOf(t: Long): String = Instant.ofEpochMilli(t).atZone(ZoneId.systemDefault()).let { "%04d-%02d".format(it.year, it.monthValue) }
 
 /** Alt bölüm: tarih ve stratejiye göre süzülebilen işlem geçmişi; işleme dokununca ayrıntı açılır. */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun TradeHistoryCard(r: BacktestReport, onOpen: (ClosedTrade) -> Unit) {
     var strategy by rememberSaveable { mutableStateOf<String?>(null) }
@@ -255,13 +281,13 @@ fun TradeHistoryCard(r: BacktestReport, onOpen: (ClosedTrade) -> Unit) {
             .sortedByDescending { it.position.openedAt }
     }
     SectionCard("İşlem geçmişi") {
-        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            FilterChip(selected = strategy == null, onClick = { strategy = null; shown = 30 }, label = { Text("Tüm stratejiler") })
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FilterChip(selected = strategy == null, onClick = { strategy = null; shown = 30 }, label = { Text("Tümü") })
             listOf(StrategyId.BREAKOUT_RETEST, StrategyId.TREND_PULLBACK).forEach { id ->
-                FilterChip(selected = strategy == id.code, onClick = { strategy = id.code; shown = 30 }, label = { Text("${id.code} ${id.title}") })
+                FilterChip(selected = strategy == id.code, onClick = { strategy = id.code; shown = 30 }, label = { Text("Strateji ${id.code}", maxLines = 1) })
             }
         }
-        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             FilterChip(selected = month == null, onClick = { month = null; shown = 30 }, label = { Text("Tüm tarihler") })
             months.forEach { m -> FilterChip(selected = month == m, onClick = { month = m; shown = 30 }, label = { Text(m) }) }
         }
@@ -279,19 +305,34 @@ fun TradeHistoryCard(r: BacktestReport, onOpen: (ClosedTrade) -> Unit) {
 @Composable
 private fun TradeRow(t: ClosedTrade, onClick: () -> Unit) {
     val p = t.position
-    Column(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(p.symbol.removeSuffix("USDT"), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-            Tag(p.strategy.code, MaterialTheme.colorScheme.primary)
-            if (t.note.contains("BELİRSİZ")) Tag("belirsiz", MaterialTheme.colorScheme.tertiary)
-            Spacer(Modifier.weight(1f))
-            Text("${formatSignedMoney(t.netPnl)} USDT", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = gainLossColor(t.netPnl.compareTo(0.0)))
+    androidx.compose.material3.Surface(
+        color = MaterialTheme.colorScheme.surfaceContainerHigh, shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(Modifier.clickable(onClick = onClick).padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(p.symbol.removeSuffix("USDT"), style = MaterialTheme.typography.titleSmall)
+                Tag(p.strategy.code, MaterialTheme.colorScheme.primary)
+                if (t.note.contains("BELİRSİZ")) Tag("belirsiz", MaterialTheme.colorScheme.tertiary)
+                Text(
+                    "${formatSignedMoney(t.netPnl)} USDT", style = MaterialTheme.typography.titleSmall, color = gainLossColor(t.netPnl.compareTo(0.0)),
+                    textAlign = TextAlign.End, maxLines = 1, modifier = Modifier.weight(1f),
+                )
+            }
+            TradeLine("Giriş", formatDateTime(p.openedAt), formatPrice(p.entryPrice))
+            TradeLine("Çıkış", formatDateTime(t.closedAt), formatPrice(t.averageExitPrice))
+            Text("${t.reason.title} · ${r(t.rMultiple)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        Text("Giriş  ${formatDateTime(p.openedAt)} · ${formatPrice(p.entryPrice)}", style = MaterialTheme.typography.bodySmall)
-        Text("Çıkış  ${formatDateTime(t.closedAt)} · ${formatPrice(t.averageExitPrice)}", style = MaterialTheme.typography.bodySmall)
-        Text("${t.reason.title} · ${r(t.rMultiple)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
-    HorizontalDivider()
+}
+
+@Composable
+private fun TradeLine(label: String, time: String, price: String) {
+    Row(Modifier.fillMaxWidth()) {
+        Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.width(44.dp))
+        Text(time, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f), maxLines = 1)
+        Text(price, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium, textAlign = TextAlign.End, maxLines = 1)
+    }
 }
 
 /** İşlem ayrıntısı: gerçek mumlar, giriş/stop/hedef/çıkış, EMA'lar, giriş anındaki S/R ve gerekçe. */
@@ -364,20 +405,23 @@ fun TradeDetailContent(trade: ClosedTrade, features: TradeFeatures?, excursion: 
     }
 }
 
-/** "A ve B ayrı" modunun sonucu: aynı koşullarda bağımsız çalıştırmalar, tüm dönem ve iki yarı. */
+/** "A ve B ayrı" modunun sonucu: aynı koşullarda bağımsız çalıştırmalar; ana ölçüler görünür, gerisi açılır bölümlerde. */
 @Composable
 fun IsolatedContent(results: List<IsolatedRun>, days: Int, symbols: List<String>) {
+    val columns = { pick: (IsolatedRun) -> PerformanceStats -> results.map { run -> run.label.substringBefore(" (") to pick(run) } }
     SectionCard("A ve B ayrı · $days gün · ${symbols.size} coin") {
         Text(
             "Her sütun ayrı bir backtest: aynı veri, dönem, ücret, kayma, başlangıç sermayesi ve risk ayarları; yalnız etkin strateji farklı. Kâr garantisi değildir.",
-            style = MaterialTheme.typography.bodySmall,
+            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        StatsTable(columns { it.full }, keyOnly = true)
     }
-    listOf<Pair<String, (IsolatedRun) -> PerformanceStats>>(
-        "Tüm dönem" to { it.full }, "İlk yarı" to { it.firstHalf }, "İkinci yarı" to { it.secondHalf },
-    ).forEach { (title, pick) ->
-        SectionCard(title) {
-            StatsTable(results.map { run -> run.label.substringBefore(" (") to pick(run) })
-        }
+    ExpandableCard("İlk yarı / ikinci yarı", subtitle = "Bir sonuç ancak iki yarıda da tutarlıysa anlamlıdır") {
+        Text("İlk yarı", style = MaterialTheme.typography.titleSmall)
+        StatsTable(columns { it.firstHalf }, keyOnly = true)
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+        Text("İkinci yarı", style = MaterialTheme.typography.titleSmall)
+        StatsTable(columns { it.secondHalf }, keyOnly = true)
     }
+    ExpandableCard("Tüm ölçüler (tüm dönem)") { StatsTable(columns { it.full }) }
 }
