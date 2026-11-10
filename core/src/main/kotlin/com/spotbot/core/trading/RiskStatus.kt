@@ -21,6 +21,10 @@ data class RiskStatus(
     val atrStopMode: AtrStopMode = AtrStopMode.OFF,
     /** Yeni işlem şu an neden açılamaz (açılabiliyorsa null). */
     val entriesBlockedReason: String? = null,
+    /** Engel piyasa filtresindense türü (veri sorunu / piyasa riski); değilse null. */
+    val marketBlockKind: com.spotbot.core.scanner.MarketBlockKind? = null,
+    /** Son taramanın piyasa filtresi (şartlar ve BTC göstergeleri). */
+    val market: com.spotbot.core.scanner.MarketState? = null,
 ) {
     companion object {
         fun of(
@@ -31,6 +35,7 @@ data class RiskStatus(
             entriesPaused: Boolean,
             marketAllowsLongs: Boolean?,
             correlatedPairs: List<String>,
+            market: com.spotbot.core.scanner.MarketState? = null,
         ): RiskStatus {
             val openRisk = (state.positions.sumOf { it.openRisk } + state.pendingOrders.sumOf { it.riskAmount }) / equity * 100
             val daily = if (state.dayStartEquity > 0) (equity - state.dayStartEquity) / state.dayStartEquity * 100 else 0.0
@@ -40,12 +45,14 @@ data class RiskStatus(
                 daily <= -risk.dailyLossLimitPercent -> "Günlük kayıp limiti doldu (%%%.2f)".format(daily)
                 count >= risk.maxOpenPositions -> "Eş zamanlı işlem sınırı dolu (${risk.maxOpenPositions})"
                 openRisk + risk.riskPerTradePercent > risk.maxTotalOpenRiskPercent + 1e-6 -> "Toplam açık risk sınırına yakın (%%%.2f / %%%.1f)".format(openRisk, risk.maxTotalOpenRiskPercent)
-                marketAllowsLongs == false -> "BTC / piyasa filtresi alıma izin vermiyor"
+                marketAllowsLongs == false -> com.spotbot.core.scanner.MarketExplanation.text(market) ?: "BTC / piyasa filtresi alıma izin vermiyor"
                 else -> null
             }
             return RiskStatus(
                 equity, openRisk, risk.maxTotalOpenRiskPercent, daily, risk.dailyLossLimitPercent, state.positions.size,
                 state.pendingOrders.size, risk.maxOpenPositions, risk.riskPerTradePercent, correlatedPairs, profile, risk.atrStopMode, blocked,
+                marketBlockKind = if (marketAllowsLongs == false) market?.blockKind ?: com.spotbot.core.scanner.MarketBlockKind.DATA else null,
+                market = market,
             )
         }
     }

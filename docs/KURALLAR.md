@@ -20,7 +20,7 @@ kuralın metni projeye hiç verilmedi; eksik kurallar varsayımla doldurulmadı.
 | Z17 | Son 15M/1H/4H mumları tarama sınırıyla eşleşiyor, canlı fiyat ≤ 30 sn | Kritik | Veri doğrulama | — | V2 altyapı kuralı (yalnız canlı motorda veri sorunu çıkabilir) |
 | Z04 | 4H ana trend düşüşte değil | Kritik | Trend | — | Tasarım notu (4H trend) |
 | Z05 | Strateji 4H rejimine uygun (A: yükseliş/yatay, B: yükseliş) | Kritik | Piyasa rejimi | — | Tasarım notu (A/B tanımı) |
-| Z10 | BTC 4H düşüşte değil ve BTC son 4 saatte %3'ten fazla düşmedi | Kritik | Piyasa rejimi | — | Tasarım notu "BTC filtresi"; %3 eşiği notta yok (bkz. belirsizlikler) |
+| Z10 | BTC filtresi: veri yeterli (B1) ve güncel (B2), BTC 4H düşüşte değil (B3), son 4 saatte %3'ten fazla düşmedi (B4) | Kritik | Piyasa rejimi | — | Tasarım notu "BTC filtresi"; %3 eşiği notta yok; B2 10.11.2026'da eklendi ([PIYASA-FILTRESI.md](PIYASA-FILTRESI.md)) |
 | Z19 | BTC 4H 5 sınıflı rejim stratejiye izin veriyor | Kritik | Piyasa rejimi | — | Bu görevde istendi; **varsayılan kapalı** (her zaman geçer, rejimi yalnız bilgi olarak yazar) |
 | Z06 | Strateji etkin (C test edilmeden açılmaz) | Kritik | Giriş teyidi | — | Tasarım notu |
 | Z07 | En az 2 bağımsız teyit | Kritik | Giriş teyidi | — | Tasarım notu "tek göstergeyle işlem yok" |

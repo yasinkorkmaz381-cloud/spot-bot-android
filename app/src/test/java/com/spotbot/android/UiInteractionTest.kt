@@ -156,4 +156,20 @@ class UiInteractionTest {
         assertEquals(1, symbolOpened)
         assertTrue(portfolio.positions.single().symbol == "ETHUSDT")
     }
+
+    @Test
+    fun `market filter block shows its kind and a plain explanation instead of a code`() {
+        val state = panelState(EngineStatus.RUNNING).let {
+            it.copy(
+                risk = com.spotbot.core.trading.RiskStatus(
+                    entriesBlockedReason = "Piyasa riski: BTC 4 saatlik grafikte düşüş trendinde (fiyat ortalamaların altında, trend gücü yüksek). Bu durumda yeni alım yapılmaz; açık pozisyonların takibi sürer.",
+                    marketBlockKind = com.spotbot.core.scanner.MarketBlockKind.MARKET,
+                ),
+            )
+        }
+        show { PanelContent(state, Calls().actions()) }
+        compose.onNodeWithText("Yeni işlem yok · Piyasa riski").assertExists()
+        compose.onNodeWithText("BTC 4 saatlik grafikte düşüş trendinde", substring = true).assertExists()
+        compose.onNodeWithText("BTC / piyasa filtresi alıma izin vermiyor").assertDoesNotExist()
+    }
 }

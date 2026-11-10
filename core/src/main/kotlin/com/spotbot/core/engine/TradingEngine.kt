@@ -473,7 +473,7 @@ class TradingEngine(
         if (mode == Mode.OBSERVE) {
             log(Decision(now(), null, null, DecisionOutcome.INFO, "Başlangıç taraması tamamlandı; işlemler bir sonraki 15M kapanışından itibaren değerlendirilecek"))
         }
-        refreshRisk(report.market.allowsLongs)
+        refreshRisk(report.market)
     }
 
     private suspend fun scan(boundary: Long): ScanReport {
@@ -699,10 +699,10 @@ class TradingEngine(
         }
     }
 
-    private fun refreshRisk(marketAllowsLongs: Boolean? = _lastScan.value?.market?.allowsLongs) {
+    private fun refreshRisk(market: com.spotbot.core.scanner.MarketState? = _lastScan.value?.market) {
         val state = _portfolio.value
         val equity = currentEquity(state)
-        _riskStatus.value = RiskStatus.of(state, equity, config.risk, config.profile, _health.value.entriesPaused, marketAllowsLongs, correlatedPairs(state))
+        _riskStatus.value = RiskStatus.of(state, equity, config.risk, config.profile, _health.value.entriesPaused, market?.allowsLongs, correlatedPairs(state), market)
     }
 
     private fun updateEquity() {

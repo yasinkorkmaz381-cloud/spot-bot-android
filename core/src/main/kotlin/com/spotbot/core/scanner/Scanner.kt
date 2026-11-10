@@ -7,6 +7,7 @@ import com.spotbot.core.model.BookTicker
 import com.spotbot.core.model.OrderBook
 import com.spotbot.core.model.SymbolInfo
 import com.spotbot.core.model.Ticker24h
+import com.spotbot.core.model.Timeframe
 import kotlinx.serialization.Serializable
 import kotlin.math.abs
 
@@ -54,6 +55,34 @@ data class CoinScan(
     val relativeStrength7dPercent: Double?,
 )
 
+/** Piyasa filtresinin bir şartı neden engelledi: veri eksik/eski mi, yoksa gerçek piyasa riski mi. */
+@Serializable
+enum class MarketBlockKind(val title: String) {
+    DATA("Veri sorunu"),
+    MARKET("Piyasa riski"),
+}
+
+/** Piyasa (BTC) filtresinin tek bir şartı ve sonucu. */
+@Serializable
+data class MarketCondition(val id: String, val title: String, val kind: MarketBlockKind, val passed: Boolean, val detail: String)
+
+/** Filtrenin kullandığı BTC göstergeleri (bir zaman dilimi, son kapanmış mum). */
+@Serializable
+data class BtcTimeframeView(
+    val timeframe: String,
+    /** Son kapanmış mumun kapanış zamanı (epoch ms). */
+    val lastClose: Long,
+    val close: Double,
+    val emaMid: Double,
+    val emaSlow: Double,
+    val superTrendUp: Boolean,
+    val adx: Double,
+    val plusDi: Double,
+    val minusDi: Double,
+    val structure: Trend,
+    val regime: Regime,
+)
+
 @Serializable
 data class MarketState(
     val btcRegime: Regime?,
@@ -62,7 +91,17 @@ data class MarketState(
     val reasons: List<String>,
     /** İzlenen coinlerden 4H kapanışı EMA55 üzerinde olanların oranı (%). */
     val breadthPercent: Double?,
-)
+    /** Filtrenin tüm şartları (sırasıyla: veri şartları, sonra piyasa şartları). */
+    val conditions: List<MarketCondition> = emptyList(),
+    val btcH4: BtcTimeframeView? = null,
+    val btcH1: BtcTimeframeView? = null,
+) {
+    /** Alımı engelleyen ilk şartın türü; alım serbestse null. Veri sorunu piyasa riskinden önce gelir. */
+    val blockKind: MarketBlockKind? get() = if (allowsLongs) null else conditions.firstOrNull { !it.passed }?.kind ?: MarketBlockKind.DATA
+
+    /** Engelleyen şartlar. */
+    val failedConditions: List<MarketCondition> get() = conditions.filter { !it.passed }
+}
 
 @Serializable
 data class ScanReport(
@@ -105,36 +144,82 @@ object Scanner {
         return watch + extras
     }
 
-    fun marketState(btc: MultiTimeframe?, coins: List<CoinMarketData>, config: ScannerConfig): MarketState {
+    /**
+     * BTC / genel piyasa filtresi. Şartlar:
+     * - B1 (veri): BTC 4H, 1H ve 15M için yeterli kapanmış mum var (her birinde en az 60).
+     * - B2 (veri): [boundary] verildiyse BTC'nin son 4H ve 1H mumları beklenen kapanışta (eski veriyle karar yok).
+     * - B3 (piyasa): BTC 4H rejimi düşüş trendi (TREND_DOWN) değil.
+     * - B4 (piyasa): BTC son 4 saatte (1H kapanışları) [ScannerConfig.btcCrashPercent4h] yüzdeden fazla düşmedi.
+     * Herhangi biri geçmezse yeni alım yapılmaz. Veri şartları geçmezse piyasa şartları değerlendirilemez.
+     */
+    fun marketState(btc: MultiTimeframe?, coins: List<CoinMarketData>, config: ScannerConfig, boundary: Long? = null): MarketState {
         val reasons = mutableListOf<String>()
-        val regime = btc?.h4?.regime
-        val change4h = btc?.h1?.let { h1 ->
+        val conditions = mutableListOf<MarketCondition>()
+        val valid = btc != null && btc.isValid
+        val regime = btc?.h4?.takeIf { it.isValid }?.regime
+        val change4h = btc?.h1?.takeIf { it.isValid }?.let { h1 ->
             val s = h1.series
             val i = h1.endIndex
             if (i >= 4) (s.close[i] / s.close[i - 4] - 1) * 100 else null
         }
-        var allows = true
-        if (btc == null || !btc.isValid) {
-            allows = false
+        conditions += MarketCondition(
+            "B1", "BTC verisi yeterli", MarketBlockKind.DATA, valid,
+            if (valid) "4H, 1H ve 15M'de en az ${MultiTimeframe.MIN_BARS} kapanmış mum var" else "BTC mumları yüklenemedi ya da yetersiz",
+        )
+        if (!valid) {
             reasons += "BTC verisi yetersiz"
         } else {
-            if (regime == Regime.TREND_DOWN) {
-                allows = false
-                reasons += "BTC 4H düşüş trendinde: yeni alım yok"
+            btc!!
+            if (boundary != null) {
+                val expectedH4 = Timeframe.H4.lastCloseAtOrBefore(boundary)
+                val expectedH1 = Timeframe.H1.lastCloseAtOrBefore(boundary)
+                val h4Close = btc.h4.candle.closeTime
+                val h1Close = btc.h1.candle.closeTime
+                val fresh = h4Close == expectedH4 && h1Close == expectedH1
+                conditions += MarketCondition(
+                    "B2", "BTC verisi güncel", MarketBlockKind.DATA, fresh,
+                    "Son 4H mum ${utc(h4Close)} (beklenen ${utc(expectedH4)}), son 1H mum ${utc(h1Close)} (beklenen ${utc(expectedH1)})",
+                )
+                if (!fresh) reasons += "BTC verisi güncel değil: son 4H ${utc(h4Close)}, son 1H ${utc(h1Close)}"
             }
-            if (change4h != null && change4h <= -config.btcCrashPercent4h) {
-                allows = false
-                reasons += "BTC son 4 saatte %%%.1f düştü".format(change4h)
-            }
-            if (allows) reasons += "BTC 4H rejimi: $regime"
+            val h4 = btc.h4.indicators
+            val notDown = regime != Regime.TREND_DOWN
+            conditions += MarketCondition(
+                "B3", "BTC 4H düşüş trendinde değil", MarketBlockKind.MARKET, notDown,
+                "Rejim $regime · kapanış %.2f, EMA21 %.2f, EMA55 %.2f · SuperTrend %s · ADX %.1f (+DI %.1f / −DI %.1f) · yapı %s".format(
+                    h4.close, h4.emaMid, h4.emaSlow, if (h4.superTrendUp) "yukarı" else "aşağı", h4.adx, h4.plusDi, h4.minusDi, btc.h4.structure.trend,
+                ),
+            )
+            if (!notDown) reasons += "BTC 4H düşüş trendinde: yeni alım yok"
+            val noCrash = change4h == null || change4h > -config.btcCrashPercent4h
+            conditions += MarketCondition(
+                "B4", "BTC son 4 saatte %%%.0f'ten fazla düşmedi".format(config.btcCrashPercent4h), MarketBlockKind.MARKET, noCrash,
+                change4h?.let { "Son 4 saat (1H kapanışları): %+.2f%%".format(it) } ?: "Hesaplanamadı",
+            )
+            if (!noCrash) reasons += "BTC son 4 saatte %%%.1f düştü".format(change4h)
         }
-        val valid = coins.mapNotNull { it.mtf?.h4?.takeIf { h4 -> h4.isValid } }
-        val breadth = if (valid.isEmpty()) null else valid.count { it.indicators.close > it.indicators.emaSlow } * 100.0 / valid.size
-        return MarketState(regime, change4h, allows, reasons, breadth)
+        val allows = conditions.all { it.passed }
+        if (allows) reasons += "BTC 4H rejimi: $regime"
+        val breadthSource = coins.mapNotNull { it.mtf?.h4?.takeIf { h4 -> h4.isValid } }
+        val breadth = if (breadthSource.isEmpty()) null else breadthSource.count { it.indicators.close > it.indicators.emaSlow } * 100.0 / breadthSource.size
+        return MarketState(
+            regime, change4h, allows, reasons, breadth, conditions,
+            btc?.h4?.takeIf { valid }?.let { view(it) }, btc?.h1?.takeIf { valid }?.let { view(it) },
+        )
     }
 
+    private fun view(a: com.spotbot.core.analysis.TimeframeAnalysis): BtcTimeframeView {
+        val i = a.indicators
+        return BtcTimeframeView(
+            a.timeframe.label, a.candle.closeTime, i.close, i.emaMid, i.emaSlow, i.superTrendUp, i.adx, i.plusDi, i.minusDi, a.structure.trend, a.regime,
+        )
+    }
+
+    private val UTC_HM = java.time.format.DateTimeFormatter.ofPattern("dd.MM HH:mm 'UTC'").withZone(java.time.ZoneOffset.UTC)
+    private fun utc(t: Long) = UTC_HM.format(java.time.Instant.ofEpochMilli(t))
+
     fun scan(coins: List<CoinMarketData>, btc: MultiTimeframe?, config: ScannerConfig, now: Long): ScanReport {
-        val market = marketState(btc, coins, config)
+        val market = marketState(btc, coins, config, boundary = now)
         val btcStrength = btc?.let { strength7d(it) }
         val scans = coins.map { coin -> scanCoin(coin, btcStrength, config) }
         val candidates = scans
@@ -223,5 +308,30 @@ object Scanner {
         val back = 42
         if (h4.endIndex < back) return null
         return (h4.series.close[h4.endIndex] / h4.series.close[h4.endIndex - back] - 1) * 100
+    }
+}
+
+/** Piyasa filtresinin kullanıcıya gösterilen açıklaması (teknik kod yerine düz Türkçe). */
+object MarketExplanation {
+    /** Alım serbestse null; değilse engelin türünü ve nedenini anlatan kısa metin. */
+    fun text(market: MarketState?): String? {
+        if (market == null || market.allowsLongs) return null
+        val failed = market.failedConditions
+        val ids = failed.map { it.id }.toSet()
+        return when {
+            "B1" in ids || failed.isEmpty() ->
+                "Veri sorunu: BTC mum verisi alınamadı ya da yetersiz. Veri tamamlanana kadar yeni alım yapılmaz; bu bir piyasa sinyali değildir."
+            "B2" in ids ->
+                "Veri sorunu: BTC verisi güncel değil (son mumlar beklenen saatte değil). Eski veriyle karar verilmez; veri güncellenince filtre yeniden değerlendirilir."
+            "B3" in ids && "B4" in ids ->
+                "Piyasa riski: BTC 4 saatlik grafikte düşüş trendinde ve son 4 saatte sert düştü. Bu durumda yeni alım yapılmaz; açık pozisyonların takibi sürer."
+            "B3" in ids ->
+                "Piyasa riski: BTC 4 saatlik grafikte düşüş trendinde (fiyat ortalamaların altında, trend gücü yüksek). Bu durumda yeni alım yapılmaz; açık pozisyonların takibi sürer."
+            "B4" in ids ->
+                "Piyasa riski: BTC son 4 saatte %s düştü. Sert düşüşte yeni alım yapılmaz; açık pozisyonların takibi sürer.".format(
+                    market.btcChange4hPercent?.let { "%%%.1f".format(-it) } ?: "",
+                )
+            else -> "Piyasa filtresi yeni alıma izin vermiyor: ${failed.joinToString { it.title }}"
+        }
     }
 }

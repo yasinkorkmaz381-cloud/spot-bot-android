@@ -80,7 +80,17 @@ private suspend fun scan() {
         r
     }
     println("Tarama: ${time.format(Instant.ofEpochMilli(report.time))} UTC")
-    println("Piyasa: ${if (report.market.allowsLongs) "alıma uygun" else "ALIM YOK"} — ${report.market.reasons.joinToString()}")
+    println("Piyasa: ${if (report.market.allowsLongs) "alıma uygun" else "ALIM YOK (${report.market.blockKind?.title})"} — ${report.market.reasons.joinToString()}")
+    com.spotbot.core.scanner.MarketExplanation.text(report.market)?.let { println("Açıklama: $it") }
+    report.market.conditions.forEach { c -> println("  ${if (c.passed) "✓" else "✗"} ${c.id} ${c.title} [${if (c.kind == com.spotbot.core.scanner.MarketBlockKind.DATA) "veri şartı" else "piyasa şartı"}] — ${c.detail}") }
+    listOfNotNull(report.market.btcH4, report.market.btcH1).forEach { v ->
+        println(
+            "  BTC %s · son kapanmış mum %s UTC · kapanış %.2f · EMA21 %.2f · EMA55 %.2f · SuperTrend %s · ADX %.1f (+DI %.1f / −DI %.1f) · yapı %s · rejim %s".format(
+                v.timeframe, time.format(Instant.ofEpochMilli(v.lastClose)), v.close, v.emaMid, v.emaSlow, if (v.superTrendUp) "yukarı" else "aşağı",
+                v.adx, v.plusDi, v.minusDi, v.structure, v.regime,
+            ),
+        )
+    }
     report.market.breadthPercent?.let { println("Genişlik: 4H EMA55 üzerindeki coin oranı %%%.0f".format(it)) }
     println()
     println("%-12s %-10s %8s %14s %8s %-10s %-8s %s".format("Parite", "Durum", "Puan", "24s hacim", "Spread", "4H", "1H", "Gerekçe"))

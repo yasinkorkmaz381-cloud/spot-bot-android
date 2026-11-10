@@ -189,6 +189,36 @@ open class ScreenshotTest {
     @Test
     fun panel() = capture("1-panel") { PanelContent(panelState(), actions) }
 
+    /** Düşüş trendindeki BTC (yapay seri): piyasa filtresi alımı engeller. */
+    private val fallingMarket by lazy {
+        val end = 2_000L * Timeframe.H4.millis
+        fun series(tf: Timeframe) = Series("BTCUSDT", tf, List(300) { i ->
+            val c = 80_000.0 * Math.pow(0.996, i.toDouble())
+            val o = if (i == 0) c else 80_000.0 * Math.pow(0.996, i - 1.0)
+            val openTime = end - (300 - i) * tf.millis
+            Candle(openTime, o, maxOf(o, c) * 1.002, minOf(o, c) * 0.998, c, 1.0, openTime + tf.millis, c)
+        })
+        val falling = MultiTimeframe("BTCUSDT", series(Timeframe.H4).analyze(), series(Timeframe.H1).analyze(), series(Timeframe.M15).analyze())
+        Scanner.marketState(falling, emptyList(), ScannerConfig(), boundary = end)
+    }
+
+    @Test
+    fun panelMarketBlocked() {
+        assertTrue(!fallingMarket.allowsLongs)
+        val base = panelState()
+        val risk = com.spotbot.core.trading.RiskStatus.of(
+            portfolio, base.equity, RiskConfig(), com.spotbot.core.trading.StrategyProfile.ADAPTIVE, false, false, emptyList(), fallingMarket,
+        )
+        capture("1b-panel-piyasa-filtresi") { PanelContent(base.copy(risk = risk), actions) }
+    }
+
+    @Test
+    fun marketFilterDetails() = capture("2b-piyasa-filtresi") {
+        Column(Modifier.verticalScroll(rememberScrollState()).padding(16.dp)) {
+            com.spotbot.android.ui.common.SectionCard("Piyasa filtresi (BTC)") { com.spotbot.android.ui.scan.MarketFilterDetails(fallingMarket) }
+        }
+    }
+
     @Test
     fun panelLight() = capture("1-panel-acik-tema", dark = false) { PanelContent(panelState(), actions) }
 

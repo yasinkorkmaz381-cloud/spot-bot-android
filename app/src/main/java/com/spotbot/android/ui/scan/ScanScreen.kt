@@ -37,6 +37,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.spotbot.android.ui.AppViewModels
 import com.spotbot.android.ui.common.AppCard
 import com.spotbot.android.ui.common.EmptyText
+import com.spotbot.android.ui.common.ExpandableCard
+import com.spotbot.android.ui.common.KeyValueRow
 import com.spotbot.android.ui.common.InfoBanner
 import com.spotbot.android.ui.common.NavRow
 import com.spotbot.android.ui.common.SectionCard
@@ -52,6 +54,9 @@ import com.spotbot.android.ui.theme.SpotBotTheme
 import com.spotbot.android.ui.theme.gainLossColor
 import com.spotbot.core.engine.TradingEngine
 import com.spotbot.core.scanner.CoinScan
+import com.spotbot.core.scanner.MarketBlockKind
+import com.spotbot.core.scanner.MarketExplanation
+import com.spotbot.core.scanner.MarketState
 import com.spotbot.core.scanner.CoinStatus
 import com.spotbot.core.scanner.ScanReport
 import com.spotbot.core.trading.CoinDecision
@@ -121,14 +126,23 @@ fun ScanContent(
     }
 }
 
+/** Engel türünün rengi: piyasa riski kırmızı (risk uyarısı), veri sorunu sarı (uyarı). */
+@Composable
+fun marketBlockColor(kind: MarketBlockKind?): Color = when (kind) {
+    MarketBlockKind.MARKET -> SpotBotTheme.tradingColors.loss
+    MarketBlockKind.DATA -> MaterialTheme.colorScheme.tertiary
+    null -> SpotBotTheme.tradingColors.gain
+}
+
 @Composable
 private fun MarketCard(r: ScanReport) {
     val market = r.market
-    val colors = SpotBotTheme.tradingColors
     AppCard {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            StatusPill(if (market.allowsLongs) "Piyasa alıma uygun" else "Piyasa filtresi: alım yok", if (market.allowsLongs) colors.gain else colors.loss)
-        }
+        StatusPill(
+            if (market.allowsLongs) "Piyasa alıma uygun" else "Alım yok · ${market.blockKind?.title ?: "Veri sorunu"}",
+            marketBlockColor(market.blockKind),
+        )
+        MarketExplanation.text(market)?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
         Text(
             buildString {
                 append("BTC 4H ${market.btcRegime?.name ?: "—"}")
@@ -137,8 +151,38 @@ private fun MarketCard(r: ScanReport) {
             },
             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        if (!market.allowsLongs) market.reasons.take(2).forEach { Text("• $it", style = MaterialTheme.typography.bodySmall) }
     }
+    if (market.conditions.isNotEmpty()) {
+        ExpandableCard("Piyasa filtresi ayrıntıları", subtitle = "Şartlar, BTC 4H/1H göstergeleri ve veri zamanları") { MarketFilterDetails(market) }
+    }
+}
+
+/** Piyasa (BTC) filtresinin her şartı ve kullandığı değerler. Panelde ve Tarama ekranında kullanılır. */
+@Composable
+fun MarketFilterDetails(market: MarketState) {
+    val colors = SpotBotTheme.tradingColors
+    market.conditions.forEach { c ->
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(if (c.passed) "✓" else "✗", color = if (c.passed) colors.gain else marketBlockColor(c.kind), fontWeight = FontWeight.Bold)
+            Column {
+                Text(c.title, style = MaterialTheme.typography.bodyMedium)
+                Text("${if (c.kind == MarketBlockKind.DATA) "Veri" else "Piyasa"} şartı · ${c.detail}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    }
+    listOfNotNull(market.btcH4, market.btcH1).forEach { v ->
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+        Text("BTC ${v.timeframe} · son kapanmış mum ${formatDateTime(v.lastClose)}", style = MaterialTheme.typography.titleSmall)
+        KeyValueRow("Kapanış", formatPrice(v.close))
+        KeyValueRow("EMA21 / EMA55", "${formatPrice(v.emaMid)} / ${formatPrice(v.emaSlow)}")
+        KeyValueRow("SuperTrend", if (v.superTrendUp) "Yukarı" else "Aşağı")
+        KeyValueRow("ADX (+DI / −DI)", "%.1f (%.1f / %.1f)".format(v.adx, v.plusDi, v.minusDi))
+        KeyValueRow("Yapı / rejim", "${v.structure} / ${v.regime}")
+    }
+    Text(
+        "Trend kararı BTC 4H'ye göre verilir (düşüş trendi: kapanış ve EMA21 EMA55'in altında, SuperTrend aşağı, ADX ≥ 20, yapı yükselişte değil). 1H yalnız son 4 saatteki sert düşüşü (%3) ölçer.",
+        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
 }
 
 @Composable

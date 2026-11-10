@@ -61,6 +61,8 @@ import com.spotbot.android.ui.common.formatSignedMoney
 import com.spotbot.android.ui.common.formatTime
 import com.spotbot.android.ui.theme.SpotBotTheme
 import com.spotbot.android.ui.theme.gainLossColor
+import com.spotbot.android.ui.scan.MarketFilterDetails
+import com.spotbot.android.ui.scan.marketBlockColor
 import com.spotbot.core.engine.EngineStatus
 import com.spotbot.core.exchange.mexc.ConnectionStatus
 import com.spotbot.core.strategy.StrategyId
@@ -230,16 +232,19 @@ private fun ControlCard(state: PanelUiState, actions: PanelActions, onStop: () -
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = SpotBotTheme.tradingColors.loss),
             ) { Text("Durdur", maxLines = 1, softWrap = false) }
         }
-        Text(
-            when {
-                !active -> "Bot kapalı. Başlat ile tarama ve sanal işlem başlar."
-                paused -> "Yeni işlem açılmıyor; açık pozisyonların stop ve hedef takibi sürüyor."
-                state.risk.entriesBlockedReason != null -> "Yeni işlem şu an engelli: ${state.risk.entriesBlockedReason}"
-                else -> "Her 15 dakikada tarar; kurallar sağlanırsa sanal işlem açar."
-            },
-            style = MaterialTheme.typography.bodySmall,
-            color = if (active && !paused && state.risk.entriesBlockedReason != null) SpotBotTheme.tradingColors.loss else MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        val blocked = state.risk.entriesBlockedReason
+        when {
+            !active -> Text("Bot kapalı. Başlat ile tarama ve sanal işlem başlar.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            paused -> Text("Yeni işlem açılmıyor; açık pozisyonların stop ve hedef takibi sürüyor.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            blocked != null -> {
+                // Engelin türü ayrı gösterilir: veri sorunu (sarı) gerçek piyasa riskinden (kırmızı) ayrılır.
+                val kind = state.risk.marketBlockKind
+                StatusPill(kind?.let { "Yeni işlem yok · ${it.title}" } ?: "Yeni işlem yok", kind?.let { marketBlockColor(it) } ?: SpotBotTheme.tradingColors.loss)
+                Text(blocked, style = MaterialTheme.typography.bodySmall)
+                if (kind != null) Text("Ayrıntı: Risk ve sistem ayrıntıları → Piyasa filtresi", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            else -> Text("Her 15 dakikada tarar; kurallar sağlanırsa sanal işlem açar.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
     }
 }
 
@@ -334,6 +339,12 @@ private fun DetailsCard(state: PanelUiState) {
         KeyValueRow("Stop yöntemi", r.atrStopMode.title)
         if (r.correlatedPairs.isNotEmpty()) KeyValueRow("İlişkili pozisyonlar", r.correlatedPairs.joinToString())
         KeyValueRow("Etkin stratejiler", StrategyId.entries.filter { it in state.enabledStrategies }.joinToString { it.code }.ifEmpty { "—" })
+
+        r.market?.takeIf { it.conditions.isNotEmpty() }?.let { market ->
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Text("Piyasa filtresi (BTC)", style = MaterialTheme.typography.titleSmall)
+            MarketFilterDetails(market)
+        }
 
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
         Text("Performans", style = MaterialTheme.typography.titleSmall)
