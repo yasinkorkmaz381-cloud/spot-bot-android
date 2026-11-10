@@ -128,6 +128,8 @@ class SettingsViewModel(private val engine: TradingEngine, private val repositor
         engine.updateConfig(repository.settings.value.engine)
     }
 
+    fun setForwardWide(enabled: Boolean) = repository.update { it.copy(forwardWideUniverse = enabled) }
+
     fun setShadow(id: StrategyId, enabled: Boolean) {
         repository.update {
             val set = if (enabled) it.engine.shadowStrategies + id else it.engine.shadowStrategies - id
@@ -209,6 +211,12 @@ fun SettingsScreen(modifier: Modifier = Modifier, viewModel: SettingsViewModel =
                     ToggleRow("   ${id.code} gölge testte", id in settings.engine.shadowStrategies, "Ayrı sanal portföyde işlem açar; aktif portföyü etkilemez") { viewModel.setShadow(id, it) }
                 }
             }
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Text("S1 ileri test evreni", style = MaterialTheme.typography.titleSmall)
+            ToggleRow(
+                "Geniş evren (tüm MEXC USDT)", settings.forwardWideUniverse,
+                "Kapalı: dar 28 parite (V4 testinde geniş evren karar kuralını geçmedi). Değiştirmek ileri testi sıfırdan başlatır.",
+            ) { viewModel.setForwardWide(it) }
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             Text("Profil", style = MaterialTheme.typography.titleSmall)
             StrategyProfile.entries.forEach { profile ->

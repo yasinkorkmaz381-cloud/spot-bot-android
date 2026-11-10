@@ -96,4 +96,34 @@ class V3EngineTest {
         val high = V3Engine(u, V3Config(from, to, CostScenario.PESSIMISTIC)).run(s)
         assertTrue(high.friction / high.trades > low.friction / low.trades)
     }
+
+    @Test
+    fun `top-N universe trades only the most liquid pairs of that day`() {
+        val mixed = Universe.of(
+            listOf(series("BTCUSDT", 1, quoteVolume = 9e6), series("AAAUSDT", 2, quoteVolume = 8e6), series("BBBUSDT", 3, quoteVolume = 1.5e6), series("CCCUSDT", 4, quoteVolume = 1.4e6)),
+        )
+        val s1 = RelativeStrength(30)
+        val all = V3Engine(mixed, V3Config(from, to)).run(s1)
+        val top2 = V3Engine(mixed, V3Config(from, to, maxUniverse = 2)).run(s1)
+        assertTrue(all.tradeList.any { it.symbol in setOf("BBBUSDT", "CCCUSDT") })
+        assertTrue(top2.tradeList.isNotEmpty())
+        assertTrue(top2.tradeList.all { it.symbol in setOf("BTCUSDT", "AAAUSDT") })
+        // Sınır etkisizse (N ≥ parite sayısı) sonuç değişmez.
+        assertEquals(all.tradeList, V3Engine(mixed, V3Config(from, to, maxUniverse = 10)).run(s1).tradeList)
+    }
+
+    @Test
+    fun `tiered costs charge more on low-volume pairs only`() {
+        val s1 = RelativeStrength(30)
+        val flat = V3Engine(u, V3Config(from, to, CostScenario.MEDIUM)).run(s1)
+        // Bütün pariteler 20M altında: kademeli senaryo daha pahalı.
+        val tiered = V3Engine(u, V3Config(from, to, CostScenario.TIERED_MEDIUM)).run(s1)
+        assertTrue(tiered.friction / tiered.trades > flat.friction / flat.trades)
+        // Hepsi 20M üstünde: kademeli senaryo düz orta senaryoyla aynı.
+        val liquid = Universe.of(data.map { series(it.symbol, listOf("BTCUSDT", "AAAUSDT", "BBBUSDT", "CCCUSDT").indexOf(it.symbol) + 1, quoteVolume = 50e6) })
+        assertEquals(
+            V3Engine(liquid, V3Config(from, to, CostScenario.MEDIUM)).run(s1).tradeList,
+            V3Engine(liquid, V3Config(from, to, CostScenario.TIERED_MEDIUM)).run(s1).tradeList,
+        )
+    }
 }

@@ -32,6 +32,14 @@ class AppContainer(app: Application) {
         shadowStore = com.spotbot.android.data.FileShadowStore(app.filesDir),
     )
     val backtest = BacktestRunner(api, scope, app.cacheDir)
+    /** V4 geniş evren taraması: MEXC'deki bütün USDT pariteleri, S1 kurallarıyla iki aşamalı. */
+    val wide = com.spotbot.core.scanner.WideScanner(api, com.spotbot.android.data.FileWideScanStore(app.filesDir))
     /** V3 araştırmasında "umut verici" çıkan S1'in ayrı sanal portföydeki ileri testi (yalnız kâğıt). */
-    val forward = com.spotbot.core.research.ForwardTracker(api, com.spotbot.android.data.FileForwardStore(app.filesDir))
+    val forward = com.spotbot.core.research.ForwardTracker(
+        api, com.spotbot.android.data.FileForwardStore(app.filesDir),
+        symbols = { if (settings.settings.value.forwardWideUniverse) wide.stage2Symbols else com.spotbot.core.research.V3_UNIVERSE },
+        universeName = {
+            if (settings.settings.value.forwardWideUniverse) com.spotbot.core.research.WIDE_UNIVERSE else com.spotbot.core.research.DEFAULT_UNIVERSE
+        },
+    )
 }

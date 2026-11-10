@@ -67,6 +67,8 @@ data class SymbolInfo(
     val buyPriceBandUp: Double = 0.0,
     /** Satış emri fiyatı ≥ piyasa × (1 − bu oran). */
     val sellPriceBandDown: Double = 0.0,
+    /** MEXC sektör/ürün etiketleri (conceptPlates): "MEME", "AI", "DeFi", "Tokenized Stocks", "Stablecoins"… */
+    val sectors: List<String> = emptyList(),
 ) {
     val canTradeBothSides: Boolean get() = tradeSideType == 1
 }

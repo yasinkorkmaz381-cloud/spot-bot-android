@@ -1,0 +1,27 @@
+Toplam USDT paritesi 1414 · ürün dışı 210 · işlem kapalı/ST 108 · 1D incelenen 77
+Likidite filtresini geçen 31 · trend 2 · BTC'den güçlü 2 · aday [XMRUSDT, INJUSDT]
+BTC 30g %-9.2 · istek 82 · süre 18 sn
+Elenme nedenleri:
+   1008  24 saatlik hacim < 250 bin USDT
+     54  MEXC risk etiketi (ST)
+    210  Desteklenmeyen ürün (stablecoin, tokenleştirilmiş hisse, emtia, kaldıraçlı)
+     54  Borsada işlem kapalı ya da tek yönlü
+     11  Spread > %1 ya da fiyat yok
+     39  30 günlük medyan hacim < 1M USDT
+      7  210 günden kısa geçmiş (yeni listeleme)
+     29  Trend koşulu yok (kapanış ≤ EMA50 ya da EMA50 düşüyor)
+En güçlü 20:
+   1 XMRUSDT      RS  +21.7  7g   -3.3  30g  +12.5  hacim    2.5M spread 0.090% stop %16.0 vol %2.6 derinlik 20450 poz 31 korel null Main | LAYER 1 / LAYER 2 | Privacy
+   2 INJUSDT      RS  +15.2  7g  +15.9  30g   +6.0  hacim    4.0M spread 0.262% stop %23.6 vol %4.8 derinlik 6325 poz 21 korel 0.27 Main | NFT | LAYER 1 / LAYER 2 | Spread %0.26 (canlı filtre %0,20)
+Güçlü ama elenen:
+  JCTUSDT      30g +480.3  30 günlük medyan hacim < 1M USDT
+  PEPEUSDT     30g  +26.9  30 günlük medyan hacim < 1M USDT
+  VRUSDT       30g  +11.0  30 günlük medyan hacim < 1M USDT
+  COINDEPOUSDT 30g   +2.6  30 günlük medyan hacim < 1M USDT
+  WFIUSDT      30g   -0.8  210 günden kısa geçmiş (yeni listeleme)
+  MBGUSDT      30g   -1.3  Trend koşulu yok (kapanış ≤ EMA50 ya da EMA50 düşüyor)
+  TRXUSDT      30g   -3.8  Trend koşulu yok (kapanış ≤ EMA50 ya da EMA50 düşüyor)
+  ADIUSDT      30g   -4.1  30 günlük medyan hacim < 1M USDT
+  KIIUSDT      30g   -4.4  210 günden kısa geçmiş (yeni listeleme)
+  ZECUSDT      30g   -5.1  Trend koşulu yok (kapanış ≤ EMA50 ya da EMA50 düşüyor)
+Sektörler (uygun adaylar): {Main=2, LAYER 1 / LAYER 2=2, Privacy=1}

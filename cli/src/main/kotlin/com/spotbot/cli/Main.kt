@@ -46,6 +46,8 @@ fun main(args: Array<String>) = runBlocking {
         "v3" -> v3(options)
         "costsplit" -> costSplit(options)
         "forward" -> forward(options)
+        "widescan" -> wideScan()
+        "v4" -> v4(options)
         "v3concentration" -> v3Concentration(options)
         else -> println(
             """
@@ -66,6 +68,10 @@ fun main(args: Array<String>) = runBlocking {
                        [--out rapor.json]  Monte Carlo ve gölge işlemlerle karşılaştırır
               compare --data klasör        Adaptif / Trend / Seçici profillerini aynı koşullarda karşılaştırır
               v3 --data klasör             Strateji araştırması V3 (4H/1D, çok yıllı, ön kayıtlı protokol)
+              v4 --data klasör [--info exchangeInfo.json]   V4 evren karşılaştırması (dar 28 / ilk 20-50-100 / tümü)
+              widescan                     Geniş evren taraması (bütün MEXC USDT pariteleri, S1 kuralları)
+              forward [--days N]           S1 ileri test izleyicisini bir kez çalıştırır
+              v3concentration --data klasör   S1 kâr yoğunlaşması (parite / işlem)
               study --data klasör          A/B filtrelerini eğitim/test ve ileri yürüyen testle doğrular; 3 yapılandırma
               analyze --data klasör        A ve B ayrı, rejim filtresi açık/kapalı, kayıp analizi ve önceden
                       [--out rapor.json]   tanımlı filtreler (ilk/ikinci yarı ayrı)

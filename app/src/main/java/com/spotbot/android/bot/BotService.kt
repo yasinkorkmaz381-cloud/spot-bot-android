@@ -95,6 +95,7 @@ class BotService : Service() {
         // S1 ileri testi: yeni bir 4H mumu kapandığında güncellenir (ağ işi arka planda).
         s.launch(Dispatchers.IO) {
             while (isActive) {
+                runCatching { container.wide.refreshIfDue(container.forward.state.value?.result?.open?.map { it.symbol }.orEmpty()) }
                 runCatching { container.forward.refreshIfDue() }
                 delay(10 * 60_000L)
             }

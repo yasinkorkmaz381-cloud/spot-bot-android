@@ -3,11 +3,30 @@
 MEXC spot piyasasında (USDT pariteleri) çalışan, **kontrollü risk** ve **sistematik karar** odaklı otomatik
 işlem botu. Android uygulaması (Türkçe kumanda paneli) + platformdan bağımsız Kotlin çekirdeği + komut satırı.
 
-> **Durum: V2.4 — sanal işlem (paper trading).** MEXC canlı verisi kullanılır, **gerçek emir gönderilmez**,
+> **Durum: V2.5 — sanal işlem (paper trading).** MEXC canlı verisi kullanılır, **gerçek emir gönderilmez**,
 > API anahtarı istenmez. Aşağıdaki backtest sonuçları stratejilerin henüz kâr avantajı göstermediğini
 > söylüyor; bu yüzden gerçek parayla kullanım (V2) için hazır değildir.
 
 **Kalite > İşlem sayısı · Risk kontrolü > Kâr beklentisi · Kanıtlanmış strateji > Tahmin**
+
+## V2.5: geniş coin evreni ve iki aşamalı tarama (10 Kasım 2026)
+
+Ön kayıt: [`docs/EVREN-V4-ONKAYIT.md`](docs/EVREN-V4-ONKAYIT.md). Sonuçlar: [`docs/EVREN-V4.md`](docs/EVREN-V4.md).
+
+- **Dinamik coin keşfi:** Tarama artık sabit listeye bağlı değil. MEXC'deki bütün USDT pariteleri (bugün 1.414) iki
+  aşamada değerlendiriliyor:
+  - Ürün ayıklama: stablecoin, tokenleştirilmiş hisse, emtia, kaldıraçlı token.
+  - Likidite, veri ve trend kontrolü.
+  - En güçlü 20 için emir defteri, ATR, volatilite ve korelasyon.
+- **Bugün işlem yapılabilir evren küçük:** Likidite kuralını geçen yalnız 31 parite var.
+- **Tarihsel test:** 471 paritenin geçmiş verisiyle, listeleme tarihi ve zamana bağlı likidite dikkate alınarak
+  yapıldı. Aynı S1 kurallarıyla dar 28 parite, ilk 20/50/100 ve tüm evren karşılaştırıldı.
+- **Sonuç: daha fazla coin daha fazla kâr getirmedi.**
+  - Son testte tüm evren +%11,4, dar liste +%15,7; ilk 20 ve ilk 50 zararda.
+  - Hiçbir evren ön kayıtlı kuralı geçmedi; son test kârı her evrende ZEC'e bağlı.
+  - Geniş evren korelasyonu ve düşüşü azaltıyor.
+- **İleri test:** S1 ileri testi dar listeyle devam ediyor. Ayarlardan geniş evrene geçilebilir.
+- **Tarama ekranı:** Huni, en güçlü 20 ve elenme nedenleri gösteriliyor.
 
 ## V2.4: strateji araştırması V3 (10 Kasım 2026)
 

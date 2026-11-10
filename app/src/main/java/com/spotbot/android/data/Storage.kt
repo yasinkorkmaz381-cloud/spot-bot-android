@@ -45,6 +45,11 @@ data class AppSettings(
     val botEnabled: Boolean = false,
     /** Ayar biçimi sürümü; eski kayıtlar açılışta taşınır (bkz. [SettingsRepository.migrate]). */
     val schemaVersion: Int = 0,
+    /**
+     * S1 ileri testinin evreni: false = dar 28 parite (varsayılan; V4 ön kayıt kararı), true = geniş MEXC evreni.
+     * Değiştirmek ileri testi o andan yeniden başlatır.
+     */
+    val forwardWideUniverse: Boolean = false,
 )
 
 /** Gölge portföyler: shadows.json (strateji adı → sanal hesap). */
@@ -59,6 +64,13 @@ class FileForwardStore(dir: File) : com.spotbot.core.research.ForwardStore {
     private val file = JsonFile(File(dir, "forward_s1.json"), com.spotbot.core.research.ForwardState.serializer())
     override fun load() = file.read()
     override fun save(state: com.spotbot.core.research.ForwardState) = file.write(state)
+}
+
+/** Geniş evren taraması: bilinen pariteler (yeni listeleme / çıkarılma tespiti) ve son sonuç. */
+class FileWideScanStore(dir: File) : com.spotbot.core.scanner.WideScanStore {
+    private val file = JsonFile(File(dir, "wide_scan.json"), com.spotbot.core.scanner.WideScanState.serializer())
+    override fun load() = file.read()
+    override fun save(state: com.spotbot.core.scanner.WideScanState) = file.write(state)
 }
 
 class SettingsRepository(dir: File) {

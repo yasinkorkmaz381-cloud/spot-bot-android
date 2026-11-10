@@ -34,7 +34,14 @@ data class ForwardState(
     val tradableNow: Int = 0,
     /** Son güncelleme başarısızsa yazılım/veri hatası (kural kararı değildir). */
     val lastError: String? = null,
+    /** İzlenen evren ("Dar liste (28)" ya da "Geniş evren"); değişirse ileri test yeniden başlar. */
+    val universe: String = DEFAULT_UNIVERSE,
+    /** Takip başladığından beri izlenen bütün pariteler (yalnız eklenir; S1 sıralamasının tam kalması için). */
+    val trackedSymbols: List<String> = emptyList(),
 )
+
+const val DEFAULT_UNIVERSE = "Dar liste (28)"
+const val WIDE_UNIVERSE = "Geniş evren (tüm MEXC USDT)"
 
 interface ForwardStore {
     fun load(): ForwardState?
@@ -61,7 +68,10 @@ class ForwardTracker(
     private val store: ForwardStore,
     private val clock: TimeSource = TimeSource.System,
     private val strategy: V3Strategy = RelativeStrength(30),
-    private val symbols: List<String> = V3_UNIVERSE,
+    /** İzlenecek pariteler: dar listede sabit; geniş evrende tarayıcının 2. aşama listesi + açık pozisyonlar. */
+    private val symbols: () -> Collection<String> = { V3_UNIVERSE },
+    /** Evren adı her güncellemede okunur; değişirse ileri test o andan yeniden başlar. */
+    private val universeName: () -> String = { DEFAULT_UNIVERSE },
     private val costs: CostScenario = CostScenario.MEDIUM,
     private val capital: Double = 1_000.0,
     /** Göstergeler ve işlem yapılabilirlik (≥ 210 gün) için takip başlangıcından önce yüklenen geçmiş. */
@@ -69,7 +79,7 @@ class ForwardTracker(
 ) {
     private val mutex = Mutex()
     private val cache = HashMap<String, List<Candle>>()
-    private val _state = MutableStateFlow(store.load()?.takeIf { it.strategy == strategy.name && it.option == strategy.option })
+    private val _state = MutableStateFlow(store.load()?.takeIf { it.strategy == strategy.name && it.option == strategy.option && it.universe == universeName() })
     val state: StateFlow<ForwardState?> = _state.asStateFlow()
 
     /** Son kapanmış 4H mumunun kapanış zamanı. */
@@ -79,7 +89,7 @@ class ForwardTracker(
     suspend fun refreshIfDue(): ForwardState = mutex.withLock {
         val now = clock.now()
         val current = _state.value
-        if (current != null && current.lastError == null && current.dataEnd >= lastClosed(now)) current else refreshLocked(now)
+        if (current != null && current.lastError == null && current.universe == universeName() && current.dataEnd >= lastClosed(now)) current else refreshLocked(now)
     }
 
     suspend fun refresh(): ForwardState = mutex.withLock { refreshLocked(clock.now()) }
@@ -91,12 +101,15 @@ class ForwardTracker(
     }
 
     private suspend fun refreshLocked(now: Long): ForwardState {
-        val base = _state.value ?: ForwardState(strategy.name, strategy.option, startedAt = lastClosed(now), capital = capital)
+        val name = universeName()
+        val base = _state.value?.takeIf { it.universe == name }
+            ?: ForwardState(strategy.name, strategy.option, startedAt = lastClosed(now), capital = capital, universe = name)
         val end = lastClosed(now)
+        val tracked = (base.trackedSymbols + symbols() + "BTCUSDT" + base.result?.open?.map { it.symbol }.orEmpty()).distinct().sorted()
         val next = try {
             val loaded = HashMap<String, List<Candle>>()
             val failures = ArrayList<String>()
-            for (symbol in symbols) {
+            for (symbol in tracked) {
                 try {
                     loaded[symbol] = load(symbol, base.startedAt - warmupMs, end)
                 } catch (e: Exception) {
@@ -104,6 +117,7 @@ class ForwardTracker(
                 }
             }
             if ("BTCUSDT" !in loaded || loaded.getValue("BTCUSDT").isEmpty()) error("BTCUSDT verisi alınamadı")
+            if (tracked.none { it != "BTCUSDT" }) error("İzlenecek parite listesi boş (geniş tarama henüz sonuç vermedi)")
             val universe = Universe.of(loaded.filterValues { it.isNotEmpty() }.map { H4Dataset(it.key, it.value) })
             val result = if (end > base.startedAt) {
                 V3Engine(universe, V3Config(base.startedAt, end, costs, capital)).run(strategy, closeAtEnd = false)
@@ -115,6 +129,7 @@ class ForwardTracker(
                 symbolsLoaded = universe.symbols.size,
                 tradableNow = universe.symbols.values.count { it.tradable(end, 1_000_000.0) },
                 lastError = if (failures.isEmpty()) null else "Veri alınamayan pariteler: ${failures.joinToString()}",
+                trackedSymbols = tracked,
             )
         } catch (e: Exception) {
             base.copy(updatedAt = now, lastError = "Güncelleme başarısız: ${e.message ?: e::class.simpleName}")

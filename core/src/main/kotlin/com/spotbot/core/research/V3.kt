@@ -77,11 +77,14 @@ class SymbolData(val symbol: String, h4: List<Candle>) {
     }
 
     /** Geçmişte işlem yapılabilirlik: ≥ 210 gün geçmiş ve son 30 günün medyan günlük hacmi ≥ [minDailyVolume]. */
-    fun tradable(t: Long, minDailyVolume: Double): Boolean {
+    fun tradable(t: Long, minDailyVolume: Double): Boolean = day(t) >= 209 && medianVolume(t) >= minDailyVolume
+
+    /** Kapanış zamanı ≤ [t] olan son 30 günün medyan günlük USDT hacmi (30 günden az veri varsa 0). */
+    fun medianVolume(t: Long): Double {
         val d = day(t)
-        if (d < 209) return false
+        if (d < 29) return 0.0
         val v = (d - 29..d).map { dQuoteVolume[it] }.sorted()
-        return (v[14] + v[15]) / 2 >= minDailyVolume
+        return (v[14] + v[15]) / 2
     }
 
     fun roc(d: Int, days: Int): Double = if (d - days < 0) Double.NaN else dClose[d] / dClose[d - days] - 1
@@ -103,21 +106,58 @@ class Universe(val symbols: Map<String, SymbolData>) {
         }
     }
 
+    private val memberCache = HashMap<Triple<Long, Int?, Set<String>?>, Set<String>>()
+
+    /**
+     * [t] anında işlem görebilen pariteler. [V3Config.maxUniverse] verilirse, o gün işlem yapılabilir pariteler 30
+     * günlük medyan hacme göre sıralanır ve ilk N alınır (BTC her zaman dahil); geleceğe bakmaz.
+     */
+    fun members(t: Long, cfg: V3Config): Set<String> {
+        val day = t / DAY_MS
+        return synchronized(memberCache) {
+            memberCache.getOrPut(Triple(day, cfg.maxUniverse, cfg.fixedUniverse)) {
+                val dayEnd = day * DAY_MS
+                val tradable = symbols.values.filter { (cfg.fixedUniverse == null || it.symbol in cfg.fixedUniverse) && it.tradable(dayEnd, cfg.minDailyVolume) }
+                val ranked = tradable.sortedByDescending { it.medianVolume(dayEnd) }.map { it.symbol }
+                (cfg.maxUniverse?.let { ranked.take(it) } ?: ranked).toSet() + btc.symbol
+            }
+        }
+    }
+
+    fun eligible(symbol: String, t: Long, cfg: V3Config): Boolean =
+        symbols.getValue(symbol).tradable(t, cfg.minDailyVolume) &&
+            (cfg.maxUniverse == null && cfg.fixedUniverse == null || symbol in members(t, cfg))
+
     companion object {
         fun of(data: List<H4Dataset>) = Universe(data.associate { it.symbol to SymbolData(it.symbol, it.h4) })
     }
 }
 
 @Serializable
-data class CostScenario(val name: String, val halfSpread: Double, val fee: Double = 0.0005, val slippage: Double = 0.0005) {
+data class CostScenario(
+    val name: String,
+    val halfSpread: Double,
+    val fee: Double = 0.0005,
+    val slippage: Double = 0.0005,
+    /** Kademeli senaryo: 30 günlük medyan hacmi [tierVolume] altında olan paritelerin yarım spread'i. */
+    val lowVolumeHalfSpread: Double? = null,
+    val tierVolume: Double = 20_000_000.0,
+) {
     val buyMarkup get() = halfSpread + slippage
     val sellMarkdown get() = halfSpread + slippage
+
+    /** Paritenin [t] anındaki hacim kademesine göre yarım spread + kayma. */
+    fun markup(d: SymbolData, t: Long): Double =
+        if (lowVolumeHalfSpread != null && d.medianVolume(t) < tierVolume) lowVolumeHalfSpread + slippage else halfSpread + slippage
 
     companion object {
         val OPTIMISTIC = CostScenario("İyimser", 0.00025)
         val MEDIUM = CostScenario("Orta", 0.00075)
         val PESSIMISTIC = CostScenario("Kötümser", 0.0015)
         val all = listOf(OPTIMISTIC, MEDIUM, PESSIMISTIC)
+        /** V4 ön kaydı: 10 Kasım 2026 spread ölçümünden hacme bağlı senaryolar (geçmiş veri değil). */
+        val TIERED_MEDIUM = CostScenario("Kademeli orta", 0.00075, lowVolumeHalfSpread = 0.00109)
+        val TIERED_PESSIMISTIC = CostScenario("Kademeli kötümser", 0.0015, lowVolumeHalfSpread = 0.00284)
     }
 }
 
@@ -133,6 +173,10 @@ data class V3Config(
     val participation: Double = 0.1,
     val minDailyVolume: Double = 1_000_000.0,
     val minNotional: Double = 5.0,
+    /** Zamana bağlı evren: her gün en likit N parite (null: işlem yapılabilir bütün pariteler). */
+    val maxUniverse: Int? = null,
+    /** Sabit parite listesi (null: veri kümesindeki bütün pariteler). */
+    val fixedUniverse: Set<String>? = null,
 )
 
 /** Açık pozisyon (strateji alanları: [peak] iz süren stop için en yüksek kapanış). */
@@ -247,7 +291,7 @@ class V3Engine(private val u: Universe, private val cfg: V3Config) {
         val lastClose = HashMap<String, Double>()
 
         fun close(p: V3Position, price: Double, time: Long, reason: String) {
-            val fill = price * (1 - c.sellMarkdown)
+            val fill = price * (1 - c.markup(u.symbols.getValue(p.symbol), time))
             val fee = fill * p.quantity * c.fee
             val friction = (price - fill) * p.quantity + p.entryFriction
             cash += fill * p.quantity - fee
@@ -256,11 +300,13 @@ class V3Engine(private val u: Universe, private val cfg: V3Config) {
             positions.remove(p.symbol)
         }
 
-        fun equity(): Double = cash + positions.values.sumOf { p -> (lastClose[p.symbol] ?: p.entryPrice) * (1 - c.sellMarkdown) * p.quantity }
+        var now = cfg.start
+        fun equity(): Double = cash + positions.values.sumOf { p -> (lastClose[p.symbol] ?: p.entryPrice) * (1 - c.markup(u.symbols.getValue(p.symbol), now)) * p.quantity }
 
         var t = (cfg.start / H4_MS) * H4_MS + H4_MS
         while (t <= cfg.end) {
             val barOpen = t - H4_MS
+            now = t
             // 1) Önceki kapanışta verilen çıkışlar bu mumun açılışında.
             for ((symbol, reason) in pendingExits.toList()) {
                 val p = positions[symbol] ?: continue
@@ -276,8 +322,9 @@ class V3Engine(private val u: Universe, private val cfg: V3Config) {
                 val d = u.symbols.getValue(s.symbol)
                 val k = d.at(t)
                 if (k < 0 || d.open[k] <= s.stop) continue
-                val fill = d.open[k] * (1 + c.buyMarkup)
-                val stopFill = s.stop * (1 - c.sellMarkdown)
+                val m = c.markup(d, barOpen)
+                val fill = d.open[k] * (1 + m)
+                val stopFill = s.stop * (1 - m)
                 val perUnit = fill - stopFill + fill * c.fee + stopFill * c.fee
                 if (perUnit <= 0) continue
                 var qty = eq0 * cfg.riskPercent / 100 / perUnit
@@ -325,7 +372,7 @@ class V3Engine(private val u: Universe, private val cfg: V3Config) {
             val dailyBlocked = eq <= dayStartEquity * (1 - cfg.dailyLossPercent / 100)
             if (!dailyBlocked && positions.size - pendingExits.size < cfg.maxPositions) {
                 pendingEntries += strategy.entries(u, t, cfg)
-                    .filter { it.symbol !in positions && u.symbols.getValue(it.symbol).tradable(t, cfg.minDailyVolume) }
+                    .filter { it.symbol !in positions && u.eligible(it.symbol, t, cfg) }
                     .sortedByDescending { it.priority }
                     .take(cfg.maxPositions - (positions.size - pendingExits.size))
             }
@@ -336,10 +383,10 @@ class V3Engine(private val u: Universe, private val cfg: V3Config) {
             emptyList()
         } else positions.values.map { p ->
             val last = lastClose[p.symbol] ?: p.entryPrice
-            val fill = last * (1 - c.sellMarkdown)
+            val fill = last * (1 - c.markup(u.symbols.getValue(p.symbol), cfg.end))
             V3OpenPosition(p.symbol, p.entryTime, p.entryPrice, p.quantity, p.stop, last, (fill - p.entryPrice) * p.quantity - fill * p.quantity * c.fee - p.entryFee)
         }
-        val finalValue = if (closeAtEnd) cash else equity() - open.sumOf { it.lastPrice * (1 - c.sellMarkdown) * it.quantity * c.fee }
+        val finalValue = if (closeAtEnd) cash else equity() - open.sumOf { it.lastPrice * (1 - c.markup(u.symbols.getValue(it.symbol), cfg.end)) * it.quantity * c.fee }
         val btc = u.btc
         val a = btc.day(cfg.start)
         val b = btc.day(cfg.end)
@@ -374,12 +421,13 @@ class RelativeStrength(private val lookback: Int) : V3Strategy {
     override val name = "S1 Göreceli güç (BTC'ye göre)"
     override val option = "L=$lookback gün"
 
-    private fun ranking(u: Universe, t: Long, cfg: V3Config): List<Pair<String, Double>> {
+    /** [t] günlük kapanışında uygun paritelerin RS sıralaması (en güçlü önce). */
+    fun ranking(u: Universe, t: Long, cfg: V3Config): List<Pair<String, Double>> {
         val btcRoc = u.btc.day(t).let { u.btc.roc(it, lookback) }
         if (btcRoc.isNaN()) return emptyList()
         return u.symbols.values.mapNotNull { d ->
             val i = d.day(t)
-            if (i < 60 || d.days[i].closeTime != t || !d.tradable(t, cfg.minDailyVolume)) return@mapNotNull null
+            if (i < 60 || d.days[i].closeTime != t || !u.eligible(d.symbol, t, cfg)) return@mapNotNull null
             if (d.dClose[i] <= d.ema50d[i] || d.ema50d[i] <= d.ema50d[i - 10]) return@mapNotNull null
             val rs = if (d === u.btc) 0.0 else d.roc(i, lookback) - btcRoc
             if (rs.isNaN() || rs <= 0) null else d.symbol to rs

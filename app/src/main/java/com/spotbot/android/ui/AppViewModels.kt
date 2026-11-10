@@ -25,7 +25,7 @@ class BotController(private val app: Application) {
 object AppViewModels {
     val Factory: ViewModelProvider.Factory = viewModelFactory {
         initializer { PanelViewModel(container().engine, container().settings, BotController(application())) }
-        initializer { ScanViewModel(container().engine) }
+        initializer { ScanViewModel(container().engine, container().wide) }
         initializer { CoinDetailViewModel(container().engine, container().api, createSavedStateHandle()) }
         initializer { TradesViewModel(container().engine, container().forward) }
         initializer { com.spotbot.android.ui.trades.TradeDetailViewModel(container().engine, container().api, createSavedStateHandle()) }

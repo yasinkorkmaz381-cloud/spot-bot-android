@@ -254,6 +254,7 @@ private fun ForwardCard(state: com.spotbot.core.research.ForwardState?, busy: Bo
                 )
                 KeyValueRow("Başlangıç", formatDateTime(state.startedAt))
                 KeyValueRow("Son kapanmış 4H mum", if (state.dataEnd > 0) formatDateTime(state.dataEnd) else "—")
+                KeyValueRow("Evren", state.universe)
                 KeyValueRow("İşlem yapılabilir parite", "${state.tradableNow} / ${state.symbolsLoaded}")
                 r?.btcBuyHoldPercent?.let { KeyValueRow("BTC al-tut (aynı dönem)", formatPercent(it, signed = true, minFractionDigits = 2)) }
                 r?.open?.forEach { p ->

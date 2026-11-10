@@ -39,7 +39,7 @@ class ForwardTrackerTest {
     private val api = ReplayMarketDataApi(raw.mapValues { HistoricalDataset(it.key, emptyList(), emptyList(), it.value) }, emptyMap(), { now })
 
     private fun tracker(store: ForwardStore) =
-        ForwardTracker(api, store, TimeSource { now }, symbols = raw.keys.toList(), warmupMs = 330 * DAY_MS)
+        ForwardTracker(api, store, TimeSource { now }, symbols = { raw.keys }, warmupMs = 330 * DAY_MS)
 
     @Test
     fun `forward test equals the research engine on the same data and only trades after its start`() = runBlocking {
@@ -73,9 +73,27 @@ class ForwardTrackerTest {
     @Test
     fun `a data failure is reported as an error, not as a rule decision`() = runBlocking {
         now = t0 + 500 * DAY_MS
-        val broken = ForwardTracker(api, InMemoryForwardStore(), TimeSource { now }, symbols = listOf("AAAUSDT"))
+        val noBtc = ReplayMarketDataApi(raw.filterKeys { it != "BTCUSDT" }.mapValues { HistoricalDataset(it.key, emptyList(), emptyList(), it.value) }, emptyMap(), { now })
+        val broken = ForwardTracker(noBtc, InMemoryForwardStore(), TimeSource { now }, symbols = { listOf("AAAUSDT") })
         val s = broken.refresh()
         assertNotNull(s.lastError)
         assertNull(s.result)
+    }
+
+    @Test
+    fun `tracked symbols only grow and a universe change restarts the forward test`() = runBlocking {
+        val store = InMemoryForwardStore()
+        var list = listOf("AAAUSDT")
+        now = t0 + 400 * DAY_MS
+        val a = ForwardTracker(api, store, TimeSource { now }, symbols = { list }, universeName = { "Geniş evren" }, warmupMs = 330 * DAY_MS).refresh()
+        assertEquals(listOf("AAAUSDT", "BTCUSDT"), a.trackedSymbols)
+        list = listOf("BBBUSDT")
+        now += 2 * DAY_MS
+        val b = ForwardTracker(api, store, TimeSource { now }, symbols = { list }, universeName = { "Geniş evren" }, warmupMs = 330 * DAY_MS).refresh()
+        assertEquals(listOf("AAAUSDT", "BBBUSDT", "BTCUSDT"), b.trackedSymbols)
+        assertEquals(a.startedAt, b.startedAt)
+        val c = ForwardTracker(api, store, TimeSource { now }, symbols = { list }, warmupMs = 330 * DAY_MS).refresh()
+        assertEquals(DEFAULT_UNIVERSE, c.universe)
+        assertEquals(now / H4_MS * H4_MS, c.startedAt)
     }
 }

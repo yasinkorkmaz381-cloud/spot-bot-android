@@ -290,6 +290,28 @@ open class ScreenshotTest {
     @Test
     fun closedTrades() = capture("5-kapanmis-islemler") { TradesContent(portfolio, emptyMap(), {}, initialTab = TradesTab.HISTORY) }
 
+    /** Tarama ekranı: geniş evren kartı açık (temsili sayılar; yalnız düzen kontrolü). */
+    @Test
+    fun wideScan() {
+        val t = 1_794_355_200_000L
+        fun coin(s: String, rank: Int, rs: Double, sectors: List<String>, warnings: List<String> = emptyList()) = com.spotbot.core.scanner.WideCoin(
+            s, sectors, 10.0, 3e6, 0.06, 1.2, 4.0, rs - 9, rs, 2.5e6, 400, rank = rank, candidate = rank <= 3,
+            stopDistancePercent = 16.0, bidDepth1Percent = 15_000.0, positionSize = 31.0, warnings = warnings,
+        )
+        val result = com.spotbot.core.scanner.WideScanResult(
+            time = t, dailyClose = t, totalPairs = 1414, productExcluded = 210, notTradable = 108, analyzed = 76,
+            liquidityPassed = 31, trendPassed = 2, strengthPassed = 2,
+            top = listOf(coin("XMRUSDT", 1, 21.7, listOf("Main", "Privacy")), coin("INJUSDT", 2, 15.2, listOf("Main", "LAYER 1 / LAYER 2"), listOf("Spread %0,16"))),
+            candidates = listOf("XMRUSDT", "INJUSDT"),
+            rejections = mapOf("24 saatlik hacim < 250 bin USDT" to 1008, "Desteklenmeyen ürün (stablecoin, tokenleştirilmiş hisse, emtia, kaldıraçlı)" to 210, "30 günlük medyan hacim < 1M USDT" to 37, "Trend koşulu yok (kapanış ≤ EMA50 ya da EMA50 düşüyor)" to 29),
+            strongestRejected = listOf(com.spotbot.core.scanner.WideCoin("PEPEUSDT", listOf("MEME"), 0.0, 0.0, 0.0, 0.0, momentum30Percent = 26.9, rejection = com.spotbot.core.scanner.WideReject.LOW_MEDIAN_VOLUME)),
+            sectorCounts = mapOf("Main" to 2), newListings = listOf("ABCUSDT"), btcMomentum30Percent = -9.2,
+        )
+        capture("2b-genis-tarama") {
+            ScanContent(null, emptyMap(), {}, wide = com.spotbot.core.scanner.WideScanState(result = result, updatedAt = t), wideExpanded = true)
+        }
+    }
+
     /** Gölge test sekmesi: S1 ileri test kartı (temsili sayılar; yalnız düzen kontrolü). */
     @Test
     fun shadowTab() {

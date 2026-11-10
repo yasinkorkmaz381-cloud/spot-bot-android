@@ -1,0 +1,123 @@
+Veri: 471 parite (4H) · 2020-01-01 → 2026-11-10
+Bu veri yalnız bugün MEXC'de bulunan paritelerdir; borsadan kaldırılanlar indirilemedi (hayatta kalma yanlılığı).
+İlk mum yılı dağılımı: 2020: 101, 2021: 76, 2022: 50, 2023: 72, 2024: 103, 2025: 67, 2026: 2
+Zamana bağlı işlem yapılabilir parite sayısı (≥210 gün, medyan ≥1M USDT):
+  2021-01-01: tümü 16 · dar listeden 9
+  2022-01-01: tümü 33 · dar listeden 12
+  2023-01-01: tümü 16 · dar listeden 14
+  2024-01-01: tümü 41 · dar listeden 20
+  2025-01-01: tümü 121 · dar listeden 28
+  2026-01-01: tümü 68 · dar listeden 27
+  2026-11-09: tümü 31 · dar listeden 17
+İşlem yapılabilir parite sayısının N'yi aştığı günler (N sınırı etkili): ilk 20 → 1810/2293 gün · ilk 50 → 618 · ilk 100 → 350
+
+════ Dar liste (28) ════
+  doğrulama · Orta            156 işlem kazanma % 44.2 PF  2.17 ort +0.263R (t=+1.90) net % +21.62 düşüş % 6.35 ücret    5.5 spread+kayma   13.7 piyasada %  88
+  doğrulama · Kademeli orta   156 işlem kazanma % 43.6 PF  2.15 ort +0.258R (t=+1.88) net % +21.19 düşüş % 6.40 ücret    5.4 spread+kayma   16.4 piyasada %  88
+  doğrulama · Kademeli kötümser  156 işlem kazanma % 41.0 PF  2.00 ort +0.234R (t=+1.73) net % +18.91 düşüş % 6.64 ücret    5.3 spread+kayma   31.7 piyasada %  88
+    BTC al-tut %+463.7 · parite 23 · en iyi SOLUSDT +73.8 · onsuz +138.1 USDT, ort +0.178R
+    eş zamanlı 225 çift · ort. korelasyon 0.47 · ≥0,8 olan %0
+    sektör (işlem): Main 153, LAYER 1 / LAYER 2 103, MEME 9, Innovation 3, Storage 2, DeFi 2
+  son test · Orta             156 işlem kazanma % 30.1 PF  1.75 ort +0.215R (t=+0.82) net % +15.95 düşüş %15.05 ücret    5.6 spread+kayma   14.1 piyasada %  85
+  son test · Kademeli orta    156 işlem kazanma % 30.1 PF  1.73 ort +0.211R (t=+0.81) net % +15.65 düşüş %15.14 ücret    5.6 spread+kayma   16.6 piyasada %  85
+  son test · Kademeli kötümser  156 işlem kazanma % 29.5 PF  1.63 ort +0.190R (t=+0.74) net % +13.84 düşüş %15.57 ücret    5.4 spread+kayma   31.3 piyasada %  85
+    BTC al-tut %-19.8 · parite 26 · en iyi ZECUSDT +215.6 · onsuz -59.1 USDT, ort -0.067R
+    eş zamanlı 220 çift · ort. korelasyon 0.47 · ≥0,8 olan %6
+    sektör (işlem): Main 155, LAYER 1 / LAYER 2 124, DeFi 16, Privacy 13, ZK 13, Storage 5, Innovation 1, MEME 1
+  tüm dönem · Orta            500 işlem kazanma % 36.8 PF  1.73 ort +0.180R (t=+1.88) net % +51.72 düşüş %15.05 ücret   17.3 spread+kayma   43.2 piyasada %  83
+  tüm dönem · Kademeli orta   500 işlem kazanma % 36.6 PF  1.71 ort +0.176R (t=+1.85) net % +50.46 düşüş %15.14 ücret   17.2 spread+kayma   51.4 piyasada %  83
+  tüm dönem · Kademeli kötümser  500 işlem kazanma % 35.2 PF  1.61 ort +0.157R (t=+1.68) net % +43.57 düşüş %15.57 ücret   16.4 spread+kayma   97.4 piyasada %  83
+    BTC al-tut %+562.3 · parite 27 · en iyi ZECUSDT +270.2 · onsuz +234.4 USDT, ort +0.100R
+    eş zamanlı 692 çift · ort. korelasyon 0.48 · ≥0,8 olan %4
+    sektör (işlem): Main 496, LAYER 1 / LAYER 2 343, MEME 33, Privacy 23, ZK 23, DeFi 21, Storage 7, Innovation 4
+
+════ İlk 20 ════
+  doğrulama · Orta            172 işlem kazanma % 43.0 PF  2.29 ort +0.301R (t=+2.55) net % +28.16 düşüş % 4.91 ücret    4.7 spread+kayma   11.8 piyasada %  97
+  doğrulama · Kademeli orta   172 işlem kazanma % 42.4 PF  2.27 ort +0.298R (t=+2.53) net % +27.77 düşüş % 4.98 ücret    4.7 spread+kayma   14.3 piyasada %  97
+  doğrulama · Kademeli kötümser  172 işlem kazanma % 42.4 PF  2.16 ort +0.278R (t=+2.40) net % +25.64 düşüş % 5.35 ücret    4.6 spread+kayma   27.9 piyasada %  97
+    BTC al-tut %+463.7 · parite 54 · en iyi SOLUSDT +55.3 · onsuz +222.4 USDT, ort +0.249R
+    eş zamanlı 298 çift · ort. korelasyon 0.33 · ≥0,8 olan %1
+    sektör (işlem): Main 126, LAYER 1 / LAYER 2 73, Innovation 42, MEME 29, GameFi 7, AI 6, Privacy 5, DeFi 4
+  son test · Orta             178 işlem kazanma % 33.7 PF  0.87 ort -0.030R (t=-0.57) net %  -2.86 düşüş % 7.47 ücret    4.7 spread+kayma   11.8 piyasada %  87
+  son test · Kademeli orta    178 işlem kazanma % 33.7 PF  0.86 ort -0.032R (t=-0.61) net %  -3.03 düşüş % 7.57 ücret    4.7 spread+kayma   13.6 piyasada %  87
+  son test · Kademeli kötümser  178 işlem kazanma % 33.7 PF  0.81 ort -0.046R (t=-0.87) net %  -4.16 düşüş % 8.07 ücret    4.6 spread+kayma   25.5 piyasada %  87
+    BTC al-tut %-19.8 · parite 52 · en iyi ZECUSDT +25.5 · onsuz -55.8 USDT, ort -0.064R
+    eş zamanlı 259 çift · ort. korelasyon 0.41 · ≥0,8 olan %2
+    sektör (işlem): Main 160, LAYER 1 / LAYER 2 114, DeFi 27, Innovation 18, Privacy 17, MEME 16, AI 9, ZK 8
+  tüm dönem · Orta            573 işlem kazanma % 35.1 PF  1.35 ort +0.093R (t=+2.06) net % +28.40 düşüş % 7.55 ücret   15.1 spread+kayma   37.8 piyasada %  90
+  tüm dönem · Kademeli orta   573 işlem kazanma % 34.9 PF  1.34 ort +0.090R (t=+2.01) net % +27.48 düşüş % 7.69 ücret   15.0 spread+kayma   45.0 piyasada %  90
+  tüm dönem · Kademeli kötümser  573 işlem kazanma % 34.6 PF  1.28 ort +0.076R (t=+1.71) net % +22.30 düşüş % 8.49 ücret   14.4 spread+kayma   85.9 piyasada %  90
+    BTC al-tut %+562.3 · parite 126 · en iyi DOGEUSDT +60.8 · onsuz +213.9 USDT, ort +0.075R
+    eş zamanlı 899 çift · ort. korelasyon 0.36 · ≥0,8 olan %1
+    sektör (işlem): Main 464, LAYER 1 / LAYER 2 272, Innovation 102, MEME 71, DeFi 40, Privacy 30, AI 17, GameFi 17
+
+════ İlk 50 ════
+  doğrulama · Orta            180 işlem kazanma % 40.0 PF  2.06 ort +0.261R (t=+2.32) net % +25.19 düşüş % 5.43 ücret    4.5 spread+kayma   11.2 piyasada %  98
+  doğrulama · Kademeli orta   180 işlem kazanma % 39.4 PF  2.04 ort +0.257R (t=+2.30) net % +24.79 düşüş % 5.49 ücret    4.4 spread+kayma   13.7 piyasada %  98
+  doğrulama · Kademeli kötümser  180 işlem kazanma % 38.9 PF  1.94 ort +0.238R (t=+2.16) net % +22.68 düşüş % 5.83 ücret    4.3 spread+kayma   27.2 piyasada %  98
+    BTC al-tut %+463.7 · parite 69 · en iyi SOLUSDT +66.0 · onsuz +181.9 USDT, ort +0.194R
+    eş zamanlı 315 çift · ort. korelasyon 0.30 · ≥0,8 olan %1
+    sektör (işlem): Main 101, Innovation 73, LAYER 1 / LAYER 2 60, MEME 36, AI 12, DeFi 8, GameFi 6, Privacy 6
+  son test · Orta             198 işlem kazanma % 29.8 PF  0.89 ort -0.025R (t=-0.42) net %  -2.71 düşüş % 8.48 ücret    3.5 spread+kayma    8.6 piyasada %  99
+  son test · Kademeli orta    198 işlem kazanma % 29.8 PF  0.88 ort -0.027R (t=-0.46) net %  -2.90 düşüş % 8.59 ücret    3.4 spread+kayma   10.4 piyasada %  99
+  son test · Kademeli kötümser  198 işlem kazanma % 29.3 PF  0.84 ort -0.039R (t=-0.66) net %  -3.98 düşüş % 9.21 ücret    3.4 spread+kayma   20.6 piyasada %  99
+    BTC al-tut %-19.8 · parite 97 · en iyi ZECUSDT +47.3 · onsuz -76.3 USDT, ort -0.081R
+    eş zamanlı 351 çift · ort. korelasyon 0.26 · ≥0,8 olan %1
+    sektör (işlem): Main 132, LAYER 1 / LAYER 2 82, Innovation 66, DeFi 31, AI 22, Privacy 22, MEME 15, ZK 9
+  tüm dönem · Orta            599 işlem kazanma % 33.2 PF  1.32 ort +0.085R (t=+1.91) net % +27.07 düşüş %10.53 ücret   12.9 spread+kayma   32.3 piyasada %  94
+  tüm dönem · Kademeli orta   599 işlem kazanma % 33.1 PF  1.31 ort +0.082R (t=+1.85) net % +26.12 düşüş %10.63 ücret   12.8 spread+kayma   39.5 piyasada %  94
+  tüm dönem · Kademeli kötümser  599 işlem kazanma % 32.6 PF  1.25 ort +0.069R (t=+1.57) net % +21.09 düşüş %11.24 ücret   12.4 spread+kayma   77.7 piyasada %  94
+    BTC al-tut %+562.3 · parite 183 · en iyi SOLUSDT +68.5 · onsuz +192.7 USDT, ort +0.063R
+    eş zamanlı 1023 çift · ort. korelasyon 0.29 · ≥0,8 olan %1
+    sektör (işlem): Main 396, LAYER 1 / LAYER 2 219, Innovation 192, MEME 75, DeFi 52, Privacy 35, AI 35, ZK 20
+
+════ İlk 100 ════
+  doğrulama · Orta            180 işlem kazanma % 42.8 PF  2.24 ort +0.285R (t=+2.57) net % +27.93 düşüş % 5.40 ücret    4.5 spread+kayma   11.2 piyasada %  98
+  doğrulama · Kademeli orta   180 işlem kazanma % 42.2 PF  2.21 ort +0.281R (t=+2.55) net % +27.51 düşüş % 5.47 ücret    4.5 spread+kayma   13.7 piyasada %  98
+  doğrulama · Kademeli kötümser  180 işlem kazanma % 41.7 PF  2.11 ort +0.262R (t=+2.41) net % +25.34 düşüş % 5.83 ücret    4.3 spread+kayma   27.3 piyasada %  98
+    BTC al-tut %+463.7 · parite 69 · en iyi SOLUSDT +66.0 · onsuz +209.1 USDT, ort +0.218R
+    eş zamanlı 314 çift · ort. korelasyon 0.30 · ≥0,8 olan %1
+    sektör (işlem): Main 101, Innovation 73, LAYER 1 / LAYER 2 62, MEME 36, AI 13, GameFi 6, Privacy 6, Assessment 6
+  son test · Orta             213 işlem kazanma % 29.6 PF  1.10 ort +0.030R (t=+0.39) net %  +2.92 düşüş % 9.88 ücret    3.5 spread+kayma    8.9 piyasada % 100
+  son test · Kademeli orta    213 işlem kazanma % 29.6 PF  1.10 ort +0.028R (t=+0.36) net %  +2.68 düşüş % 9.93 ücret    3.5 spread+kayma   11.0 piyasada % 100
+  son test · Kademeli kötümser  213 işlem kazanma % 29.6 PF  1.05 ort +0.016R (t=+0.21) net %  +1.40 düşüş %10.15 ücret    3.5 spread+kayma   22.2 piyasada % 100
+    BTC al-tut %-19.8 · parite 117 · en iyi ZECUSDT +68.1 · onsuz -41.3 USDT, ort -0.037R
+    eş zamanlı 389 çift · ort. korelasyon 0.17 · ≥0,8 olan %0
+    sektör (işlem): Main 116, Innovation 97, LAYER 1 / LAYER 2 62, Privacy 24, DeFi 23, AI 23, MEME 20, ZK 9
+  tüm dönem · Orta            615 işlem kazanma % 34.3 PF  1.42 ort +0.108R (t=+2.31) net % +37.19 düşüş % 9.88 ücret   13.1 spread+kayma   32.8 piyasada %  95
+  tüm dönem · Kademeli orta   615 işlem kazanma % 34.1 PF  1.41 ort +0.105R (t=+2.26) net % +36.03 düşüş % 9.93 ücret   13.0 spread+kayma   40.5 piyasada %  95
+  tüm dönem · Kademeli kötümser  615 işlem kazanma % 33.8 PF  1.35 ort +0.091R (t=+1.99) net % +30.41 düşüş %10.15 ücret   12.6 spread+kayma   80.3 piyasada %  95
+    BTC al-tut %+562.3 · parite 204 · en iyi ZECUSDT +86.7 · onsuz +273.6 USDT, ort +0.086R
+    eş zamanlı 1063 çift · ort. korelasyon 0.26 · ≥0,8 olan %1
+    sektör (işlem): Main 383, Innovation 221, LAYER 1 / LAYER 2 202, MEME 80, DeFi 41, Privacy 37, AI 36, ZK 19
+
+════ Tümü ════
+  doğrulama · Orta            181 işlem kazanma % 41.4 PF  2.21 ort +0.280R (t=+2.54) net % +27.55 düşüş % 5.40 ücret    4.5 spread+kayma   11.2 piyasada %  98
+  doğrulama · Kademeli orta   181 işlem kazanma % 40.9 PF  2.19 ort +0.276R (t=+2.52) net % +27.13 düşüş % 5.47 ücret    4.5 spread+kayma   13.8 piyasada %  98
+  doğrulama · Kademeli kötümser  181 işlem kazanma % 40.3 PF  2.08 ort +0.257R (t=+2.38) net % +24.96 düşüş % 5.83 ücret    4.3 spread+kayma   27.5 piyasada %  98
+    BTC al-tut %+463.7 · parite 70 · en iyi SOLUSDT +66.0 · onsuz +205.3 USDT, ort +0.213R
+    eş zamanlı 315 çift · ort. korelasyon 0.29 · ≥0,8 olan %1
+    sektör (işlem): Main 100, Innovation 74, LAYER 1 / LAYER 2 62, MEME 37, AI 13, Assessment 7, GameFi 6, Privacy 6
+  son test · Orta             211 işlem kazanma % 28.0 PF  1.37 ort +0.113R (t=+0.88) net % +11.71 düşüş %13.62 ücret    3.6 spread+kayma    9.1 piyasada % 100
+  son test · Kademeli orta    211 işlem kazanma % 28.0 PF  1.36 ort +0.111R (t=+0.86) net % +11.42 düşüş %13.66 ücret    3.6 spread+kayma   11.3 piyasada % 100
+  son test · Kademeli kötümser  211 işlem kazanma % 27.5 PF  1.31 ort +0.097R (t=+0.77) net %  +9.90 düşüş %13.82 ücret    3.6 spread+kayma   22.9 piyasada % 100
+    BTC al-tut %-19.8 · parite 116 · en iyi ZECUSDT +150.6 · onsuz -36.4 USDT, ort -0.027R
+    eş zamanlı 391 çift · ort. korelasyon 0.18 · ≥0,8 olan %1
+    sektör (işlem): Main 109, Innovation 100, LAYER 1 / LAYER 2 58, Privacy 25, MEME 23, DeFi 22, AI 22, ZK 10
+  tüm dönem · Orta            613 işlem kazanma % 33.3 PF  1.52 ort +0.136R (t=+2.31) net % +48.57 düşüş %13.62 ücret   13.2 spread+kayma   33.1 piyasada %  95
+  tüm dönem · Kademeli orta   613 işlem kazanma % 33.1 PF  1.51 ort +0.133R (t=+2.27) net % +47.34 düşüş %13.65 ücret   13.1 spread+kayma   40.9 piyasada %  95
+  tüm dönem · Kademeli kötümser  613 işlem kazanma % 32.5 PF  1.44 ort +0.119R (t=+2.06) net % +41.06 düşüş %13.81 ücret   12.7 spread+kayma   81.2 piyasada %  95
+    BTC al-tut %+562.3 · parite 204 · en iyi ZECUSDT +195.7 · onsuz +277.7 USDT, ort +0.089R
+    eş zamanlı 1062 çift · ort. korelasyon 0.26 · ≥0,8 olan %1
+    sektör (işlem): Main 374, Innovation 225, LAYER 1 / LAYER 2 198, MEME 84, DeFi 39, Privacy 38, AI 35, ZK 20
+
+════ İki aşamalı tarama doğrulaması (Tümü, tüm dönem, kademeli orta) ════
+Günlük ilk 20'ye en az bir kez giren parite: 349 / 471
+Tam evren 613 işlem net %+47.34 · alt küme 613 işlem net %+47.34 · işlemler birebir aynı: EVET
+
+════ SONUÇ (ön kayıtlı karar kuralı: kademeli orta maliyette doğrulama ve son test ort R > 0, PF ≥ 1,1, ≥ 30 işlem; son test en iyi parite olmadan ort R > 0) ════
+  Dar liste (28): GEÇMEDİ · doğrulama +0.258R PF 2.15 (156) · son test +0.211R PF 1.73 (156) · son test en iyi parite (ZECUSDT) olmadan -0.067R
+  İlk 20: GEÇMEDİ · doğrulama +0.298R PF 2.27 (172) · son test -0.032R PF 0.86 (178) · son test en iyi parite (ZECUSDT) olmadan -0.064R
+  İlk 50: GEÇMEDİ · doğrulama +0.257R PF 2.04 (180) · son test -0.027R PF 0.88 (198) · son test en iyi parite (ZECUSDT) olmadan -0.081R
+  İlk 100: GEÇMEDİ · doğrulama +0.281R PF 2.21 (180) · son test +0.028R PF 1.10 (213) · son test en iyi parite (ZECUSDT) olmadan -0.037R
+  Tümü: GEÇMEDİ · doğrulama +0.276R PF 2.19 (181) · son test +0.111R PF 1.36 (211) · son test en iyi parite (ZECUSDT) olmadan -0.027R

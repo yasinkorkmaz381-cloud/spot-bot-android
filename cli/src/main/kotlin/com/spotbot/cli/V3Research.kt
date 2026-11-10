@@ -147,3 +147,139 @@ fun v3Concentration(options: Map<String, String>) {
         println("  parite katkısı (ilk 5): " + bySymbol.take(5).joinToString { "%s %+.1f".format(it.first, it.second) } + " · en iyi parite olmadan %+.1f".format(total - bySymbol.first().second))
     }
 }
+
+/** V4 geniş evren taramasını gerçek MEXC verisiyle bir kez çalıştırır (uygulamadakiyle aynı kod). */
+suspend fun wideScan() {
+    val st = com.spotbot.core.scanner.WideScanner(com.spotbot.core.exchange.mexc.MexcRestClient()).scan()
+    st.lastError?.let { println("HATA: $it") }
+    val r = st.result ?: return
+    println("Toplam USDT paritesi ${r.totalPairs} · ürün dışı ${r.productExcluded} · işlem kapalı/ST ${r.notTradable} · 1D incelenen ${r.analyzed}")
+    println("Likidite filtresini geçen ${r.liquidityPassed} · trend ${r.trendPassed} · BTC'den güçlü ${r.strengthPassed} · aday ${r.candidates}")
+    println("BTC 30g %%%+.1f · istek ${r.requests} · süre ${r.durationMs / 1000} sn".format(r.btcMomentum30Percent))
+    println("Elenme nedenleri:"); r.rejections.forEach { (k, v) -> println("  %5d  %s".format(v, k)) }
+    println("En güçlü 20:")
+    r.top.forEach { c ->
+        println("  %2s %-12s RS %+6.1f  7g %+6.1f  30g %+6.1f  hacim %6.1fM spread %.3f%% stop %%%.1f vol %%%.1f derinlik %s poz %s korel %s %s".format(
+            c.rank ?: "-", c.symbol, c.relativeStrength, c.momentum7Percent, c.momentum30Percent, c.medianVolume30 / 1e6, c.spreadPercent,
+            c.stopDistancePercent ?: Double.NaN, c.volatilityPercent ?: Double.NaN, c.bidDepth1Percent?.let { "%.0f".format(it) }, c.positionSize?.let { "%.0f".format(it) },
+            c.maxCorrelation?.let { "%.2f".format(it) }, (c.sectors.take(3) + c.warnings).joinToString(" | ")))
+    }
+    println("Güçlü ama elenen:"); r.strongestRejected.forEach { println("  %-12s 30g %+6.1f  %s".format(it.symbol, it.momentum30Percent, it.rejection?.title)) }
+    println("Sektörler (uygun adaylar): ${r.sectorCounts}")
+}
+
+/**
+ * V4 ön kayıtlı evren karşılaştırması (docs/EVREN-V4-ONKAYIT.md): S1 (L=30) kuralları sabit; dar 28 parite, zamana bağlı
+ * ilk 20/50/100 ve tüm uygun pariteler.
+ */
+fun v4(options: Map<String, String>) {
+    val dir = File(options["data"] ?: error("--data 4H klasörü gerekli"))
+    val plates: Map<String, List<String>> = options["info"]?.let { f ->
+        kotlinx.serialization.json.Json.parseToJsonElement(File(f).readText()).let { root ->
+            (root as kotlinx.serialization.json.JsonObject)["symbols"]!!.let { it as kotlinx.serialization.json.JsonArray }.associate { e ->
+                val o = e as kotlinx.serialization.json.JsonObject
+                (o["symbol"] as kotlinx.serialization.json.JsonPrimitive).content to
+                    ((o["conceptPlates"] as? kotlinx.serialization.json.JsonArray)?.map { (it as kotlinx.serialization.json.JsonPrimitive).content }.orEmpty())
+            }
+        }
+    }.orEmpty()
+    val files = dir.listFiles { f -> f.name.endsWith("USDT.json") }!!.sorted()
+    val universe = Universe.of(files.map { v3Json.decodeFromString(H4Dataset.serializer(), it.readText()) })
+    val dataEnd = universe.btc.bars.last().openTime + com.spotbot.core.research.H4_MS
+    val valid = date("2023-01-01") to date("2025-01-01")
+    val hold = date("2025-01-01") to dataEnd
+    val full = date("2020-08-01") to dataEnd
+    val narrow = com.spotbot.core.research.V3_UNIVERSE.toSet()
+    data class U(val name: String, val max: Int?, val fixed: Set<String>?)
+    val universes = listOf(U("Dar liste (28)", null, narrow), U("İlk 20", 20, null), U("İlk 50", 50, null), U("İlk 100", 100, null), U("Tümü", null, null))
+    val costs = listOf(CostScenario.MEDIUM, CostScenario.TIERED_MEDIUM, CostScenario.TIERED_PESSIMISTIC)
+    val s1 = com.spotbot.core.research.RelativeStrength(30)
+    val pool = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors())
+    fun cfg(p: Pair<Long, Long>, c: CostScenario, x: U) = V3Config(p.first, p.second, c, maxUniverse = x.max, fixedUniverse = x.fixed)
+
+    println("Veri: ${universe.symbols.size} parite (4H) · ${d(universe.btc.bars.first().openTime)} → ${d(dataEnd)}")
+    println("Bu veri yalnız bugün MEXC'de bulunan paritelerdir; borsadan kaldırılanlar indirilemedi (hayatta kalma yanlılığı).")
+    val listing = universe.symbols.values.map { it.bars.first().openTime }
+    println("İlk mum yılı dağılımı: " + listing.groupBy { d(it).take(4) }.toSortedMap().map { "${it.key}: ${it.value.size}" }.joinToString())
+    println("Zamana bağlı işlem yapılabilir parite sayısı (≥210 gün, medyan ≥1M USDT):")
+    for (day in listOf("2021-01-01", "2022-01-01", "2023-01-01", "2024-01-01", "2025-01-01", "2026-01-01", d(dataEnd - 86_400_000L))) {
+        val t = date(day)
+        val n = universe.symbols.values.count { it.tradable(t, 1_000_000.0) }
+        val inNarrow = universe.symbols.values.count { it.symbol in narrow && it.tradable(t, 1_000_000.0) }
+        println("  $day: tümü $n · dar listeden $inNarrow")
+    }
+    var binding = IntArray(3)
+    var dayCount = 0
+    var t = full.first
+    while (t < full.second) {
+        val n = universe.symbols.values.count { it.tradable(t, 1_000_000.0) }
+        listOf(20, 50, 100).forEachIndexed { i, k -> if (n > k) binding[i]++ }
+        dayCount++
+        t += com.spotbot.core.research.DAY_MS
+    }
+    println("İşlem yapılabilir parite sayısının N'yi aştığı günler (N sınırı etkili): ilk 20 → ${binding[0]}/$dayCount gün · ilk 50 → ${binding[1]} · ilk 100 → ${binding[2]}")
+
+    val jobs = universes.flatMap { x -> listOf("doğrulama" to valid, "son test" to hold, "tüm dönem" to full).flatMap { p -> costs.map { c -> Triple(x, p, c) } } }
+    val results = jobs.map { (x, p, c) -> pool.submit<V3Result> { V3Engine(universe, cfg(p.second, c, x)).run(s1) } }.map { it.get() }
+    val byKey = jobs.zip(results).associate { (k, r) -> Triple(k.first.name, k.second.first, k.third.name) to r }
+
+    fun concentration(r: V3Result): String {
+        val bySymbol = r.tradeList.groupBy { it.symbol }.mapValues { e -> e.value.sumOf { it.netPnl } }.toList().sortedByDescending { it.second }
+        val total = r.tradeList.sumOf { it.netPnl }
+        val withoutBest = r.tradeList.filter { it.symbol != bySymbol.firstOrNull()?.first }
+        val rWithout = if (withoutBest.isEmpty()) 0.0 else withoutBest.map { it.r }.average()
+        return "parite ${bySymbol.size} · en iyi ${bySymbol.firstOrNull()?.let { "%s %+.1f".format(it.first, it.second) }} · onsuz %+.1f USDT, ort %+.3fR".format(total - (bySymbol.firstOrNull()?.second ?: 0.0), rWithout)
+    }
+    fun correlation(r: V3Result): String {
+        val tr = r.tradeList.sortedBy { it.entryTime }
+        val cs = ArrayList<Double>()
+        for (i in tr.indices) for (j in i + 1 until tr.size) {
+            val a = tr[i]; val b = tr[j]
+            if (b.entryTime >= a.exitTime) continue
+            val da = universe.symbols.getValue(a.symbol); val db = universe.symbols.getValue(b.symbol)
+            val ia = da.day(b.entryTime); val ib = db.day(b.entryTime)
+            if (ia < 61 || ib < 61) continue
+            val ra = DoubleArray(60) { k -> da.dClose[ia - 59 + k] / da.dClose[ia - 60 + k] - 1 }
+            val rb = DoubleArray(60) { k -> db.dClose[ib - 59 + k] / db.dClose[ib - 60 + k] - 1 }
+            cs += com.spotbot.core.scanner.WideScanner.correlation(ra, rb)
+        }
+        return if (cs.isEmpty()) "eş zamanlı çift yok" else "eş zamanlı ${cs.size} çift · ort. korelasyon %.2f · ≥0,8 olan %%%.0f".format(cs.average(), cs.count { it >= 0.8 } * 100.0 / cs.size)
+    }
+    fun sectors(r: V3Result): String = r.tradeList.flatMap { tr -> plates[tr.symbol].orEmpty().filter { it in com.spotbot.core.scanner.WideScanner.SECTOR_LABELS }.ifEmpty { listOf("Diğer") } }
+        .groupingBy { it }.eachCount().toList().sortedByDescending { it.second }.take(8).joinToString { "${it.first} ${it.second}" }
+
+    for (x in universes) {
+        println("\n════ ${x.name} ════")
+        for ((pn, p) in listOf("doğrulama" to valid, "son test" to hold, "tüm dönem" to full)) {
+            for (c in costs) println(line("$pn · ${c.name}", byKey.getValue(Triple(x.name, pn, c.name))))
+            val r = byKey.getValue(Triple(x.name, pn, CostScenario.TIERED_MEDIUM.name))
+            println("    BTC al-tut %%%+.1f · ${concentration(r)}".format(r.btcBuyHoldPercent))
+            println("    ${correlation(r)}")
+            println("    sektör (işlem): ${sectors(r)}")
+        }
+    }
+
+    println("\n════ İki aşamalı tarama doğrulaması (Tümü, tüm dönem, kademeli orta) ════")
+    val allCfg = cfg(full, CostScenario.TIERED_MEDIUM, universes.last())
+    val stage2 = HashSet<String>()
+    var day = (full.first / com.spotbot.core.research.DAY_MS) * com.spotbot.core.research.DAY_MS
+    while (day <= full.second) { s1.ranking(universe, day, allCfg).take(20).forEach { stage2 += it.first }; day += com.spotbot.core.research.DAY_MS }
+    val fullRun = byKey.getValue(Triple("Tümü", "tüm dönem", CostScenario.TIERED_MEDIUM.name))
+    val sub = Universe(universe.symbols.filterKeys { it in stage2 || it == "BTCUSDT" })
+    val subRun = V3Engine(sub, allCfg).run(s1)
+    val same = fullRun.tradeList == subRun.tradeList
+    println("Günlük ilk 20'ye en az bir kez giren parite: ${stage2.size} / ${universe.symbols.size}")
+    println("Tam evren ${fullRun.trades} işlem net %%%+.2f · alt küme ${subRun.trades} işlem net %%%+.2f · işlemler birebir aynı: ${if (same) "EVET" else "HAYIR"}".format(fullRun.netReturnPercent, subRun.netReturnPercent))
+
+    println("\n════ SONUÇ (ön kayıtlı karar kuralı: kademeli orta maliyette doğrulama ve son test ort R > 0, PF ≥ 1,1, ≥ 30 işlem; son test en iyi parite olmadan ort R > 0) ════")
+    for (x in universes) {
+        val v = byKey.getValue(Triple(x.name, "doğrulama", CostScenario.TIERED_MEDIUM.name))
+        val h = byKey.getValue(Triple(x.name, "son test", CostScenario.TIERED_MEDIUM.name))
+        val best = h.tradeList.groupBy { it.symbol }.maxByOrNull { e -> e.value.sumOf { it.netPnl } }?.key
+        val hWithout = h.tradeList.filter { it.symbol != best }.map { it.r }.let { if (it.isEmpty()) 0.0 else it.average() }
+        val ok = passes(v) && passes(h) && hWithout > 0
+        println("  ${x.name}: " + (if (ok) "GEÇTİ" else "GEÇMEDİ") + " · doğrulama %+.3fR PF %.2f (%d) · son test %+.3fR PF %.2f (%d) · son test en iyi parite (%s) olmadan %+.3fR".format(
+            v.averageR, v.profitFactor, v.trades, h.averageR, h.profitFactor, h.trades, best, hWithout))
+    }
+    pool.shutdown()
+}

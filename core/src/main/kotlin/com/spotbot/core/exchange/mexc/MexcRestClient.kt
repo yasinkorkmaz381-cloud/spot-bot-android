@@ -198,6 +198,7 @@ internal fun parseSymbolInfo(o: JsonObject): SymbolInfo = SymbolInfo(
     maxMarketQuoteAmount = o.doubleOrZero("maxQuoteAmountMarket"),
     buyPriceBandUp = priceFilter(o, "bidMultiplierUp"),
     sellPriceBandDown = priceFilter(o, "askMultiplierDown"),
+    sectors = (o["conceptPlates"] as? kotlinx.serialization.json.JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.content }.orEmpty(),
 )
 
 private fun priceFilter(o: JsonObject, key: String): Double =

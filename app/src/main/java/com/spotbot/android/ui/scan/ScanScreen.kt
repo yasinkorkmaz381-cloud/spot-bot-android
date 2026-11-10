@@ -32,6 +32,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.spotbot.android.ui.AppViewModels
@@ -67,11 +68,23 @@ import com.spotbot.core.trading.CoinDecision
 import com.spotbot.core.trading.CoinOutcome
 import com.spotbot.core.trading.DataStamp
 import com.spotbot.core.trading.ScanLog
+import kotlinx.coroutines.launch
 
-class ScanViewModel(engine: TradingEngine) : ViewModel() {
+class ScanViewModel(engine: TradingEngine, private val wideScanner: com.spotbot.core.scanner.WideScanner) : ViewModel() {
     val report = engine.lastScan
     val scanLogs = engine.scanLogs
     val health = engine.health
+    val wide = wideScanner.state
+    private val _wideBusy = kotlinx.coroutines.flow.MutableStateFlow(false)
+    val wideBusy: kotlinx.coroutines.flow.StateFlow<Boolean> = _wideBusy
+
+    fun refreshWide() {
+        if (_wideBusy.value) return
+        _wideBusy.value = true
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            try { wideScanner.scan() } finally { _wideBusy.value = false }
+        }
+    }
 }
 
 /** Teşhis panelinin verisi: hepsi motorun gerçek kayıtlarından gelir. */
@@ -117,7 +130,12 @@ fun ScanScreen(onOpenSymbol: (String) -> Unit, onOpenDecisionLog: () -> Unit, mo
         health, logs.lastOrNull()?.let { ScanDiagnostics.of(it, report?.market) }, ScanDiagnostics.lastSignal(logs), report?.market,
         com.spotbot.core.trading.SystemStatus.of(health, System.currentTimeMillis(), logs.lastOrNull()),
     )
-    ScanContent(report, logs.lastOrNull()?.coins?.associateBy { it.symbol }.orEmpty(), onOpenSymbol, modifier, onOpenDecisionLog, view)
+    val wide by viewModel.wide.collectAsStateWithLifecycle()
+    val wideBusy by viewModel.wideBusy.collectAsStateWithLifecycle()
+    ScanContent(
+        report, logs.lastOrNull()?.coins?.associateBy { it.symbol }.orEmpty(), onOpenSymbol, modifier, onOpenDecisionLog, view,
+        wide = wide, wideBusy = wideBusy, onRefreshWide = viewModel::refreshWide,
+    )
 }
 
 @Composable
@@ -128,8 +146,13 @@ fun ScanContent(
     modifier: Modifier = Modifier,
     onOpenDecisionLog: () -> Unit = {},
     diagnostics: DiagnosticsView? = null,
+    wide: com.spotbot.core.scanner.WideScanState? = null,
+    wideBusy: Boolean = false,
+    onRefreshWide: () -> Unit = {},
+    wideExpanded: Boolean = false,
 ) {
     LazyColumn(modifier.fillMaxSize(), contentPadding = PaddingValues(Spacing.screen), verticalArrangement = Arrangement.spacedBy(Spacing.cards)) {
+        item(key = "wide") { WideScanCard(wide, wideBusy, onRefreshWide, wideExpanded) }
         if (r == null) {
             item { InfoBanner("Henüz tarama yok. Botu başlattığınızda ilk tarama hemen, sonrakiler her 15 dakikalık mum kapanışında yapılır.") }
             diagnostics?.let { d -> item { DiagnosticsCard(d) } }
