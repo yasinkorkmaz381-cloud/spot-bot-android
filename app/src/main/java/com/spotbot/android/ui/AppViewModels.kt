@@ -2,7 +2,6 @@ package com.spotbot.android.ui
 
 import android.app.Application
 import androidx.lifecycle.ViewModelProvider
-import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewmodel.CreationExtras
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
@@ -10,7 +9,6 @@ import com.spotbot.android.AppContainer
 import com.spotbot.android.SpotBotApplication
 import com.spotbot.android.bot.BotService
 import com.spotbot.android.ui.backtest.BacktestViewModel
-import com.spotbot.android.ui.detail.CoinDetailViewModel
 import com.spotbot.android.ui.panel.PanelViewModel
 import com.spotbot.android.ui.scan.ScanViewModel
 import com.spotbot.android.ui.settings.SettingsViewModel
@@ -24,15 +22,11 @@ class BotController(private val app: Application) {
 
 object AppViewModels {
     val Factory: ViewModelProvider.Factory = viewModelFactory {
-        initializer { PanelViewModel(container().engine, container().settings, BotController(application())) }
-        initializer { ScanViewModel(container().engine, container().wide) }
-        initializer { CoinDetailViewModel(container().engine, container().api, createSavedStateHandle()) }
-        initializer { TradesViewModel(container().engine, container().forward) }
-        initializer { com.spotbot.android.ui.trades.TradeDetailViewModel(container().engine, container().api, createSavedStateHandle()) }
-        initializer { com.spotbot.android.ui.trades.EventsViewModel(container().engine) }
-        initializer { com.spotbot.android.ui.scan.DecisionLogViewModel(container().engine) }
-        initializer { BacktestViewModel(container().backtest, container().settings) }
-        initializer { SettingsViewModel(container().engine, container().settings) }
+        initializer { PanelViewModel(container().bot, container().settings, BotController(application()), container().config) }
+        initializer { ScanViewModel(container().bot) }
+        initializer { TradesViewModel(container().bot, container().archive) }
+        initializer { BacktestViewModel(container().backtest) }
+        initializer { SettingsViewModel(container(), BotController(application())) }
     }
 
     private fun CreationExtras.application(): SpotBotApplication =

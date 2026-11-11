@@ -3,11 +3,51 @@
 MEXC spot piyasasında (USDT pariteleri) çalışan, **kontrollü risk** ve **sistematik karar** odaklı otomatik
 işlem botu. Android uygulaması (Türkçe kumanda paneli) + platformdan bağımsız Kotlin çekirdeği + komut satırı.
 
-> **Durum: V2.5 — sanal işlem (paper trading).** MEXC canlı verisi kullanılır, **gerçek emir gönderilmez**,
-> API anahtarı istenmez. Aşağıdaki backtest sonuçları stratejilerin henüz kâr avantajı göstermediğini
-> söylüyor; bu yüzden gerçek parayla kullanım (V2) için hazır değildir.
+> **Durum: V3.0, tek strateji (Momentum RS-1), yalnız sanal işlem (paper trading).** Gerçek MEXC verisi kullanılır.
+> **Gerçek emir gönderilmez** ve API anahtarı istenmez. Strateji dokunulmamış bağımsız testte **zarar ediyor**
+> (aşağıda); gerçek parayla kullanım için dayanak yoktur.
 
-**Kalite > İşlem sayısı · Risk kontrolü > Kâr beklentisi · Kanıtlanmış strateji > Tahmin**
+## V3.0: tek strateji, Momentum RS-1 (11 Kasım 2026)
+
+- Kurallar ve test protokolü: [`docs/RS1-ONKAYIT.md`](docs/RS1-ONKAYIT.md). Kod ve sonuçlardan önce commit edildi.
+- Sonuç raporu: [`docs/RS1-V5.md`](docs/RS1-V5.md).
+
+**Değişenler:**
+
+- **Eski stratejiler kaldırıldı:** A/B/C, eski 15M motor, eski backtest ve V3/V4 araştırma kodu. Yedek: `e0f2032`
+  commit'i. Bu stratejilerin artık çalışmadığı otomatik testle doğrulanıyor.
+- **Eski kayıtlar korundu:** Cihazdaki eski kayıtlar silinmeden `archive-v4/` klasörüne taşınır ve İşlemler → Arşiv'de
+  salt okunur görünür.
+- **Tek karar zinciri:** MEXC verisi → veri doğrulama → BTC filtresi (EMA100 ve 30 günlük getiri) → bütün MEXC USDT
+  pariteleri → Momentum RS-1 → risk → paper emir.
+- **Aynı motor:** Backtest ve paper trading aynı `Rs1Engine` kodunu çalıştırır; aynı veriyle aynı kararlar çıkar
+  (testli).
+
+**Bağımsız son test** (2025-01 → 2026-11, orta maliyet):
+
+| Ölçü | Değer |
+| --- | ---: |
+| İşlem | 45 |
+| Ortalama R | −0,145 |
+| PF | 0,56 |
+| Net | −%3,3 |
+| BTC al-tut | −%19,8 |
+
+Ön kayıtlı ölçüte göre **başarısız.** Eğitim (+%7,9) ve doğrulama (+%6,0) pozitif ama istatistiksel olarak zayıf.
+
+**Bugün işlem yapılabilir evren:** 1.413 paritenin 6'sı (5M USDT medyan hacim şartı). BTC filtresi kapalı.
+
+**Komut satırı:**
+
+```
+cryptoscan scan
+cryptoscan paper
+cryptoscan download --out veri
+cryptoscan research --data veri
+cryptoscan backtest --data veri --from 2025-01-01 --cost orta
+```
+
+Aşağıdaki V2.x bölümleri tarihsel kayıttır. Söz konusu stratejiler ve modüller artık uygulamada yoktur.
 
 ## V2.5: geniş coin evreni ve iki aşamalı tarama (10 Kasım 2026)
 

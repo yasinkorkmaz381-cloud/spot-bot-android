@@ -2,7 +2,7 @@ package com.spotbot.core.model
 
 import kotlinx.serialization.Serializable
 
-/** Botun kullandığı zaman dilimleri. [mexcInterval] REST, [mexcStream] WebSocket adıdır. */
+/** Kullanılan zaman dilimleri. [mexcInterval] REST adıdır ([mexcStream] eski WebSocket adı, kullanılmıyor). */
 enum class Timeframe(val label: String, val mexcInterval: String, val mexcStream: String, val millis: Long) {
     M5("5M", "5m", "Min5", 5 * 60_000L),
     M15("15M", "15m", "Min15", 15 * 60_000L),

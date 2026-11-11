@@ -1,0 +1,57 @@
+Veri: 1203 parite (1D) · 2020-01-01 → 2026-11-09
+Bu evren bugün MEXC'de bulunan paritelerdir; borsadan kaldırılanlar indirilemez (hayatta kalma yanlılığı). Spread ve derinlik şartları (5, 6) geçmişte ölçülemediği için backtest'te uygulanmaz; spread maliyet senaryolarıyla modellenir.
+Zamana bağlı likidite (≥150 gün güvenilir geçmiş, 30 gün medyan hacim ≥ 5M USDT) ve BTC filtresi:
+  2021-01-04: likit   4 · BTC filtresi açık
+  2022-01-03: likit   7 · BTC filtresi kapalı
+  2023-01-02: likit   5 · BTC filtresi kapalı
+  2024-01-01: likit  15 · BTC filtresi açık
+  2025-01-06: likit  50 · BTC filtresi kapalı
+  2026-01-05: likit  25 · BTC filtresi kapalı
+  2026-11-09: likit  10 · BTC filtresi kapalı
+
+════ eğitim · 2020-08-01 → 2022-12-31 ════
+  İyimser                    42 işlem · kazanma % 31.0 · PF  1.96 · ort +0.380R (t=+1.06) · beklenen  +1.91 USDT/işlem · net %  +8.02 ( 1000.00→ 1080.24) · düşüş % 3.54 · ücret   1.1 · spread+kayma   1.7 · süre   7.5 gün · piyasada % 25
+  Orta                       42 işlem · kazanma % 31.0 · PF  1.93 · ort +0.372R (t=+1.05) · beklenen  +1.87 USDT/işlem · net %  +7.85 ( 1000.00→ 1078.51) · düşüş % 3.55 · ücret   1.1 · spread+kayma   2.7 · süre   7.5 gün · piyasada % 25
+  Kötümser                   42 işlem · kazanma % 31.0 · PF  1.90 · ort +0.361R (t=+1.02) · beklenen  +1.81 USDT/işlem · net %  +7.60 ( 1000.00→ 1075.98) · düşüş % 3.56 · ücret   1.1 · spread+kayma   4.4 · süre   7.5 gün · piyasada % 25
+  BTC al-tut %+45.41 · USDT'de bekleme %0 · BTC filtresi açık günler 335/883 (%38)
+  parite 22 · en iyi RACAUSDT +59.2 · onsuz +19.3 USDT, ort +0.105R · en kötü XRPUSDT -19.5
+  rejim (giriş günü BTC): düşüş 3 işlem -0.633R -10.3 USDT ⚠ · yatay 2 işlem +0.843R +8.8 USDT ⚠ · yüksek volatilite 11 işlem +0.273R +15.0 USDT ⚠ · yükseliş 37 işlem +0.428R +80.1 USDT
+  çıkış nedenleri: Haftalık değerlendirmede uygunluk kaybı 20, BTC piyasa filtresi kapandı 10, Koruyucu stop 9, İz süren stop 3
+  haftalık değerlendirme 126 · girişli 28 · girişsiz nedenler: BTC EMA100 altında ve 30 günlük getirisi negatif 53, BTC günlük kapanışı EMA100 altında 16, Uygun adaylar zaten portföyde ya da bu değerlendirmede çıkıldı 11, BTC 30 günlük getirisi pozitif değil 10, Uygunluk şartlarını geçen coin yok 7, Pozisyon sınırı dolu (2) 1
+  en kârlı 5 parite: RACAUSDT +59.2, BTCUSDT +49.5, TRXUSDT +24.6, BNBUSDT +9.9, DOGEUSDT +4.5
+
+════ doğrulama · 2023-01-01 → 2024-12-31 ════
+  İyimser                    60 işlem · kazanma % 31.7 · PF  1.70 · ort +0.214R (t=+1.16) · beklenen  +1.06 USDT/işlem · net %  +6.35 ( 1000.00→ 1063.51) · düşüş % 3.53 · ücret   2.2 · spread+kayma   3.3 · süre   9.2 gün · piyasada % 45
+  Orta                       60 işlem · kazanma % 31.7 · PF  1.66 · ort +0.204R (t=+1.11) · beklenen  +1.01 USDT/işlem · net %  +6.04 ( 1000.00→ 1060.41) · düşüş % 3.55 · ücret   2.1 · spread+kayma   5.4 · süre   9.2 gün · piyasada % 45
+  Kötümser                   60 işlem · kazanma % 31.7 · PF  1.60 · ort +0.189R (t=+1.05) · beklenen  +0.93 USDT/işlem · net %  +5.59 ( 1000.00→ 1055.89) · düşüş % 3.57 · ücret   2.1 · spread+kayma   8.5 · süre   9.2 gün · piyasada % 45
+  BTC al-tut %+463.74 · USDT'de bekleme %0 · BTC filtresi açık günler 436/731 (%60)
+  parite 25 · en iyi BTCUSDT +47.0 · onsuz +13.4 USDT, ort +0.059R · en kötü ZIGUSDT -9.9
+  rejim (giriş günü BTC): düşüş 4 işlem -0.271R -5.6 USDT ⚠ · yatay 8 işlem +0.022R +0.6 USDT ⚠ · yüksek volatilite 6 işlem +0.072R +2.1 USDT ⚠ · yükseliş 48 işlem +0.274R +65.5 USDT
+  çıkış nedenleri: Haftalık değerlendirmede uygunluk kaybı 33, BTC piyasa filtresi kapandı 14, İz süren stop 8, Koruyucu stop 5
+  haftalık değerlendirme 105 · girişli 43 · girişsiz nedenler: BTC 30 günlük getirisi pozitif değil 23, BTC EMA100 altında ve 30 günlük getirisi negatif 15, Uygunluk şartlarını geçen coin yok 7, BTC günlük kapanışı EMA100 altında 6, Pozisyon sınırı dolu (2) 6, Uygun adaylar zaten portföyde ya da bu değerlendirmede çıkıldı 5
+  en kârlı 5 parite: BTCUSDT +47.0, DOGEUSDT +21.1, MXUSDT +14.7, PEPEUSDT +10.8, SOLUSDT +8.2
+
+════ son test · 2025-01-01 → 2026-11-09 ════
+  İyimser                    45 işlem · kazanma % 22.2 · PF  0.57 · ort -0.140R (t=-1.11) · beklenen  -0.70 USDT/işlem · net %  -3.16 ( 1000.00→  968.42) · düşüş % 5.36 · ücret   1.3 · spread+kayma   1.9 · süre   7.6 gün · piyasada % 28
+  Orta                       45 işlem · kazanma % 20.0 · PF  0.56 · ort -0.145R (t=-1.15) · beklenen  -0.72 USDT/işlem · net %  -3.26 ( 1000.00→  967.39) · düşüş % 5.42 · ücret   1.3 · spread+kayma   3.2 · süre   7.6 gün · piyasada % 28
+  Kötümser                   45 işlem · kazanma % 20.0 · PF  0.54 · ort -0.152R (t=-1.22) · beklenen  -0.76 USDT/işlem · net %  -3.41 ( 1000.00→  965.87) · düşüş % 5.49 · ücret   1.3 · spread+kayma   5.1 · süre   7.6 gün · piyasada % 28
+  BTC al-tut %-19.76 · USDT'de bekleme %0 · BTC filtresi açık günler 249/678 (%37)
+  parite 34 · en iyi PENGUUSDT +25.0 · onsuz -57.7 USDT, ort -0.269R · en kötü ENAUSDT -10.1
+  rejim (giriş günü BTC): düşüş 4 işlem -0.353R -7.1 USDT ⚠ · yatay 3 işlem -0.409R -6.1 USDT ⚠ · yükseliş 38 işlem -0.102R -19.5 USDT
+  çıkış nedenleri: Haftalık değerlendirmede uygunluk kaybı 28, BTC piyasa filtresi kapandı 8, Koruyucu stop 4, İz süren stop 3, İki gün EMA50 altında kapanış 2
+  haftalık değerlendirme 97 · girişli 29 · girişsiz nedenler: BTC EMA100 altında ve 30 günlük getirisi negatif 32, BTC 30 günlük getirisi pozitif değil 16, BTC günlük kapanışı EMA100 altında 15, Uygunluk şartlarını geçen coin yok 4, Pozisyon sınırı dolu (2) 1
+  en kârlı 5 parite: PENGUUSDT +25.0, MNTUSDT +4.0, UNIUSDT +4.0, BCHUSDT +3.4, SEIUSDT +2.2
+
+════ tüm dönem · 2020-08-01 → 2026-11-09 ════
+  İyimser                   147 işlem · kazanma % 28.6 · PF  1.42 · ort +0.153R (t=+1.15) · beklenen  +0.77 USDT/işlem · net % +11.26 ( 1000.00→ 1112.56) · düşüş % 5.36 · ücret   4.9 · spread+kayma   7.4 · süre   8.2 gün · piyasada % 32
+  Orta                      147 işlem · kazanma % 27.9 · PF  1.40 · ort +0.145R (t=+1.10) · beklenen  +0.72 USDT/işlem · net % +10.64 ( 1000.00→ 1106.37) · düşüş % 5.42 · ücret   4.9 · spread+kayma  12.2 · süre   8.2 gün · piyasada % 32
+  Kötümser                  147 işlem · kazanma % 27.9 · PF  1.36 · ort +0.134R (t=+1.02) · beklenen  +0.66 USDT/işlem · net %  +9.73 ( 1000.00→ 1097.35) · düşüş % 5.49 · ücret   4.8 · spread+kayma  19.2 · süre   8.2 gün · piyasada % 32
+  BTC al-tut %+562.34 · USDT'de bekleme %0 · BTC filtresi açık günler 1020/2292 (%45)
+  parite 58 · en iyi BTCUSDT +94.1 · onsuz +12.2 USDT, ort +0.025R · en kötü XRPUSDT -33.4
+  rejim (giriş günü BTC): düşüş 11 işlem -0.400R -24.4 USDT ⚠ · yatay 13 işlem +0.049R +2.4 USDT ⚠ · yüksek volatilite 17 işlem +0.202R +17.3 USDT ⚠ · yükseliş 123 işlem +0.204R +128.4 USDT
+  çıkış nedenleri: Haftalık değerlendirmede uygunluk kaybı 81, BTC piyasa filtresi kapandı 32, Koruyucu stop 18, İz süren stop 14, İki gün EMA50 altında kapanış 2
+  haftalık değerlendirme 328 · girişli 100 · girişsiz nedenler: BTC EMA100 altında ve 30 günlük getirisi negatif 100, BTC 30 günlük getirisi pozitif değil 49, BTC günlük kapanışı EMA100 altında 37, Uygunluk şartlarını geçen coin yok 18, Uygun adaylar zaten portföyde ya da bu değerlendirmede çıkıldı 16, Pozisyon sınırı dolu (2) 8
+  en kârlı 5 parite: BTCUSDT +94.1, RACAUSDT +59.2, PENGUUSDT +28.6, DOGEUSDT +25.4, TRXUSDT +23.6
+
+════ SONUÇ (ön kayıt: son test, orta maliyet; ort R > 0, PF ≥ 1,1, ≥ 30 işlem, en iyi parite olmadan ort R > 0) ════
+  BAŞARISIZ · ort -0.145R · PF 0.56 · net %-3.26 · en iyi parite (PENGUUSDT) olmadan -0.269R · BTC al-tut %-19.76

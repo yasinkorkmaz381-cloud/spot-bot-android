@@ -22,9 +22,8 @@ import com.spotbot.android.MainActivity
 import com.spotbot.android.R
 import com.spotbot.android.SpotBotApplication
 import com.spotbot.android.ui.common.formatMoney
+import com.spotbot.android.ui.common.formatPrice
 import com.spotbot.android.ui.common.formatSignedMoney
-import com.spotbot.core.engine.EngineEvent
-import com.spotbot.core.engine.EngineStatus
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -34,14 +33,15 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 /**
- * Botu 7/24 çalıştıran ön plan servisi. Sistem süreci sonlandırırsa START_STICKY ile yeniden başlatılır;
- * CPU'nun uykuya geçmemesi için kısmi wake lock tutar. Ayrıca pil optimizasyonu muafiyeti önerilir.
+ * Ön plan servisi: Momentum RS-1 döngüsünü ([com.spotbot.core.rs1.Rs1Bot.cycle]) birkaç dakikada bir çalıştırır.
+ * Android pil kısıtları servisi geciktirebilir ya da durdurabilir; bu durum Panel'de gösterilir.
  */
 class BotService : Service() {
 
     private val container by lazy { (application as SpotBotApplication).container }
     private var scope: CoroutineScope? = null
     private var wakeLock: PowerManager.WakeLock? = null
+    private val notified = HashSet<String>()
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -51,91 +51,76 @@ class BotService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        when (intent?.action) {
-            ACTION_STOP -> {
-                container.settings.update { it.copy(botEnabled = false) }
-                container.engine.stop()
-                ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
-                stopSelf()
-                return START_NOT_STICKY
-            }
-            ACTION_TOGGLE_ENTRIES -> {
-                container.engine.setEntriesPaused(!container.engine.health.value.entriesPaused)
-            }
+        if (intent?.action == ACTION_STOP) {
+            container.settings.update { it.copy(botEnabled = false) }
+            container.bot.setRunning(false)
+            ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
+            stopSelf()
+            return START_NOT_STICKY
         }
-        // Başlatma (ya da sistemin servisi yeniden oluşturması: intent == null).
         ServiceCompat.startForeground(
             this, NOTIFICATION_ID, statusNotification(),
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE else 0,
         )
         acquireWakeLock()
         container.settings.update { it.copy(botEnabled = true) }
-        container.engine.start()
-        if (scope == null) observe()
+        container.bot.setRunning(true)
+        if (scope == null) loop()
         return START_STICKY
     }
 
     override fun onDestroy() {
         scope?.cancel()
         scope = null
+        container.bot.setRunning(false)
         wakeLock?.takeIf { it.isHeld }?.release()
         super.onDestroy()
     }
 
-    private fun observe() {
-        val s = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    private fun loop() {
+        val s = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         scope = s
+        // Var olan kayıtlar için bildirim gönderme; yalnız bundan sonra oluşanlar.
+        container.paper.state.value?.result?.let { r -> notified += r.trades.map { "T:" + it.key } + r.open.map { "P:" + it.key } }
         s.launch {
             while (isActive) {
-                notify(NOTIFICATION_ID, statusNotification())
                 acquireWakeLock()
-                delay(30_000)
-            }
-        }
-        // S1 ileri testi: yeni bir 4H mumu kapandığında güncellenir (ağ işi arka planda).
-        s.launch(Dispatchers.IO) {
-            while (isActive) {
-                runCatching { container.wide.refreshIfDue(container.forward.state.value?.result?.open?.map { it.symbol }.orEmpty()) }
-                runCatching { container.forward.refreshIfDue() }
-                delay(10 * 60_000L)
-            }
-        }
-        s.launch {
-            container.engine.events.collect { event ->
-                val (title, text) = when (event) {
-                    is EngineEvent.Opened -> getString(R.string.notif_opened, event.position.symbol) to
-                        getString(R.string.notif_opened_text, event.position.strategy.title, event.position.entryPrice.toString(), event.position.stopPrice.toString())
-                    is EngineEvent.Closed -> getString(R.string.notif_closed, event.trade.position.symbol) to
-                        getString(R.string.notif_closed_text, event.trade.reason.title, formatSignedMoney(event.trade.netPnl))
-                    is EngineEvent.Problem -> getString(R.string.notif_problem) to event.message
-                }
-                val channel = if (event is EngineEvent.Problem) CHANNEL_ALERTS else CHANNEL_TRADES
-                notify((System.currentTimeMillis() % 100_000).toInt() + 10, simpleNotification(channel, title, text))
+                runCatching { container.bot.cycle() }
+                notifyChanges()
+                notify(NOTIFICATION_ID, statusNotification())
+                delay(CYCLE_MILLIS)
             }
         }
     }
 
-    private fun statusNotification(): Notification {
-        val engine = container.engine
-        val health = engine.health.value
-        val portfolio = engine.portfolio.value
-        val equity = portfolio.cash + portfolio.positions.sumOf { it.lastPrice * it.quantity }
-        val status = when {
-            health.status == EngineStatus.ERROR -> getString(R.string.status_error)
-            health.entriesPaused -> getString(R.string.status_paused)
-            health.status == EngineStatus.RUNNING -> getString(R.string.status_running)
-            else -> getString(R.string.status_starting)
+    private fun notifyChanges() {
+        val r = container.paper.state.value?.result ?: return
+        for (p in r.open) {
+            if (notified.add("P:" + p.key)) {
+                notify(p.key.hashCode(), simpleNotification(CHANNEL_TRADES, getString(R.string.notif_opened, p.symbol), getString(R.string.notif_opened_text, formatPrice(p.entryPrice), formatPrice(p.stop))))
+            }
         }
-        val text = getString(R.string.notif_status_text, formatMoney(equity), portfolio.positions.size)
-        val toggleText = if (health.entriesPaused) R.string.action_resume_entries else R.string.action_pause_entries
+        for (t in r.trades) {
+            if (notified.add("T:" + t.key)) {
+                notify(t.key.hashCode() + 1, simpleNotification(CHANNEL_TRADES, getString(R.string.notif_closed, t.symbol), getString(R.string.notif_closed_text, t.reason.title, formatSignedMoney(t.netPnl))))
+            }
+        }
+        container.bot.status.value.lastError?.let { e ->
+            if (notified.add("E:$e")) notify(ERROR_ID, simpleNotification(CHANNEL_ALERTS, getString(R.string.notif_problem), e))
+        }
+    }
+
+    private fun statusNotification(): Notification {
+        val r = container.paper.state.value?.result
+        val status = container.bot.status.value
+        val text = getString(R.string.notif_status_text, formatMoney(r?.endEquity ?: container.config.capital), r?.open?.size ?: 0)
         return NotificationCompat.Builder(this, CHANNEL_STATUS)
             .setSmallIcon(R.drawable.ic_notification)
-            .setContentTitle("${getString(R.string.app_name)} · $status")
+            .setContentTitle("${getString(R.string.app_name)} · ${getString(if (status.lastError != null) R.string.status_error else R.string.status_running)}")
             .setContentText(text)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setContentIntent(openApp())
-            .addAction(0, getString(toggleText), servicePending(ACTION_TOGGLE_ENTRIES, 1))
             .addAction(0, getString(R.string.action_stop_bot), servicePending(ACTION_STOP, 2))
             .build()
     }
@@ -178,8 +163,9 @@ class BotService : Service() {
     companion object {
         const val ACTION_START = "com.spotbot.android.START"
         const val ACTION_STOP = "com.spotbot.android.STOP"
-        const val ACTION_TOGGLE_ENTRIES = "com.spotbot.android.TOGGLE_ENTRIES"
         private const val NOTIFICATION_ID = 1
+        private const val ERROR_ID = 2
+        private const val CYCLE_MILLIS = 5 * 60_000L
         private const val WAKE_LOCK_TIMEOUT_MILLIS = 15 * 60_000L
         private const val CHANNEL_STATUS = "status"
         private const val CHANNEL_TRADES = "trades"

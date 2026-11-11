@@ -1,16 +1,14 @@
 package com.spotbot.android.bot
 
-import com.spotbot.android.data.storageJson
-import com.spotbot.core.backtest.BacktestConfig
-import com.spotbot.core.backtest.BacktestDataLoader
-import com.spotbot.core.backtest.BacktestEngine
-import com.spotbot.core.backtest.BacktestReport
-import com.spotbot.core.backtest.HistoricalDataset
-import com.spotbot.core.backtest.runResolvingIntrabar
-import com.spotbot.core.engine.EngineConfig
 import com.spotbot.core.exchange.MarketDataApi
-import com.spotbot.core.model.Timeframe
-import com.spotbot.core.strategy.StrategyId
+import com.spotbot.core.model.Candle
+import com.spotbot.core.rs1.DAY_MS
+import com.spotbot.core.rs1.DailySeries
+import com.spotbot.core.rs1.Rs1Config
+import com.spotbot.core.rs1.Rs1Costs
+import com.spotbot.core.rs1.Rs1Engine
+import com.spotbot.core.rs1.Rs1History
+import com.spotbot.core.rs1.Rs1Result
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -18,129 +16,76 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.json.Json
 import java.io.File
+import java.time.LocalDate
+import java.time.ZoneOffset
 
-/**
- * Backtest maliyet senaryosu. Geçmiş spread verisi olmadığından tek bir günün ölçümü geçmişin gerçeği sayılmaz;
- * sonuç birkaç senaryoyla karşılaştırılmalıdır.
- */
-enum class BacktestCost(val title: String, val halfSpread: Double?, val description: String) {
-    OPTIMISTIC("İyimser", 0.00025, "Alış-satış farkı %0,05 (yalnız en likit paritelerde gerçekçi)."),
-    MEDIUM("Orta", 0.00075, "Alış-satış farkı %0,15 (karar senaryosu)."),
-    PESSIMISTIC("Kötümser", 0.0015, "Alış-satış farkı %0,30."),
-    TODAY("Bugünkü fark", null, "Bugün ölçülen fark geçmişe uygulanır ve %0,20'yi aşan coin elenir. Tek günlük ölçüm: senaryo, gerçek geçmiş değil."),
+/** Backtest dönemi. Son test dönemi, araştırmadaki dokunulmamış dönemle aynıdır (docs/RS1-ONKAYIT.md). */
+enum class BacktestPeriod(val title: String, val from: String?, val to: String?, val yearsBack: Int?) {
+    LAST_YEAR("Son 1 yıl", null, null, 1),
+    HOLDOUT("Son test (2025 →)", "2025-01-01", null, null),
+    VALIDATION("Doğrulama (2023–2024)", "2023-01-01", "2025-01-01", null),
+    TRAIN("Eğitim (2020-08 – 2022)", "2020-08-01", "2023-01-01", null),
+    ALL("Tüm dönem (2020-08 →)", "2020-08-01", null, null),
+    ;
+
+    fun range(today: Long): Pair<Long, Long> {
+        val end = to?.let { day(it) } ?: today
+        val start = from?.let { day(it) } ?: (end - (yearsBack ?: 1) * 365L * DAY_MS)
+        return start to end
+    }
+
+    companion object {
+        fun day(s: String) = LocalDate.parse(s).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
+    }
 }
 
 sealed interface BacktestState {
     data object Idle : BacktestState
     data class Running(val message: String, val progress: Float?) : BacktestState
-    /** [data]: işlem ayrıntı grafikleri için test verisi (yalnız bellekte). */
-    data class Done(val report: BacktestReport, val data: Map<String, HistoricalDataset> = emptyMap()) : BacktestState
-    data class Isolated(val results: List<com.spotbot.core.backtest.IsolatedRun>, val days: Int, val symbols: List<String>) : BacktestState
-    data class Compared(val results: List<com.spotbot.core.backtest.ProfileComparison>, val days: Int, val symbols: List<String>) : BacktestState
+    data class Done(val result: Rs1Result, val period: BacktestPeriod, val failedSymbols: Int) : BacktestState
     data class Failed(val message: String) : BacktestState
 }
 
-/** Uygulama içinden backtest: veriyi MEXC'den indirir (önbelleğe alır) ve çekirdek backtest motorunu çalıştırır. */
-class BacktestRunner(private val api: MarketDataApi, private val scope: CoroutineScope, private val cacheDir: File) {
+/**
+ * Cihazda Momentum RS-1 backtest'i: bugünkü MEXC USDT evreninin (ürün ayıklaması dışında filtre yok) 1D geçmişi
+ * indirilir (önbellek), paper trading ile aynı motor çalıştırılır. Spread/derinlik şartları geçmişte ölçülemez.
+ */
+class BacktestRunner(private val api: MarketDataApi, private val scope: CoroutineScope, private val cacheDir: File, private val base: Rs1Config) {
+    private val json = Json { ignoreUnknownKeys = true; allowSpecialFloatingPointValues = true }
     private val _state = MutableStateFlow<BacktestState>(BacktestState.Idle)
     val state: StateFlow<BacktestState> = _state.asStateFlow()
     private var job: Job? = null
 
-    /** Profilleri aynı veri, dönem, maliyet ve risk ayarlarıyla karşılaştırır (ilk/ikinci yarı ayrımıyla). */
-    fun compare(symbols: List<String>, days: Int, capital: Double, engine: EngineConfig, cost: BacktestCost = BacktestCost.MEDIUM) {
+    fun run(period: BacktestPeriod, costs: Rs1Costs) {
         if (job?.isActive == true) return
-        job = scope.launch(Dispatchers.Default) {
-            runCatching {
-                val (config, data, info) = prepare(symbols, days, capital, engine.enabledStrategies, engine, cost)
-                _state.value = BacktestState.Running("Profiller aynı koşullarda çalışıyor", 0.5f)
-                com.spotbot.core.backtest.StrategyComparison.run(config.copy(shadowAnalysis = false), data, info) { p ->
-                    _state.value = BacktestState.Running("Profiller aynı koşullarda çalışıyor", 0.5f + p.toFloat() / 2)
-                }
-            }.onSuccess { _state.value = BacktestState.Compared(it, days, symbols) }
-                .onFailure { _state.value = BacktestState.Failed(it.message ?: it.javaClass.simpleName) }
+        job = scope.launch(Dispatchers.IO) {
+            try {
+                val today = System.currentTimeMillis() / DAY_MS * DAY_MS
+                val (start, end) = period.range(today)
+                // Göstergeler ve 150 günlük geçmiş şartı için başlangıçtan 400 gün önce.
+                val from = start - 400 * DAY_MS
+                _state.value = BacktestState.Running("Parite listesi alınıyor…", null)
+                val symbols = Rs1History.universe(api)
+                val dir = File(cacheDir, "rs1-1d").apply { mkdirs() }
+                val (data, failed) = Rs1History.download(
+                    api, symbols, from, end,
+                    cache = { s -> read(File(dir, "$s-$from-$end.json")) },
+                    store = { s, c -> File(dir, "$s-$from-$end.json").writeText(json.encodeToString(ListSerializer(Candle.serializer()), c)) },
+                    onProgress = { i, n -> _state.value = BacktestState.Running("1D veri: $i / $n parite", i.toFloat() / n) },
+                )
+                _state.value = BacktestState.Running("Momentum RS-1 çalıştırılıyor…", null)
+                val cfg = base.copy(costs = costs)
+                val result = Rs1Engine(data.mapValues { (s, c) -> DailySeries(s, c, cfg) }, cfg).run(start, end)
+                _state.value = BacktestState.Done(result, period, failed.size)
+            } catch (e: Exception) {
+                _state.value = BacktestState.Failed(e.message ?: e::class.simpleName ?: "Hata")
+            }
         }
     }
 
-    /** A ve B'yi aynı veri, ücret, sermaye ve dönemde ayrı ayrı çalıştırır (ilk/ikinci yarı ayrımıyla). */
-    fun isolate(symbols: List<String>, days: Int, capital: Double, engine: EngineConfig, cost: BacktestCost = BacktestCost.MEDIUM) {
-        if (job?.isActive == true) return
-        job = scope.launch(Dispatchers.Default) {
-            runCatching {
-                val (config, data, info) = prepare(symbols, days, capital, setOf(StrategyId.BREAKOUT_RETEST, StrategyId.TREND_PULLBACK), engine, cost)
-                _state.value = BacktestState.Running("A ve B aynı koşullarda ayrı çalışıyor", 0.5f)
-                com.spotbot.core.backtest.StrategyIsolation.run(config.copy(shadowAnalysis = false), data, info) { p ->
-                    _state.value = BacktestState.Running("A ve B aynı koşullarda ayrı çalışıyor", 0.5f + p.toFloat() / 2)
-                }
-            }.onSuccess { _state.value = BacktestState.Isolated(it, days, symbols) }
-                .onFailure { _state.value = BacktestState.Failed(it.message ?: it.javaClass.simpleName) }
-        }
-    }
-
-    private suspend fun prepare(
-        symbols: List<String>,
-        days: Int,
-        capital: Double,
-        strategies: Set<StrategyId>,
-        engine: EngineConfig,
-        cost: BacktestCost = BacktestCost.MEDIUM,
-    ): Triple<BacktestConfig, Map<String, HistoricalDataset>, Map<String, com.spotbot.core.model.SymbolInfo>> {
-        val end = Timeframe.H4.lastCloseAtOrBefore(api.serverTime())
-        val start = end - days * DAY
-        val config = BacktestConfig(
-            symbols = symbols, startTime = start, endTime = end, initialCapital = capital,
-            risk = engine.risk, scanner = engine.scanner, strategyParams = engine.strategyParams,
-            analysis = engine.analysis, enabledStrategies = strategies, slippage = engine.slippage,
-            execution = engine.execution, shadowAnalysis = true, profile = engine.profile, maxEntryDriftPercent = engine.maxEntryDriftPercent,
-            // Ölçülen spread: şu anki en iyi alış/satış farkının yarısı (alınamazsa sabit değere düşer).
-            halfSpread = cost.halfSpread ?: 0.00025,
-            halfSpreadBySymbol = if (cost == BacktestCost.TODAY) runCatching {
-                api.bookTickers().filter { it.bid > 0 && !it.spreadPercent.isNaN() }.associate { it.symbol to it.spreadPercent / 200 }
-            }.getOrDefault(emptyMap()) else emptyMap(),
-        )
-        val loadStart = start - config.warmupDays * DAY
-        val all = (symbols + "BTCUSDT").distinct()
-        val data = all.mapIndexed { i, symbol ->
-            _state.value = BacktestState.Running("$symbol verisi hazırlanıyor (${i + 1}/${all.size})", i.toFloat() / all.size * 0.5f)
-            symbol to load(symbol, loadStart, end)
-        }.toMap()
-        return Triple(config, data, api.exchangeInfo().associateBy { it.symbol })
-    }
-
-    fun run(symbols: List<String>, days: Int, capital: Double, strategies: Set<StrategyId>, engine: EngineConfig, cost: BacktestCost = BacktestCost.MEDIUM) {
-        if (job?.isActive == true) return
-        job = scope.launch(Dispatchers.Default) {
-            runCatching {
-                val (config, data, info) = prepare(symbols, days, capital, strategies, engine, cost)
-                _state.value = BacktestState.Running("Backtest çalışıyor", 0.5f)
-                // Aynı mumda stop ve hedef görülen durumlar için 5M mumlar indirilir ve test yeniden çalıştırılır.
-                val (report, resolved) = BacktestEngine(config).runResolvingIntrabar(data, info, BacktestDataLoader(api)) { p ->
-                    _state.value = BacktestState.Running("Backtest çalışıyor", 0.5f + p.toFloat() / 2)
-                }
-                resolved.forEach { (symbol, d) -> if (d.m5.size != data[symbol]?.m5?.size) save(symbol, config.startTime - config.warmupDays * DAY, config.endTime, d) }
-                BacktestState.Done(report, resolved)
-            }.onSuccess { _state.value = it }
-                .onFailure { _state.value = BacktestState.Failed(it.message ?: it.javaClass.simpleName) }
-        }
-    }
-
-    private fun cacheFile(symbol: String, start: Long, end: Long) = File(cacheDir, "bt-$symbol-$start-$end.json")
-
-    private fun save(symbol: String, start: Long, end: Long, dataset: HistoricalDataset) =
-        runCatching { cacheFile(symbol, start, end).writeText(storageJson.encodeToString(HistoricalDataset.serializer(), dataset)) }
-
-    private suspend fun load(symbol: String, start: Long, end: Long): HistoricalDataset {
-        val file = cacheFile(symbol, start, end)
-        file.takeIf { it.exists() }?.let { cached ->
-            runCatching { return storageJson.decodeFromString(HistoricalDataset.serializer(), cached.readText()) }
-        }
-        cacheDir.listFiles { f -> f.name.startsWith("bt-$symbol-") }?.forEach { it.delete() }
-        return BacktestDataLoader(api).load(listOf(symbol), start, end).getValue(symbol).also {
-            file.writeText(storageJson.encodeToString(HistoricalDataset.serializer(), it))
-        }
-    }
-
-    companion object {
-        private const val DAY = 24 * 60 * 60_000L
-    }
+    private fun read(f: File): List<Candle>? =
+        f.takeIf { it.exists() }?.let { runCatching { json.decodeFromString(ListSerializer(Candle.serializer()), it.readText()) }.getOrNull() }
 }

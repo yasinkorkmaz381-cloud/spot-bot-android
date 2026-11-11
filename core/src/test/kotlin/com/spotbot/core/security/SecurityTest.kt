@@ -1,6 +1,9 @@
 package com.spotbot.core.security
 
-import com.spotbot.core.engine.EngineConfig
+import com.spotbot.core.rs1.Rs1Config
+import com.spotbot.core.rs1.Rs1Costs
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
@@ -30,14 +33,32 @@ class SecurityTest {
     }
 
     @Test
-    fun `default configuration is paper trading with unchanged risk defaults`() {
-        val config = EngineConfig()
-        assertTrue(config.risk.riskPerTradePercent == 0.5)
-        assertTrue(config.risk.dailyLossLimitPercent == 1.5)
-        assertTrue(config.risk.maxOpenPositions == 3)
-        assertTrue(config.risk.minNetRiskReward == 1.5)
-        assertTrue(config.risk.atrStopMode == com.spotbot.core.risk.AtrStopMode.OFF)
-        assertTrue(config.profile == com.spotbot.core.trading.StrategyProfile.ADAPTIVE)
-        assertTrue(config.execution == com.spotbot.core.trading.ExecutionConfig())
+    fun `default configuration matches the pre-registered RS-1 parameters`() {
+        val c = Rs1Config()
+        assertEquals(100, c.emaTrend); assertEquals(50, c.emaExit); assertEquals(14, c.atrPeriod)
+        assertEquals(3.0, c.minRelativeStrengthPoints, 0.0); assertEquals(0.15, c.maxSpreadPercent, 0.0)
+        assertEquals(5_000_000.0, c.minMedianVolume, 0.0); assertEquals(2.5, c.maxRangeAtr, 0.0); assertEquals(2, c.candidates)
+        assertEquals(1_000.0, c.capital, 0.0); assertEquals(0.5, c.riskPercent, 0.0); assertEquals(2, c.maxPositions)
+        assertEquals(25.0, c.maxPositionPercent, 0.0); assertEquals(50.0, c.maxTotalPercent, 0.0); assertEquals(1.5, c.dailyLossPercent, 0.0)
+        assertEquals(2.5, c.initialStopAtr, 0.0); assertEquals(3.0, c.trailAtr, 0.0); assertEquals(2, c.emaExitDays)
+        assertEquals(1, c.entryWeekday); assertEquals(Rs1Costs.MEDIUM, c.costs)
+    }
+
+    /** Tek strateji: eski A/B/C motoru ve strateji sınıfları derlenmiş kodda yok; kaynaklar onlara başvurmuyor. */
+    @Test
+    fun `old strategies and the old trading engine cannot run`() {
+        val removed = listOf(
+            "com.spotbot.core.engine.TradingEngine", "com.spotbot.core.strategy.StrategyId",
+            "com.spotbot.core.strategy.BreakoutRetestStrategy", "com.spotbot.core.strategy.TrendPullbackStrategy",
+            "com.spotbot.core.strategy.RangeStrategy", "com.spotbot.core.trading.DecisionPipeline",
+            "com.spotbot.core.backtest.BacktestEngine", "com.spotbot.core.research.V3Engine",
+        )
+        for (name in removed) {
+            val present = runCatching { Class.forName(name) }.isSuccess
+            assertFalse("$name hâlâ derlenmiş kodda", present)
+        }
+        val references = listOf("StrategyId", "TradingEngine", "BREAKOUT_RETEST", "TREND_PULLBACK", "DecisionPipeline", "BacktestEngine")
+        val hits = sources.filter { it.extension == "kt" }.flatMap { f -> references.filter { f.readText().contains(it) }.map { "${f.path}: $it" } }
+        assertTrue("Eski strateji başvurusu: $hits", hits.isEmpty())
     }
 }

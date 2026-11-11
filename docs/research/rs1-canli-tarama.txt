@@ -1,0 +1,19 @@
+Tarama 2026-11-11 22:14 UTC · son günlük kapanış 2026-11-10 · 33 istek · 7 sn
+BTC filtresi: KAPALI · kapanış 73788.38 · EMA100 77554.56 · 30g %-11.92 BTC EMA100 altında ve 30 günlük getirisi negatif
+Toplam USDT paritesi 1413 · 1D incelenen 24 · likidite 6 · trend 0 · bütün şartlar 0 · aday []
+Elenme aşamaları:
+   1067  24 saatlik hacim < 1M USDT (ön eleme)
+    112  İşlem durdurulmuş, tek yönlü ya da MEXC risk etiketli
+    210  Desteklenmeyen ürün (stablecoin, tokenleştirilmiş hisse, emtia, kaldıraçlı)
+     12  30 günlük medyan hacim < 5M USDT
+      4  Spread > %0,15
+      2  Güvenilir fiyat geçmişi yok (yeni listeleme, eksik gün)
+      6  Trend yok (EMA100, 7 ya da 30 günlük getiri)
+En güçlü 6 (30 günlük getiri):
+  TRXUSDT      30g    -3.8% 7g   -1.2% RS   +8.2 hacim    5.3M spread 0.031% derinlik 236480/147615 aralık 0.54ATR Kapanış ≤ EMA100, 7 günlük getiri ≤ 0, 30 günlük getiri ≤ 0
+  BNBUSDT      30g    -9.8% 7g   -2.5% RS   +2.2 hacim   15.4M spread 0.048% derinlik 97868/77354 aralık 1.00ATR Kapanış ≤ EMA100, 7 günlük getiri ≤ 0, 30 günlük getiri ≤ 0, BTC'ye göre 30 günlük avantaj < 3 puan
+  BTCUSDT      30g   -11.9% 7g   -4.7% RS   +0.0 hacim  329.6M spread 0.000% derinlik 3249489/3084369 aralık 1.18ATR Kapanış ≤ EMA100, 7 günlük getiri ≤ 0, 30 günlük getiri ≤ 0
+  ETHUSDT      30g   -19.1% 7g   -9.7% RS   -7.1 hacim  205.6M spread 0.009% derinlik 2029245/1842751 aralık 1.33ATR Kapanış ≤ EMA100, 7 günlük getiri ≤ 0, 30 günlük getiri ≤ 0, BTC'ye göre 30 günlük avantaj < 3 puan
+  SOLUSDT      30g   -25.1% 7g  -10.2% RS  -13.2 hacim   56.8M spread 0.012% derinlik 1081514/1090073 aralık 1.29ATR Kapanış ≤ EMA100, 7 günlük getiri ≤ 0, 30 günlük getiri ≤ 0, BTC'ye göre 30 günlük avantaj < 3 puan
+  XRPUSDT      30g   -25.2% 7g  -17.3% RS  -13.2 hacim   27.8M spread 0.009% derinlik 456796/265600 aralık 1.29ATR Kapanış ≤ EMA100, 7 günlük getiri ≤ 0, 30 günlük getiri ≤ 0, BTC'ye göre 30 günlük avantaj < 3 puan
+İşlem açılmama nedeni: BTC EMA100 altında ve 30 günlük getirisi negatif · sonraki haftalık değerlendirme 2026-11-16 00:15 UTC

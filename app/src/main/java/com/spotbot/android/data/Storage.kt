@@ -1,16 +1,14 @@
 package com.spotbot.android.data
 
-import com.spotbot.core.engine.EngineConfig
-import com.spotbot.core.engine.StateStore
-import com.spotbot.core.trading.DecisionLogStore
-import com.spotbot.core.trading.PortfolioState
-import com.spotbot.core.trading.ScanLog
+import com.spotbot.core.rs1.PaperState
+import com.spotbot.core.rs1.PaperStore
+import com.spotbot.core.rs1.ScanState
+import com.spotbot.core.rs1.ScanStore
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
 import java.io.File
 
@@ -31,101 +29,76 @@ internal class JsonFile<T>(private val file: File, private val serializer: KSeri
     }
 }
 
-/** Sanal portföyün uygulama dosyalarında kalıcı saklanması (yeniden başlatmada kaldığı yerden devam). */
-class FileStateStore(dir: File) : StateStore {
-    private val file = JsonFile(File(dir, "portfolio.json"), PortfolioState.serializer())
-    override fun load(): PortfolioState? = file.read()
-    override fun save(state: PortfolioState) = file.write(state)
+/** Momentum RS-1 paper trading durumu (paper.json): yeniden başlatmada kaldığı yerden devam eder. */
+class FilePaperStore(dir: File) : PaperStore {
+    private val file = JsonFile(File(dir, "paper.json"), PaperState.serializer())
+    override fun load() = file.read()
+    override fun save(state: PaperState) = file.write(state)
+}
+
+/** Son geniş evren taraması ve bilinen pariteler (yeni listeleme / çıkarılma tespiti). */
+class FileScanStore(dir: File) : ScanStore {
+    private val file = JsonFile(File(dir, "scan.json"), ScanState.serializer())
+    override fun load() = file.read()
+    override fun save(state: ScanState) = file.write(state)
 }
 
 @Serializable
 data class AppSettings(
-    val engine: EngineConfig = EngineConfig(),
     /** Kullanıcı botu çalışır bıraktıysa yeniden başlatmada (ör. cihaz açılışı) otomatik başlatılır. */
     val botEnabled: Boolean = false,
     /** Ayar biçimi sürümü; eski kayıtlar açılışta taşınır (bkz. [SettingsRepository.migrate]). */
     val schemaVersion: Int = 0,
-    /**
-     * S1 ileri testinin evreni: false = dar 28 parite (varsayılan; V4 ön kayıt kararı), true = geniş MEXC evreni.
-     * Değiştirmek ileri testi o andan yeniden başlatır.
-     */
-    val forwardWideUniverse: Boolean = false,
 )
 
-/** Gölge portföyler: shadows.json (strateji adı → sanal hesap). */
-class FileShadowStore(dir: File) : com.spotbot.core.engine.ShadowStore {
-    private val file = JsonFile(File(dir, "shadows.json"), kotlinx.serialization.builtins.MapSerializer(String.serializer(), PortfolioState.serializer()))
-    override fun load(): Map<String, PortfolioState> = file.read().orEmpty()
-    override fun save(shadows: Map<String, PortfolioState>) = file.write(shadows)
-}
-
-/** V3 ileri testi (S1) kalıcı durumu: başlangıç zamanı yeniden başlatmalarda korunur. */
-class FileForwardStore(dir: File) : com.spotbot.core.research.ForwardStore {
-    private val file = JsonFile(File(dir, "forward_s1.json"), com.spotbot.core.research.ForwardState.serializer())
-    override fun load() = file.read()
-    override fun save(state: com.spotbot.core.research.ForwardState) = file.write(state)
-}
-
-/** Geniş evren taraması: bilinen pariteler (yeni listeleme / çıkarılma tespiti) ve son sonuç. */
-class FileWideScanStore(dir: File) : com.spotbot.core.scanner.WideScanStore {
-    private val file = JsonFile(File(dir, "wide_scan.json"), com.spotbot.core.scanner.WideScanState.serializer())
-    override fun load() = file.read()
-    override fun save(state: com.spotbot.core.scanner.WideScanState) = file.write(state)
-}
-
-class SettingsRepository(dir: File) {
+/**
+ * Ayarlar ve sürüm geçişi. Sürüm 3 (V5, tek strateji): eski A/B/C motorunun bütün dosyaları silinmeden
+ * `archive-v4/` klasörüne taşınır; uygulama yalnız Momentum RS-1 ile devam eder.
+ */
+class SettingsRepository(private val dir: File) {
     private val file = JsonFile(File(dir, "settings.json"), AppSettings.serializer())
-    private val _settings = MutableStateFlow(migrate(file.read() ?: AppSettings()).also { file.write(it) })
+    private val _settings = MutableStateFlow(migrate(dir, file.read() ?: AppSettings()).also { file.write(it) })
     val settings: StateFlow<AppSettings> = _settings.asStateFlow()
 
+    fun update(transform: (AppSettings) -> AppSettings) {
+        val next = transform(_settings.value)
+        _settings.value = next
+        file.write(next)
+    }
+
     companion object {
-        const val SCHEMA = 2
+        const val SCHEMA = 3
+        const val ARCHIVE = "archive-v4"
+        /** Eski motorun dosyaları (A/B/C sanal portföyü, gölge portföyler, S1 ileri testi, V4 taraması, karar günlüğü). */
+        val LEGACY = listOf("portfolio.json", "shadows.json", "forward_s1.json", "wide_scan.json", "decisions")
 
         /**
-         * Sürüm 2: Strateji A aktif kâğıt işlemden çıkarılır ve gölge teste alınır (B aktif kalır). İşlem geçmişi ve
-         * risk ayarları değişmez. Tekrar uygulanması sonucu değiştirmez.
+         * Sürüm 3'e geçiş: eski dosyalar ve eski ayar dosyasının bir kopyası `archive-v4/` altına taşınır (silinmez),
+         * taşınanların listesi `archive-v4/BILGI.txt`'ye yazılır. "Bot çalışıyor" tercihi korunur. Tekrar uygulanması
+         * bir şey değiştirmez.
          */
-        fun migrate(s: AppSettings): AppSettings {
+        fun migrate(dir: File, s: AppSettings): AppSettings {
             if (s.schemaVersion >= SCHEMA) return s
-            val a = com.spotbot.core.strategy.StrategyId.BREAKOUT_RETEST
-            val active = (s.engine.enabledStrategies - a).ifEmpty { setOf(com.spotbot.core.strategy.StrategyId.TREND_PULLBACK) }
-            return s.copy(engine = s.engine.copy(enabledStrategies = active, shadowStrategies = s.engine.shadowStrategies + a), schemaVersion = SCHEMA)
-        }
-    }
-
-    fun update(transform: (AppSettings) -> AppSettings) {
-        val updated = transform(_settings.value)
-        _settings.value = updated
-        file.write(updated)
-    }
-}
-
-/**
- * Coin bazında karar günlüğü: her tarama bir satır (JSON Lines), gün başına bir dosya; son [keepDays] gün tutulur.
- * Bir tarama ~15 KB; günde 96 tarama ≈ 1,5 MB.
- */
-class FileDecisionLogStore(private val dir: File, private val keepDays: Int = 3) : DecisionLogStore {
-    private val day = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).apply { timeZone = java.util.TimeZone.getTimeZone("UTC") }
-
-    init { dir.mkdirs() }
-
-    @Synchronized
-    override fun append(log: ScanLog) {
-        File(dir, "${day.format(java.util.Date(log.time))}.jsonl").appendText(storageJson.encodeToString(ScanLog.serializer(), log) + "\n")
-        dir.listFiles { f -> f.name.endsWith(".jsonl") }?.sortedBy { it.name }?.dropLast(keepDays)?.forEach { it.delete() }
-    }
-
-    @Synchronized
-    override fun recent(limit: Int): List<ScanLog> {
-        val files = dir.listFiles { f -> f.name.endsWith(".jsonl") }?.sortedBy { it.name }.orEmpty()
-        val result = ArrayDeque<ScanLog>()
-        for (file in files.reversed()) {
-            val lines = file.readLines().filter { it.isNotBlank() }
-            for (line in lines.reversed()) {
-                runCatching { storageJson.decodeFromString(ScanLog.serializer(), line) }.getOrNull()?.let { result.addFirst(it) }
-                if (result.size >= limit) return result.toList()
+            val archive = File(dir, ARCHIVE)
+            val moved = ArrayList<String>()
+            for (name in LEGACY) {
+                val f = File(dir, name)
+                if (!f.exists()) continue
+                archive.mkdirs()
+                val target = File(archive, name)
+                if (!target.exists() && f.renameTo(target)) moved += name
             }
+            File(dir, "settings.json").takeIf { it.exists() }?.let { old ->
+                archive.mkdirs()
+                File(archive, "settings-eski.json").takeIf { !it.exists() }?.let { old.copyTo(it); moved += "settings.json (kopya)" }
+            }
+            if (moved.isNotEmpty()) {
+                File(archive, "BILGI.txt").appendText(
+                    "Sürüm 3'e geçiş (Momentum RS-1, tek strateji): eski A/B/C motorunun kayıtları buraya taşındı; silinmedi.\n" +
+                        moved.joinToString("\n") { "- $it" } + "\n",
+                )
+            }
+            return AppSettings(botEnabled = s.botEnabled, schemaVersion = SCHEMA)
         }
-        return result.toList()
     }
 }

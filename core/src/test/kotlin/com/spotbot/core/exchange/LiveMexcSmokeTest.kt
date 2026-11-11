@@ -1,8 +1,6 @@
 package com.spotbot.core.exchange
 
-import com.spotbot.core.exchange.mexc.ConnectionStatus
 import com.spotbot.core.exchange.mexc.MexcRestClient
-import com.spotbot.core.exchange.mexc.MexcWebSocketClient
 import com.spotbot.core.model.Timeframe
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -36,23 +34,4 @@ class LiveMexcSmokeTest {
         assertTrue(api.exchangeInfo().any { it.symbol == "BTCUSDT" && it.isSpotTradingAllowed })
     }
 
-    @Test
-    fun `websocket delivers book ticker updates`() = runBlocking {
-        requireLive()
-        val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-        try {
-            val ws = MexcWebSocketClient(scope)
-            val feed = LivePriceFeed(MexcRestClient(), ws, scope)
-            feed.watch(setOf("BTCUSDT", "ETHUSDT"))
-            feed.start()
-            withTimeout(30_000) {
-                ws.state.first { it.status == ConnectionStatus.CONNECTED && it.lastMessageAt != null }
-                val prices = feed.prices.first { it.keys.containsAll(setOf("BTCUSDT", "ETHUSDT")) }
-                assertTrue(prices.getValue("BTCUSDT").ask >= prices.getValue("BTCUSDT").bid)
-            }
-            feed.stop()
-        } finally {
-            scope.cancel()
-        }
-    }
 }

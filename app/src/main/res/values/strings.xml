@@ -7,16 +7,12 @@
     <string name="channel_alerts">Kritik uyarılar</string>
 
     <string name="status_running">Çalışıyor</string>
-    <string name="status_paused">Yeni işlemler duraklatıldı</string>
-    <string name="status_starting">Başlatılıyor</string>
     <string name="status_error">Hata</string>
-    <string name="notif_status_text">Sermaye %1$s USDT · Açık işlem: %2$d (sanal)</string>
+    <string name="notif_status_text">Momentum RS-1 · sermaye %1$s USDT · açık pozisyon: %2$d (sanal)</string>
     <string name="notif_opened">%1$s alındı (sanal)</string>
-    <string name="notif_opened_text">%1$s · giriş %2$s · stop %3$s</string>
+    <string name="notif_opened_text">Giriş %1$s · stop %2$s</string>
     <string name="notif_closed">%1$s kapandı (sanal)</string>
     <string name="notif_closed_text">%1$s · net %2$s USDT</string>
     <string name="notif_problem">Bot uyarısı</string>
-    <string name="action_pause_entries">Yeni işlemleri durdur</string>
-    <string name="action_resume_entries">Yeni işlemlere izin ver</string>
     <string name="action_stop_bot">Botu kapat</string>
 </resources>
