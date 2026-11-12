@@ -54,7 +54,7 @@ class UiInteractionTest {
     @Test
     fun `backtest runs the selected period and cost scenario`() {
         var asked: Pair<BacktestPeriod, Rs1Costs>? = null
-        show { BacktestContent(BacktestState.Idle, { p, c -> asked = p to c }) }
+        show { BacktestContent(BacktestState.Idle, { p, c, _ -> asked = p to c }) }
         compose.onNodeWithText("Kötümser").performClick()
         compose.onNodeWithText("Backtest'i çalıştır").performClick()
         assertEquals(BacktestPeriod.HOLDOUT to Rs1Costs.PESSIMISTIC, asked)

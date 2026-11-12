@@ -148,6 +148,8 @@ data class Rs1Result(
     val exposurePercent: Double = 0.0,
     /** Gün içi stop çözümünde günlük mumla (ihtiyatlı varsayım) çözülen stop sayısı. */
     val dailyResolvedStops: Int = 0,
+    /** Ortalama sermaye kullanımı: açık pozisyon piyasa değeri / özsermaye, günlük ortalama (%). */
+    val capitalUsePercent: Double = 0.0,
 ) {
     val netPnl: Double get() = endEquity - startCapital
     val realizedPnl: Double get() = trades.sumOf { it.netPnl }
@@ -232,6 +234,7 @@ class Rs1Engine(
         val lastPrice = HashMap<String, Double>()
         var exposedDays = 0
         var days = 0
+        var capitalUse = 0.0
         var dailyResolved = 0
         fun equityAt(time: Long): Double = equity.lastOrNull { it.time == time }?.equity ?: cfg.capital
 
@@ -390,9 +393,11 @@ class Rs1Engine(
             // ---- 3) Gün sonu değerleme.
             for (sym in positions.keys) bar(sym, t)?.let { lastPrice[sym] = it.close }
             if (t + DAY_MS <= end) {
-                equity += EquityPoint(t + DAY_MS, markedEquity())
+                val eqNow = markedEquity()
+                equity += EquityPoint(t + DAY_MS, eqNow)
                 days++
                 if (positions.isNotEmpty()) exposedDays++
+                if (eqNow > 0) capitalUse += positions.values.sumOf { (lastPrice[it.symbol] ?: it.entryPrice) * it.quantity } / eqNow
             }
             t += DAY_MS
         }
@@ -415,6 +420,7 @@ class Rs1Engine(
         return Rs1Result(
             start, end, c.name, cfg.capital, endEquity, trades, open, equity, decisions, buyHold(start, end), series.size,
             if (days == 0) 0.0 else exposedDays * 100.0 / days, dailyResolved,
+            if (days == 0) 0.0 else capitalUse * 100 / days,
         )
     }
 

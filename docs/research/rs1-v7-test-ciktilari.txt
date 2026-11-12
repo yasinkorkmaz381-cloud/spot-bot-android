@@ -1,0 +1,134 @@
+Çalıştırılan testlerin gerçek çıktıları (JUnit XML; ./gradlew --rerun-tasks :core:test :app:testDebugUnitTest :app:lintDebug :app:assembleDebug -Pscreenshots)
+
+=== core/build/test-results/test
+com.spotbot.core.exchange.LiveMexcSmokeTest: 1 test, atlanan 1, başarısız 0 (zaman 2026-11-12T19:20:21.924Z UTC)
+   - rest endpoints return consistent closed candles [ATLANDI, 0.048 sn]
+com.spotbot.core.exchange.MexcRestClientTest: 6 test, atlanan 0, başarısız 0 (zaman 2026-11-12T19:20:21.986Z UTC)
+   - parses exchange info fields used for order rules [geçti, 0.323 sn]
+   - converts 24h change ratio to percent and tolerates nulls [geçti, 0.008 sn]
+   - client errors are not retried [geçti, 0.016 sn]
+   - retries after rate limit using Retry-After [geçti, 0.055 sn]
+   - history loader continues after the last returned candle so capped pages leave no gaps [geçti, 0.115 sn]
+   - parses klines and sends MEXC interval names [geçti, 0.009 sn]
+com.spotbot.core.rs1.Rs1BacktestTest: 3 test, atlanan 0, başarısız 0 (zaman 2026-11-12T19:20:22.518Z UTC)
+   - the Android path equals the research engine with 4H stop resolution [geçti, 0.182 sn]
+   - a stop raised at the daily close is not applied to that same day's earlier low [geçti, 0.012 sn]
+   - the approximate mode uses daily bars only and is labelled as such [geçti, 0.028 sn]
+com.spotbot.core.rs1.Rs1EngineTest: 17 test, atlanan 0, başarısız 0 (zaman 2026-11-12T19:20:22.748Z UTC)
+   - trailing stop only moves up and exits are deterministic [geçti, 0.025 sn]
+   - accounting is exact and the risk per trade is 0_5 percent of equity [geçti, 0.011 sn]
+   - entries happen only on Mondays at the open, within position and capital limits [geçti, 0.009 sn]
+   - an intraday gap through the stop exits at the 4H open, not at the stop [geçti, 0.013 sn]
+   - protective stop exits at the stop price, a gap exits at the open [geçti, 0.011 sn]
+   - thin volume, weak relative strength and wide ranges are not bought [geçti, 0.008 sn]
+   - daily evaluation mode enters on non-Mondays and never duplicates a held coin [geçti, 0.01 sn]
+   - new listings are not traded before 150 days of history [geçti, 0.006 sn]
+   - two closes below EMA50 exit at the next open [geçti, 0.006 sn]
+   - BTC filter closed means no entries and the reason is recorded [geçti, 0.004 sn]
+   - decisions before a cutoff do not depend on later data (no look-ahead) [geçti, 0.009 sn]
+   - the frozen default configuration exits only on the protective stop or the BTC regime [geçti, 0.006 sn]
+   - a daily loss of 1_5 percent blocks new entries that Monday [geçti, 0.008 sn]
+   - stop history only rises and open positions are reported as unrealized [geçti, 0.005 sn]
+   - per-symbol fees and the double-cost scenario are applied [geçti, 0.013 sn]
+   - weekly evaluation exits a coin that lost eligibility [geçti, 0.005 sn]
+   - weekday helper matches the calendar [geçti, 0.0 sn]
+com.spotbot.core.rs1.Rs1PaperTest: 8 test, atlanan 0, başarısız 0 (zaman 2026-11-12T19:20:22.907Z UTC)
+   - paper trading makes exactly the backtest decisions on the same data [geçti, 0.871 sn]
+   - entries fill at the live order book price recorded at evaluation, not at the stale open [geçti, 0.004 sn]
+   - restarting the app keeps positions and history [geçti, 0.113 sn]
+   - live checks decide entries - wide spread or thin book blocks the candidate [geçti, 0.003 sn]
+   - untracked intervals are recorded when the app was not running [geçti, 0.002 sn]
+   - snapshots outside the Monday window are refused [geçti, 0.002 sn]
+   - an intraday stop is recorded before the day closes, at the same price as the daily result [geçti, 0.124 sn]
+   - a missed weekly evaluation blocks entries that week and is reported as an access problem [geçti, 0.004 sn]
+com.spotbot.core.rs1.Rs1ScannerTest: 7 test, atlanan 0, başarısız 0 (zaman 2026-11-12T19:20:24.035Z UTC)
+   - scanner candidates equal the engine's choice on the same Monday [geçti, 0.014 sn]
+   - discovers all pairs, excludes products and applies the RS-1 rules [geçti, 0.003 sn]
+   - the bot records the weekly live check in the Monday window and paper trading enters [geçti, 0.007 sn]
+   - next weekly evaluation is the coming Monday 00_15 UTC [geçti, 0.001 sn]
+   - wide spreads fail the 0_15 percent rule [geçti, 0.003 sn]
+   - new listings and delistings are detected and daily candles are cached [geçti, 0.003 sn]
+   - a thin order book blocks candidates and is counted as a depth failure [geçti, 0.002 sn]
+com.spotbot.core.security.SecurityTest: 4 test, atlanan 0, başarısız 0 (zaman 2026-11-12T19:20:24.073Z UTC)
+   - rest client only issues GET requests [geçti, 0.011 sn]
+   - old strategies and the old trading engine cannot run [geçti, 0.033 sn]
+   - default configuration matches the pre-registered and frozen RS-1 parameters [geçti, 0.001 sn]
+   - no signed order endpoints or api key handling exist in the sources [geçti, 0.021 sn]
+com.spotbot.core.ta.IndicatorsTest: 9 test, atlanan 0, başarısız 0 (zaman 2026-11-12T19:20:24.142Z UTC)
+   - supertrend matches reference [geçti, 0.018 sn]
+   - macd matches reference [geçti, 0.004 sn]
+   - sma and warmup produce NaN until enough data [geçti, 0.002 sn]
+   - rsi matches reference [geçti, 0.002 sn]
+   - adx and directional indicators match reference [geçti, 0.006 sn]
+   - atr matches reference [geçti, 0.002 sn]
+   - ema matches reference [geçti, 0.003 sn]
+   - daily vwap resets at UTC midnight [geçti, 0.002 sn]
+   - correlation of identical and inverted series [geçti, 0.002 sn]
+TOPLAM 55 test · atlanan 1 · başarısız 0
+
+=== app/build/test-results/testDebugUnitTest
+com.spotbot.android.FormattersTest: 5 test, atlanan 0, başarısız 0 (zaman 2026-11-12T19:20:33.986Z UTC)
+   - compact volumes and ratios [geçti, 0.013 sn]
+   - percent places the sign and symbol per locale [geçti, 0.002 sn]
+   - money and signed money [geçti, 0.001 sn]
+   - decimal input accepts comma or dot [geçti, 0.009 sn]
+   - prices use magnitude based precision and Turkish separators [geçti, 0.001 sn]
+com.spotbot.android.ScreenshotTest: 8 test, atlanan 0, başarısız 0 (zaman 2026-11-12T19:20:34.197Z UTC)
+   - scanScreen [geçti, 7.692 sn]
+   - weekly [geçti, 0.507 sn]
+   - archive [geçti, 0.326 sn]
+   - panel [geçti, 0.412 sn]
+   - history [geçti, 0.246 sn]
+   - settings [geçti, 0.253 sn]
+   - openPositions [geçti, 0.285 sn]
+   - backtest [geçti, 0.317 sn]
+com.spotbot.android.SettingsMigrationTest: 3 test, atlanan 0, başarısız 0 (zaman 2026-11-12T19:20:44.905Z UTC)
+   - archived trades are readable without the old classes [geçti, 0.033 sn]
+   - old engine files are archived, not deleted, and the bot preference is kept [geçti, 0.005 sn]
+   - a fresh install has nothing to archive [geçti, 0.0 sn]
+com.spotbot.android.SmallScreenTest: 8 test, atlanan 0, başarısız 0 (zaman 2026-11-12T19:20:44.947Z UTC)
+   - scanScreen [geçti, 0.159 sn]
+   - weekly [geçti, 0.156 sn]
+   - archive [geçti, 0.129 sn]
+   - panel [geçti, 0.131 sn]
+   - history [geçti, 0.146 sn]
+   - settings [geçti, 0.122 sn]
+   - openPositions [geçti, 0.149 sn]
+   - backtest [geçti, 0.16 sn]
+com.spotbot.android.UiInteractionTest: 4 test, atlanan 0, başarısız 0 (zaman 2026-11-12T19:20:46.108Z UTC)
+   - backtest runs the selected period and cost scenario [geçti, 5.06 sn]
+   - resetting the paper account asks for confirmation [geçti, 0.341 sn]
+   - the settings screen offers no strategy selection [geçti, 0.142 sn]
+   - trades tabs switch between open, history, weekly and archive [geçti, 0.492 sn]
+TOPLAM 28 test · atlanan 0 · başarısız 0
+
+
+=== Gradle konsol çıktısı (son 25 satır)
+> Task :app:mergeDebugNativeLibs
+
+> Task :app:stripDebugDebugSymbols
+Unable to strip the following libraries, packaging them as they are: libandroidx.graphics.path.so. Run with --info option to learn more.
+
+> Task :app:validateSigningDebug
+> Task :app:writeDebugAppMetadata
+> Task :app:writeDebugSigningConfigVersions
+> Task :app:packageDebug
+> Task :app:createDebugApkListingFileRedirect
+> Task :app:assembleDebug
+> Task :cli:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :cli:compileKotlin
+> Task :cli:compileJava NO-SOURCE
+> Task :cli:processResources NO-SOURCE
+> Task :cli:classes UP-TO-DATE
+> Task :cli:jar
+> Task :cli:startScripts
+> Task :cli:installDist
+
+[Incubating] Problems report is available at: file:///home/user/spot-bot-android/build/reports/problems/problems-report.html
+
+BUILD SUCCESSFUL in 1m 13s
+68 actionable tasks: 68 executed
+Configuration cache entry reused.
+
+=== Lint: 0 sorun
+=== APK: 13509486 Nov 12 19:21 bayt, sürüm 3.2.0-paper (versionCode 13)

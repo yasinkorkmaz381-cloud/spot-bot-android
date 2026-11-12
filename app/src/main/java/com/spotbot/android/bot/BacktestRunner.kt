@@ -52,47 +52,42 @@ sealed interface BacktestState {
         /** Ön kayıtlı kabul ölçütleri (iki kat maliyet çalıştırmasıyla). */
         val evidence: com.spotbot.core.rs1.Evidence? = null,
         val doubled: Rs1Result? = null,
+        val mode: com.spotbot.core.rs1.BacktestMode = com.spotbot.core.rs1.BacktestMode.RESEARCH,
     ) : BacktestState
     data class Failed(val message: String) : BacktestState
 }
 
-/**
- * Cihazda Momentum RS-1 backtest'i: bugünkü MEXC USDT evreninin (ürün ayıklaması dışında filtre yok) 1D geçmişi
- * indirilir (önbellek), paper trading ile aynı motor çalıştırılır. Spread/derinlik şartları geçmişte ölçülemez.
- */
 class BacktestRunner(private val api: MarketDataApi, private val scope: CoroutineScope, private val cacheDir: File, private val base: Rs1Config) {
     private val json = Json { ignoreUnknownKeys = true; allowSpecialFloatingPointValues = true }
     private val _state = MutableStateFlow<BacktestState>(BacktestState.Idle)
     val state: StateFlow<BacktestState> = _state.asStateFlow()
     private var job: Job? = null
 
-    fun run(period: BacktestPeriod, costs: Rs1Costs) {
+    /**
+     * Araştırma ile aynı yol ([com.spotbot.core.rs1.Rs1Backtest]): aynı veri hazırlığı, aynı motor, aynı gerçekleşme
+     * modeli. [mode] = APPROXIMATE ise gün içi veri indirilmez ve sonuç "yaklaşık" olarak etiketlenir.
+     */
+    fun run(period: BacktestPeriod, costs: Rs1Costs, mode: com.spotbot.core.rs1.BacktestMode = com.spotbot.core.rs1.BacktestMode.RESEARCH) {
         if (job?.isActive == true) return
         job = scope.launch(Dispatchers.IO) {
             try {
                 val today = System.currentTimeMillis() / DAY_MS * DAY_MS
                 val (start, end) = period.range(today)
-                // Göstergeler ve 150 günlük geçmiş şartı için başlangıçtan 400 gün önce.
-                val from = start - 400 * DAY_MS
-                _state.value = BacktestState.Running("Parite listesi alınıyor…", null)
-                val symbols = Rs1History.universe(api)
-                // Parite bazında taker ücreti (MEXC exchangeInfo; geçmişte de aynı olduğu varsayımdır).
-                val fees = api.exchangeInfo().associate { it.symbol to it.takerFee }
-                val dir = File(cacheDir, "rs1-1d").apply { mkdirs() }
-                val (data, failed) = Rs1History.download(
-                    api, symbols, from, end,
-                    cache = { s -> read(File(dir, "$s-$from-$end.json")) },
-                    store = { s, c -> File(dir, "$s-$from-$end.json").writeText(json.encodeToString(ListSerializer(Candle.serializer()), c)) },
-                    onProgress = { i, n -> _state.value = BacktestState.Running("1D veri: $i / $n parite", i.toFloat() / n) },
+                _state.value = BacktestState.Running("Parite listesi ve ücretler alınıyor…", null)
+                val dir = File(cacheDir, "rs1-bt").apply { mkdirs() }
+                fun file(key: String) = File(dir, key.replace(':', '_') + ".json")
+                val data = com.spotbot.core.rs1.Rs1Backtest.prepare(
+                    api, start, end, mode, base,
+                    cache = { k -> read(file(k)) },
+                    store = { k, c -> file(k).writeText(json.encodeToString(ListSerializer(Candle.serializer()), c)) },
+                    onProgress = { what, i, n -> _state.value = BacktestState.Running("$what: $i / $n parite", i.toFloat() / n) },
                 )
                 _state.value = BacktestState.Running("Momentum RS-1 çalıştırılıyor…", null)
                 val cfg = base.copy(costs = costs)
-                val series = data.mapValues { (s, c) -> DailySeries(s, c, cfg) }
                 // Açık pozisyonlar dönem sonunda zorla kapatılmaz: gerçekleşmemiş olarak değerlenir.
-                val result = Rs1Engine(series, cfg, fees).run(start, end, closeAtEnd = false)
-                val dcfg = cfg.copy(costs = costs.doubled())
-                val doubled = Rs1Engine(data.mapValues { (s, c) -> DailySeries(s, c, dcfg) }, dcfg, fees).run(start, end, closeAtEnd = false)
-                _state.value = BacktestState.Done(result, period, failed.size, com.spotbot.core.rs1.Rs1Evidence.classify(result, doubled), doubled)
+                val result = com.spotbot.core.rs1.Rs1Backtest.run(data, cfg, start, end)
+                val doubled = com.spotbot.core.rs1.Rs1Backtest.run(data, cfg.copy(costs = costs.doubled()), start, end)
+                _state.value = BacktestState.Done(result, period, data.failed.size, com.spotbot.core.rs1.Rs1Evidence.classify(result, doubled), doubled, mode)
             } catch (e: Exception) {
                 _state.value = BacktestState.Failed(e.message ?: e::class.simpleName ?: "Hata")
             }

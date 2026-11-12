@@ -1,0 +1,149 @@
+V7 protokolü · 1D 1203 parite (1136260 mum; yinelenen 0, sırasız 0; UTC'ye hizasız 0, 4H'den kurulan 0) · 4H 471 parite · ücret tablosu 1791 · veri sonu 2026-11-09
+Ortak kurallar: Rs1Versions.V6 (yalnız giriş sıklığı ve iz süren stop değişir; iz süren = en yüksek kapanış − 3.0 ATR). Orta maliyet + parite ücreti; ×2 maliyet. Her çalıştırma 1.000 USDT, pozisyon devri yok, açık pozisyon dönem sonunda gerçekleşmemiş.
+UYARI: 2020–2026 daha önce incelendi; bütün sonuçlar tarihsel sağlamlık incelemesidir, bağımsız test değildir.
+
+════ Pencere 1 · eğitim 2020-08-01 → 2022-07-31 · değerlendirme 2022-08-01 → 2023-01-31 ════
+  eğitim W0                    16 işlem · net % +25.69 (gerç  +256.9 / açık   +0.0) · düşüş % 5.34 · PF  7.97 · beklenti +16.06 · ort +3.122R [+0.29, +7.07] · ×2 % +24.57 · en iyi coin yok  +6.24 · en iyi 3 yok    +6.4 · piyasada % 33 · sermaye %  3 · maliyet   2.1 ⚠<30
+  eğitim W1                    24 işlem · net %  +9.61 (gerç   +96.1 / açık   +0.0) · düşüş % 2.76 · PF  3.02 · beklenti  +4.00 · ort +0.782R [+0.09, +1.57] · ×2 %  +9.13 · en iyi coin yok  +2.46 · en iyi 3 yok    +7.6 · piyasada % 30 · sermaye %  2 · maliyet   2.2 ⚠<30
+  eğitim D0                    24 işlem · net % +27.68 (gerç  +276.8 / açık   +0.0) · düşüş % 5.36 · PF  8.19 · beklenti +11.53 · ort +2.217R [+0.27, +4.96] · ×2 % +26.46 · en iyi coin yok  +4.44 · en iyi 3 yok   +24.6 · piyasada % 40 · sermaye %  4 · maliyet   3.0 ⚠<30
+  eğitim D1                    33 işlem · net % +12.68 (gerç  +126.8 / açık   +0.0) · düşüş % 3.29 · PF  3.39 · beklenti  +3.84 · ort +0.743R [+0.15, +1.40] · ×2 % +12.02 · en iyi coin yok  +1.91 · en iyi 3 yok   +25.3 · piyasada % 39 · sermaye %  2 · maliyet   3.2
+  Seçim (yalnız eğitim verisi): kazanan yok → W0 (mevcut V6)
+  değerlendirme W0              0 işlem · net %  +0.92 (gerç    +0.0 / açık   +9.2) · düşüş % 0.64 · PF  0.00 · beklenti  +0.00 · ort +0.000R [NaN, NaN] · ×2 %  +0.83 · en iyi coin yok  +0.00 · en iyi 3 yok    +0.0 · piyasada %  9 · sermaye %  1 · maliyet   0.0 ⚠<30
+  değerlendirme W1              0 işlem · net %  +0.92 (gerç    +0.0 / açık   +9.2) · düşüş % 0.64 · PF  0.00 · beklenti  +0.00 · ort +0.000R [NaN, NaN] · ×2 %  +0.83 · en iyi coin yok  +0.00 · en iyi 3 yok    +0.0 · piyasada %  9 · sermaye %  1 · maliyet   0.0 ⚠<30
+  değerlendirme D0              2 işlem · net %  +0.56 (gerç    -3.6 / açık   +9.2) · düşüş % 0.64 · PF  0.00 · beklenti  -1.82 · ort -0.365R [-0.40, -0.33] · ×2 %  +0.45 · en iyi coin yok  -2.01 · en iyi 3 yok    +0.0 · piyasada % 10 · sermaye %  1 · maliyet   0.2 ⚠<30
+  değerlendirme D1              2 işlem · net %  +0.56 (gerç    -3.6 / açık   +9.2) · düşüş % 0.64 · PF  0.00 · beklenti  -1.82 · ort -0.365R [-0.40, -0.33] · ×2 %  +0.45 · en iyi coin yok  -2.01 · en iyi 3 yok    +0.0 · piyasada % 10 · sermaye %  1 · maliyet   0.2 ⚠<30
+
+════ Pencere 2 · eğitim 2020-08-01 → 2023-01-31 · değerlendirme 2023-02-01 → 2023-07-31 ════
+  eğitim W0                    16 işlem · net % +26.85 (gerç  +256.9 / açık  +11.6) · düşüş % 5.34 · PF  7.97 · beklenti +16.06 · ort +3.122R [+0.29, +7.07] · ×2 % +25.61 · en iyi coin yok  +6.24 · en iyi 3 yok    +6.4 · piyasada % 28 · sermaye %  3 · maliyet   2.1 ⚠<30
+  eğitim W1                    24 işlem · net % +10.62 (gerç   +96.1 / açık  +10.1) · düşüş % 2.86 · PF  3.02 · beklenti  +4.00 · ort +0.782R [+0.09, +1.57] · ×2 % +10.03 · en iyi coin yok  +2.46 · en iyi 3 yok    +7.6 · piyasada % 26 · sermaye %  2 · maliyet   2.2 ⚠<30
+  eğitim D0                    26 işlem · net % +28.38 (gerç  +272.1 / açık  +11.8) · düşüş % 5.36 · PF  7.30 · beklenti +10.47 · ort +2.018R [+0.22, +4.52] · ×2 % +27.03 · en iyi coin yok  +3.85 · en iyi 3 yok   +19.9 · piyasada % 34 · sermaye %  3 · maliyet   3.2 ⚠<30
+  eğitim D1                    35 işlem · net % +13.31 (gerç  +122.7 / açık  +10.4) · düşüş % 3.29 · PF  3.15 · beklenti  +3.51 · ort +0.680R [+0.11, +1.29] · ×2 % +12.53 · en iyi coin yok  +1.63 · en iyi 3 yok   +21.2 · piyasada % 33 · sermaye %  2 · maliyet   3.5
+  Seçim (yalnız eğitim verisi): kazanan yok → W0 (mevcut V6)
+  değerlendirme W0              7 işlem · net %  -0.95 (gerç    -9.5 / açık   +0.0) · düşüş % 1.23 · PF  0.07 · beklenti  -1.36 · ort -0.273R [-0.41, -0.12] · ×2 %  -1.02 · en iyi coin yok  -1.39 · en iyi 3 yok    -8.7 · piyasada % 39 · sermaye %  3 · maliyet   1.0 ⚠<30
+  değerlendirme W1              7 işlem · net %  -1.03 (gerç   -10.3 / açık   +0.0) · düşüş % 1.30 · PF  0.07 · beklenti  -1.47 · ort -0.295R [-0.45, -0.13] · ×2 %  -1.10 · en iyi coin yok  -1.52 · en iyi 3 yok    -9.4 · piyasada % 38 · sermaye %  2 · maliyet   1.0 ⚠<30
+  değerlendirme D0             10 işlem · net %  +0.11 (gerç    +1.1 / açık   +0.0) · düşüş % 1.37 · PF  1.12 · beklenti  +0.11 · ort +0.023R [-0.21, +0.28] · ×2 %  -0.03 · en iyi coin yok  -0.50 · en iyi 3 yok    -9.1 · piyasada % 61 · sermaye %  4 · maliyet   1.4 ⚠<30
+  değerlendirme D1             11 işlem · net %  -0.39 (gerç    -3.9 / açık   +0.0) · düşüş % 1.39 · PF  0.72 · beklenti  -0.36 · ort -0.071R [-0.31, +0.19] · ×2 %  -0.53 · en iyi coin yok  -0.59 · en iyi 3 yok   -14.0 · piyasada % 56 · sermaye %  4 · maliyet   1.6 ⚠<30
+
+════ Pencere 3 · eğitim 2020-08-01 → 2023-07-31 · değerlendirme 2023-08-01 → 2024-01-31 ════
+  eğitim W0                    23 işlem · net % +26.22 (gerç  +262.2 / açık   +0.0) · düşüş % 5.34 · PF  6.81 · beklenti +11.40 · ort +2.209R [+0.20, +5.02] · ×2 % +24.91 · en iyi coin yok  +5.06 · en iyi 3 yok   +11.7 · piyasada % 32 · sermaye %  3 · maliyet   3.6 ⚠<30
+  eğitim W1                    33 işlem · net %  +8.41 (gerç   +84.1 / açık   +0.0) · düşüş % 3.74 · PF  2.33 · beklenti  +2.55 · ort +0.502R [-0.01, +1.09] · ×2 %  +7.81 · en iyi coin yok  +1.74 · en iyi 3 yok    -4.4 · piyasada % 29 · sermaye %  2 · maliyet   3.9
+  eğitim D0                    36 işlem · net % +28.80 (gerç  +288.0 / açık   +0.0) · düşüş % 5.36 · PF  6.42 · beklenti  +8.00 · ort +1.527R [+0.20, +3.41] · ×2 % +27.30 · en iyi coin yok  +3.19 · en iyi 3 yok   +35.9 · piyasada % 38 · sermaye %  4 · maliyet   5.2
+  eğitim D1                    47 işlem · net % +12.21 (gerç  +122.1 / açık   +0.0) · düşüş % 3.29 · PF  2.70 · beklenti  +2.60 · ort +0.504R [+0.08, +0.98] · ×2 % +11.34 · en iyi coin yok  +1.17 · en iyi 3 yok   +20.6 · piyasada % 37 · sermaye %  2 · maliyet   5.6
+  Seçim (yalnız eğitim verisi): kazanan yok → W0 (mevcut V6)
+  değerlendirme W0              3 işlem · net %  +8.57 (gerç   +85.7 / açık   +0.0) · düşüş % 2.77 · PF 24.72 · beklenti +28.58 · ort +5.698R [+1.70, +9.69] · ×2 %  +8.24 · en iyi coin yok +14.51 · en iyi 3 yok    +0.0 · piyasada % 47 · sermaye %  7 · maliyet   0.8 ⚠<30
+  değerlendirme W1              4 işlem · net %  +8.03 (gerç   +80.3 / açık   +0.0) · düşüş % 2.97 · PF 14.48 · beklenti +20.07 · ort +4.004R [-0.51, +8.59] · ×2 %  +7.72 · en iyi coin yok  +6.16 · en iyi 3 yok    -3.6 · piyasada % 45 · sermaye %  5 · maliyet   0.9 ⚠<30
+  değerlendirme D0              7 işlem · net %  +9.60 (gerç   +98.1 / açık   -2.1) · düşüş % 3.28 · PF 11.21 · beklenti +14.02 · ort +2.793R [-0.23, +6.35] · ×2 %  +9.16 · en iyi coin yok  +5.70 · en iyi 3 yok    -9.6 · piyasada % 55 · sermaye %  8 · maliyet   1.1 ⚠<30
+  değerlendirme D1             10 işlem · net %  +9.88 (gerç  +100.9 / açık   -2.1) · düşüş % 2.39 · PF  9.55 · beklenti +10.09 · ort +1.997R [-0.01, +4.52] · ×2 %  +9.44 · en iyi coin yok  +3.51 · en iyi 3 yok    -3.5 · piyasada % 55 · sermaye %  6 · maliyet   1.4 ⚠<30
+
+════ Pencere 4 · eğitim 2020-08-01 → 2024-01-31 · değerlendirme 2024-02-01 → 2024-07-31 ════
+  eğitim W0                    26 işlem · net % +37.04 (gerç  +370.4 / açık   +0.0) · düşüş % 5.34 · PF  8.45 · beklenti +14.25 · ort +2.611R [+0.66, +5.10] · ×2 % +35.21 · en iyi coin yok  +8.98 · en iyi 3 yok   +88.1 · piyasada % 34 · sermaye %  4 · maliyet   4.6 ⚠<30
+  eğitim W1                    37 işlem · net % +17.11 (gerç  +171.1 / açık   +0.0) · düşüş % 4.01 · PF  3.46 · beklenti  +4.62 · ort +0.881R [+0.18, +1.67] · ×2 % +16.13 · en iyi coin yok  +2.89 · en iyi 3 yok   +35.7 · piyasada % 31 · sermaye %  2 · maliyet   4.8
+  eğitim D0                    43 işlem · net % +41.17 (gerç  +414.4 / açık   -2.7) · düşüş % 5.36 · PF  7.33 · beklenti  +9.64 · ort +1.733R [+0.48, +3.34] · ×2 % +38.96 · en iyi coin yok  +5.13 · en iyi 3 yok  +107.1 · piyasada % 41 · sermaye %  4 · maliyet   6.7
+  eğitim D1                    57 işlem · net % +23.30 (gerç  +235.4 / açık   -2.4) · düşüş % 3.29 · PF  3.77 · beklenti  +4.13 · ort +0.766R [+0.25, +1.37] · ×2 % +21.85 · en iyi coin yok  +2.88 · en iyi 3 yok   +87.1 · piyasada % 40 · sermaye %  3 · maliyet   7.1
+  Seçim (yalnız eğitim verisi): kazanan yok → W0 (mevcut V6)
+  değerlendirme W0              6 işlem · net %  +3.30 (gerç   +30.4 / açık   +2.7) · düşüş % 1.82 · PF  3.23 · beklenti  +5.06 · ort +1.006R [-0.36, +2.63] · ×2 %  +3.10 · en iyi coin yok  +2.59 · en iyi 3 yok   -13.6 · piyasada % 50 · sermaye %  3 · maliyet   0.8 ⚠<30
+  değerlendirme W1             12 işlem · net %  -0.59 (gerç    -8.5 / açık   +2.6) · düşüş % 2.55 · PF  0.71 · beklenti  -0.71 · ort -0.139R [-0.60, +0.42] · ×2 %  -0.75 · en iyi coin yok  -2.04 · en iyi 3 yok   -28.7 · piyasada % 45 · sermaye %  3 · maliyet   1.3 ⚠<30
+  değerlendirme D0             10 işlem · net %  +0.76 (gerç    +2.5 / açık   +5.1) · düşüş % 2.25 · PF  1.19 · beklenti  +0.25 · ort +0.052R [-0.38, +0.63] · ×2 %  +0.59 · en iyi coin yok  -1.29 · en iyi 3 yok   -12.8 · piyasada % 57 · sermaye %  4 · maliyet   1.2 ⚠<30
+  değerlendirme D1             15 işlem · net %  +1.57 (gerç   +10.5 / açık   +5.2) · düşüş % 1.69 · PF  1.74 · beklenti  +0.70 · ort +0.142R [-0.20, +0.54] · ×2 %  +1.31 · en iyi coin yok  -0.26 · en iyi 3 yok   -13.1 · piyasada % 57 · sermaye %  4 · maliyet   1.8 ⚠<30
+
+════ Pencere 5 · eğitim 2020-08-01 → 2024-07-31 · değerlendirme 2024-08-01 → 2025-01-31 ════
+  eğitim W0                    32 işlem · net % +41.57 (gerç  +412.0 / açık   +3.7) · düşüş % 5.34 · PF  7.02 · beklenti +12.88 · ort +2.310R [+0.69, +4.45] · ×2 % +39.41 · en iyi coin yok  +8.44 · en iyi 3 yok  +129.7 · piyasada % 36 · sermaye %  4 · maliyet   5.6
+  eğitim W1                    49 işlem · net % +16.42 (gerç  +161.2 / açık   +3.0) · düşüş % 5.16 · PF  2.56 · beklenti  +3.29 · ort +0.631R [+0.09, +1.25] · ×2 % +15.26 · en iyi coin yok  +2.17 · en iyi 3 yok   +25.7 · piyasada % 33 · sermaye %  2 · maliyet   6.3
+  eğitim D0                    55 işlem · net % +42.24 (gerç  +415.1 / açık   +7.2) · düşüş % 5.36 · PF  5.78 · beklenti  +7.55 · ort +1.357R [+0.35, +2.61] · ×2 % +39.77 · en iyi coin yok  +3.87 · en iyi 3 yok  +107.9 · piyasada % 43 · sermaye %  4 · maliyet   8.9
+  eğitim D1                    74 işlem · net % +25.23 (gerç  +246.0 / açık   +6.4) · düşüş % 3.29 · PF  3.34 · beklenti  +3.32 · ort +0.614R [+0.20, +1.07] · ×2 % +23.44 · en iyi coin yok  +2.39 · en iyi 3 yok   +97.8 · piyasada % 42 · sermaye %  3 · maliyet   9.7
+  Seçim (yalnız eğitim verisi): kazanan yok → W0 (mevcut V6)
+  değerlendirme W0              8 işlem · net %  +2.32 (gerç   +23.7 / açık   -0.6) · düşüş % 4.25 · PF  2.46 · beklenti  +2.97 · ort +0.608R [-0.59, +2.61] · ×2 %  +2.17 · en iyi coin yok  -2.15 · en iyi 3 yok   -16.2 · piyasada % 45 · sermaye %  4 · maliyet   0.8 ⚠<30
+  değerlendirme W1             10 işlem · net %  +2.15 (gerç   +22.0 / açık   -0.6) · düşüş % 2.72 · PF  2.03 · beklenti  +2.20 · ort +0.459R [-0.55, +1.86] · ×2 %  +2.00 · en iyi coin yok  -1.62 · en iyi 3 yok   -21.4 · piyasada % 43 · sermaye %  3 · maliyet   0.9 ⚠<30
+  değerlendirme D0             20 işlem · net %  +3.20 (gerç   +37.0 / açık   -4.9) · düşüş % 3.45 · PF  2.26 · beklenti  +1.85 · ort +0.376R [-0.20, +1.06] · ×2 %  +2.97 · en iyi coin yok  +0.49 · en iyi 3 yok   -20.1 · piyasada % 59 · sermaye %  4 · maliyet   1.7 ⚠<30
+  değerlendirme D1             24 işlem · net %  +1.79 (gerç   +22.8 / açık   -4.9) · düşüş % 3.97 · PF  1.61 · beklenti  +0.95 · ort +0.198R [-0.25, +0.80] · ×2 %  +1.53 · en iyi coin yok  -0.57 · en iyi 3 yok   -27.9 · piyasada % 59 · sermaye %  4 · maliyet   2.1 ⚠<30
+
+════ Pencere 6 · eğitim 2020-08-01 → 2025-01-31 · değerlendirme 2025-02-01 → 2025-07-31 ════
+  eğitim W0                    42 işlem · net % +43.95 (gerç  +440.3 / açık   -0.8) · düşüş % 5.34 · PF  5.48 · beklenti +10.48 · ort +1.859R [+0.57, +3.46] · ×2 % +41.57 · en iyi coin yok  +6.74 · en iyi 3 yok  +145.4 · piyasada % 37 · sermaye %  4 · maliyet   7.1
+  eğitim W1                    61 işlem · net % +18.18 (gerç  +182.4 / açık   -0.6) · düşüş % 5.97 · PF  2.36 · beklenti  +2.99 · ort +0.570R [+0.09, +1.10] · ×2 % +16.85 · en iyi coin yok  +2.10 · en iyi 3 yok   +38.3 · piyasada % 34 · sermaye %  2 · maliyet   7.7
+  eğitim D0                    75 işlem · net % +46.60 (gerç  +473.0 / açık   -7.0) · düşüş % 5.36 · PF  4.80 · beklenti  +6.31 · ort +1.106R [+0.36, +2.08] · ×2 % +43.76 · en iyi coin yok  +3.59 · en iyi 3 yok  +165.8 · piyasada % 44 · sermaye %  4 · maliyet  11.4
+  eğitim D1                    98 işlem · net % +27.36 (gerç  +279.7 / açık   -6.1) · düşüş % 3.97 · PF  2.90 · beklenti  +2.85 · ort +0.520R [+0.19, +0.90] · ×2 % +25.24 · en iyi coin yok  +2.11 · en iyi 3 yok  +122.1 · piyasada % 44 · sermaye %  3 · maliyet  12.4
+  Seçim (yalnız eğitim verisi): kazanan yok → W0 (mevcut V6)
+  değerlendirme W0              4 işlem · net %  -0.56 (gerç   -15.5 / açık  +10.0) · düşüş % 2.17 · PF  0.00 · beklenti  -3.88 · ort -0.776R [-1.00, -0.52] · ×2 %  -0.60 · en iyi coin yok  -4.57 · en iyi 3 yok    -5.0 · piyasada % 46 · sermaye %  2 · maliyet   0.3 ⚠<30
+  değerlendirme W1              5 işlem · net %  -0.31 (gerç   -13.0 / açık  +10.0) · düşüş % 1.92 · PF  0.06 · beklenti  -2.61 · ort -0.523R [-0.87, -0.18] · ×2 %  -0.36 · en iyi coin yok  -3.46 · en iyi 3 yok   -10.0 · piyasada % 44 · sermaye %  2 · maliyet   0.3 ⚠<30
+  değerlendirme D0              8 işlem · net %  -0.67 (gerç   -18.3 / açık  +11.6) · düşüş % 2.90 · PF  0.04 · beklenti  -2.29 · ort -0.460R [-0.69, -0.23] · ×2 %  -0.73 · en iyi coin yok  -2.58 · en iyi 3 yok   -17.2 · piyasada % 54 · sermaye %  3 · maliyet   0.5 ⚠<30
+  değerlendirme D1              8 işlem · net %  +0.43 (gerç    -7.4 / açık  +11.8) · düşüş % 1.83 · PF  0.29 · beklenti  -0.93 · ort -0.185R [-0.43, +0.05] · ×2 %  +0.34 · en iyi coin yok  -1.40 · en iyi 3 yok   -10.3 · piyasada % 54 · sermaye %  3 · maliyet   0.6 ⚠<30
+
+════ Pencere 7 · eğitim 2020-08-01 → 2025-07-31 · değerlendirme 2025-08-01 → 2026-01-31 ════
+  eğitim W0                    48 işlem · net % +42.20 (gerç  +407.8 / açık  +14.2) · düşüş % 6.63 · PF  4.12 · beklenti  +8.50 · ort +1.532R [+0.39, +2.97] · ×2 % +39.80 · en iyi coin yok  +4.87 · en iyi 3 yok  +112.9 · piyasada % 38 · sermaye %  4 · maliyet   7.6
+  eğitim W1                    68 işlem · net % +16.97 (gerç  +158.0 / açık  +11.7) · düşüş % 5.97 · PF  1.99 · beklenti  +2.32 · ort +0.451R [+0.01, +0.95] · ×2 % +15.60 · en iyi coin yok  +1.48 · en iyi 3 yok   +13.8 · piyasada % 35 · sermaye %  2 · maliyet   8.2
+  eğitim D0                    83 işlem · net % +46.01 (gerç  +443.0 / açık  +17.1) · düşüş % 5.36 · PF  3.84 · beklenti  +5.34 · ort +0.950R [+0.27, +1.83] · ×2 % +43.09 · en iyi coin yok  +2.77 · en iyi 3 yok  +135.7 · piyasada % 45 · sermaye %  4 · maliyet  12.2
+  eğitim D1                   106 işlem · net % +28.24 (gerç  +267.4 / açık  +15.0) · düşüş % 4.56 · PF  2.63 · beklenti  +2.52 · ort +0.463R [+0.15, +0.82] · ×2 % +26.00 · en iyi coin yok  +1.78 · en iyi 3 yok  +109.8 · piyasada % 45 · sermaye %  3 · maliyet  13.1
+  Seçim (yalnız eğitim verisi): kazanan yok → W0 (mevcut V6)
+  değerlendirme W0              7 işlem · net %  -1.89 (gerç   -18.9 / açık   +0.0) · düşüş % 2.11 · PF  0.06 · beklenti  -2.69 · ort -0.541R [-0.82, -0.25] · ×2 %  -1.91 · en iyi coin yok  -3.33 · en iyi 3 yok   -17.6 · piyasada % 14 · sermaye %  1 · maliyet   0.5 ⚠<30
+  değerlendirme W1              7 işlem · net %  -1.05 (gerç   -10.5 / açık   +0.0) · düşüş % 1.27 · PF  0.30 · beklenti  -1.49 · ort -0.300R [-0.65, +0.07] · ×2 %  -1.08 · en iyi coin yok  -2.31 · en iyi 3 yok   -13.9 · piyasada % 14 · sermaye %  1 · maliyet   0.5 ⚠<30
+  değerlendirme D0             13 işlem · net %  -1.94 (gerç   -19.4 / açık   +0.0) · düşüş % 2.89 · PF  0.26 · beklenti  -1.50 · ort -0.300R [-0.54, -0.05] · ×2 %  -2.01 · en iyi coin yok  -1.97 · en iyi 3 yok   -26.0 · piyasada % 19 · sermaye %  1 · maliyet   1.0 ⚠<30
+  değerlendirme D1             13 işlem · net %  -0.55 (gerç    -5.5 / açık   +0.0) · düşüş % 1.56 · PF  0.66 · beklenti  -0.43 · ort -0.085R [-0.31, +0.15] · ×2 %  -0.65 · en iyi coin yok  -0.82 · en iyi 3 yok   -14.4 · piyasada % 19 · sermaye %  1 · maliyet   1.1 ⚠<30
+
+════ Pencere 8 · eğitim 2020-08-01 → 2026-01-31 · değerlendirme 2026-02-01 → 2026-07-31 ════
+  eğitim W0                    55 işlem · net % +41.01 (gerç  +410.1 / açık   +0.0) · düşüş % 6.63 · PF  3.67 · beklenti  +7.46 · ort +1.344R [+0.34, +2.59] · ×2 % +38.59 · en iyi coin yok  +4.18 · en iyi 3 yok  +115.1 · piyasada % 36 · sermaye %  3 · maliyet   8.4
+  eğitim W1                    75 işlem · net % +16.98 (gerç  +169.8 / açık   +0.0) · düşüş % 5.97 · PF  1.98 · beklenti  +2.26 · ort +0.436R [+0.04, +0.90] · ×2 % +15.56 · en iyi coin yok  +1.50 · en iyi 3 yok   +25.6 · piyasada % 33 · sermaye %  2 · maliyet   8.9
+  eğitim D0                    96 işlem · net % +43.86 (gerç  +438.6 / açık   +0.0) · düşüş % 5.42 · PF  3.30 · beklenti  +4.57 · ort +0.815R [+0.21, +1.56] · ×2 % +40.89 · en iyi coin yok  +2.29 · en iyi 3 yok  +131.3 · piyasada % 43 · sermaye %  4 · maliyet  13.9
+  eğitim D1                   119 işlem · net % +28.15 (gerç  +281.5 / açık   +0.0) · düşüş % 4.56 · PF  2.55 · beklenti  +2.37 · ort +0.431R [+0.15, +0.75] · ×2 % +25.79 · en iyi coin yok  +1.69 · en iyi 3 yok  +123.9 · piyasada % 42 · sermaye %  3 · maliyet  14.6
+  Seçim (yalnız eğitim verisi): kazanan yok → W0 (mevcut V6)
+  değerlendirme W0              2 işlem · net %  -0.60 (gerç    -6.0 / açık   +0.0) · düşüş % 0.89 · PF  0.00 · beklenti  -2.98 · ort -0.595R [-0.84, -0.35] · ×2 %  -0.61 · en iyi coin yok  -4.22 · en iyi 3 yok    +0.0 · piyasada % 13 · sermaye %  1 · maliyet   0.4 ⚠<30
+  değerlendirme W1              2 işlem · net %  -0.66 (gerç    -6.6 / açık   +0.0) · düşüş % 0.95 · PF  0.00 · beklenti  -3.29 · ort -0.657R [-0.84, -0.47] · ×2 %  -0.67 · en iyi coin yok  -4.22 · en iyi 3 yok    +0.0 · piyasada % 13 · sermaye %  1 · maliyet   0.4 ⚠<30
+  değerlendirme D0              5 işlem · net %  -0.49 (gerç    -4.9 / açık   +0.0) · düşüş % 1.00 · PF  0.19 · beklenti  -0.98 · ort -0.196R [-0.39, -0.00] · ×2 %  -0.58 · en iyi coin yok  -1.39 · en iyi 3 yok    -5.1 · piyasada % 18 · sermaye %  2 · maliyet   1.1 ⚠<30
+  değerlendirme D1              7 işlem · net %  -0.73 (gerç    -7.3 / açık   +0.0) · düşüş % 1.23 · PF  0.09 · beklenti  -1.04 · ort -0.207R [-0.37, -0.04] · ×2 %  -0.86 · en iyi coin yok  -1.53 · en iyi 3 yok    -8.0 · piyasada % 18 · sermaye %  2 · maliyet   1.7 ⚠<30
+
+════ Pencere 9 · eğitim 2020-08-01 → 2026-07-31 · değerlendirme 2026-08-01 → 2026-11-09 (kısa) ════
+  eğitim W0                    57 işlem · net % +40.16 (gerç  +401.6 / açık   +0.0) · düşüş % 6.75 · PF  3.48 · beklenti  +7.05 · ort +1.276R [+0.30, +2.51] · ×2 % +37.74 · en iyi coin yok  +3.96 · en iyi 3 yok  +106.7 · piyasada % 34 · sermaye %  3 · maliyet   8.9
+  eğitim W1                    77 işlem · net % +16.21 (gerç  +162.1 / açık   +0.0) · düşüş % 5.97 · PF  1.90 · beklenti  +2.10 · ort +0.407R [+0.01, +0.84] · ×2 % +14.79 · en iyi coin yok  +1.35 · en iyi 3 yok   +17.9 · piyasada % 32 · sermaye %  2 · maliyet   9.3
+  eğitim D0                   101 işlem · net % +43.15 (gerç  +431.5 / açık   +0.0) · düşüş % 5.78 · PF  3.17 · beklenti  +4.27 · ort +0.765R [+0.20, +1.53] · ×2 % +40.07 · en iyi coin yok  +2.16 · en iyi 3 yok  +124.3 · piyasada % 41 · sermaye %  4 · maliyet  15.4
+  eğitim D1                   126 işlem · net % +27.22 (gerç  +272.2 / açık   +0.0) · düşüş % 4.56 · PF  2.42 · beklenti  +2.16 · ort +0.396R [+0.13, +0.70] · ×2 % +24.70 · en iyi coin yok  +1.56 · en iyi 3 yok  +114.6 · piyasada % 40 · sermaye %  3 · maliyet  16.7
+  Seçim (yalnız eğitim verisi): kazanan yok → W0 (mevcut V6)
+  değerlendirme W0              4 işlem · net %  -1.49 (gerç   -14.9 / açık   +0.0) · düşüş % 1.98 · PF  0.00 · beklenti  -3.73 · ort -0.748R [-1.00, -0.24] · ×2 %  -1.51 · en iyi coin yok  -4.99 · en iyi 3 yok    -5.0 · piyasada % 58 · sermaye %  4 · maliyet   0.4 ⚠<30
+  değerlendirme W1              5 işlem · net %  -1.35 (gerç   -13.5 / açık   +0.0) · düşüş % 1.83 · PF  0.09 · beklenti  -2.69 · ort -0.541R [-0.89, -0.18] · ×2 %  -1.38 · en iyi coin yok  -3.71 · en iyi 3 yok   -10.0 · piyasada % 58 · sermaye %  3 · maliyet   0.5 ⚠<30
+  değerlendirme D0              2 işlem · net %  +1.51 (gerç   +15.1 / açık   +0.0) · düşüş % 1.93 · PF Infinity · beklenti  +7.53 · ort +1.507R [+0.69, +2.32] · ×2 %  +1.38 · en iyi coin yok  +3.46 · en iyi 3 yok    +0.0 · piyasada % 61 · sermaye % 10 · maliyet   0.5 ⚠<30
+  değerlendirme D1              4 işlem · net %  +1.62 (gerç   +16.2 / açık   +0.0) · düşüş % 1.51 · PF 40.50 · beklenti  +4.04 · ort +0.808R [+0.18, +1.52] · ×2 %  +1.48 · en iyi coin yok  +2.01 · en iyi 3 yok    -0.4 · piyasada % 60 · sermaye %  8 · maliyet   0.7 ⚠<30
+
+════ Birleşik pencere dışı (9 pencere) ════
+  W0 haftalık · V6 çıkış (mevcut)   41 işlem · toplam net    +96.4 USDT (pencere başı 1.000) · ×2 maliyet +86.9 · PF 1.75 · beklenti  +1.83 · ort R [-0.25, +1.07] · en kötü pencere düşüşü %4.25 · pozitif pencere 4/9 · en iyi coin SOLUSDT +77.6, onsuz beklenti -0.07 · en iyi 3 işlem olmadan -31.7 · piyasada %36 · sermaye %3 → Yetersiz kanıt
+  W1 haftalık · + iz süren         52 işlem · toplam net    +61.2 USDT (pencere başı 1.000) · ×2 maliyet +52.1 · PF 1.34 · beklenti  +0.77 · ort R [-0.30, +0.70] · en kötü pencere düşüşü %2.97 · pozitif pencere 3/9 · W0'dan kötü olmayan pencere 4/9 · en iyi coin SOLUSDT +65.2, onsuz beklenti -0.52 · en iyi 3 işlem olmadan -60.0 · piyasada %34 · sermaye %2 → Yetersiz kanıt
+  D0 günlük · V6 çıkış             77 işlem · toplam net   +126.4 USDT (pencere başı 1.000) · ×2 maliyet +111.9 · PF 1.92 · beklenti  +1.40 · ort R [-0.07, +0.68] · en kötü pencere düşüşü %3.45 · pozitif pencere 6/9 · W0'dan kötü olmayan pencere 5/9 · en iyi coin SOLUSDT +61.1, onsuz beklenti +0.62 · en iyi 3 işlem olmadan -4.9 · piyasada %44 · sermaye %4 → Yetersiz kanıt
+  D1 günlük · + iz süren           94 işlem · toplam net   +141.7 USDT (pencere başı 1.000) · ×2 maliyet +125.0 · PF 2.06 · beklenti  +1.30 · ort R [-0.02, +0.60] · en kötü pencere düşüşü %3.97 · pozitif pencere 6/9 · W0'dan kötü olmayan pencere 5/9 · en iyi coin SOLUSDT +79.8, onsuz beklenti +0.48 · en iyi 3 işlem olmadan +6.3 · piyasada %43 · sermaye %4 → Yetersiz kanıt
+  seçim yolu (pencere başına seçilen)   41 işlem · toplam net    +96.4 USDT (pencere başı 1.000) · ×2 maliyet — · PF 1.75 · beklenti  +1.83 · ort R [-0.25, +1.07] · en kötü pencere düşüşü %4.25 · pozitif pencere 4/9 · W0'dan kötü olmayan pencere 9/9 · en iyi coin SOLUSDT +77.6, onsuz beklenti -0.07 · en iyi 3 işlem olmadan -31.7 · piyasada %36 · sermaye %3 → Yetersiz kanıt
+  seçimler: P1=W0, P2=W0, P3=W0, P4=W0, P5=W0, P6=W0, P7=W0, P8=W0, P9=W0
+
+════ Pencere bazında net (USDT) ════
+  pencere        W0        W1        D0        D1
+  P1  2022-08-01     +9.2      +9.2      +5.6      +5.6
+  P2  2023-02-01     -9.5     -10.3      +1.1      -3.9
+  P3  2023-08-01    +85.7     +80.3     +96.0     +98.8
+  P4  2024-02-01    +33.0      -5.9      +7.6     +15.7
+  P5  2024-08-01    +23.2     +21.5     +32.0     +17.9
+  P6  2025-02-01     -5.6      -3.1      -6.7      +4.3
+  P7  2025-08-01    -18.9     -10.5     -19.4      -5.5
+  P8  2026-02-01     -6.0      -6.6      -4.9      -7.3
+  P9  2026-08-01    -14.9     -13.5     +15.1     +16.2
+
+════ Tüm geçmiş 2020-08-01 → 2026-11-09 ════
+  W0                           61 işlem · net % +38.07 (gerç  +380.7 / açık   +0.0) · düşüş % 8.27 · PF  3.08 · beklenti  +6.24 · ort +1.143R [+0.23, +2.31] · ×2 % +35.66 · en iyi coin yok  +3.24 · en iyi 3 yok   +85.8 · piyasada % 35 · sermaye %  3 · maliyet   9.5
+  W1                           82 işlem · net % +14.64 (gerç  +146.4 / açık   +0.0) · düşüş % 5.97 · PF  1.74 · beklenti  +1.79 · ort +0.350R [-0.03, +0.77] · ×2 % +13.21 · en iyi coin yok  +1.06 · en iyi 3 yok    +2.3 · piyasada % 33 · sermaye %  2 · maliyet   9.9
+  D0                          103 işlem · net % +45.31 (gerç  +453.1 / açık   +0.0) · düşüş % 5.78 · PF  3.27 · beklenti  +4.40 · ort +0.780R [+0.22, +1.49] · ×2 % +42.00 · en iyi coin yok  +2.35 · en iyi 3 yok  +145.8 · piyasada % 42 · sermaye %  4 · maliyet  16.2
+  D1                          130 işlem · net % +29.27 (gerç  +292.7 / açık   +0.0) · düşüş % 4.56 · PF  2.52 · beklenti  +2.25 · ort +0.409R [+0.15, +0.70] · ×2 % +26.54 · en iyi coin yok  +1.69 · en iyi 3 yok  +135.2 · piyasada % 41 · sermaye %  3 · maliyet  17.6
+  Tüm geçmişte açık üstünlük: yok
+
+NİHAİ KARAR: KAZANAN YOK → V7 kuralları V6 ile aynı kalır (W0).
+
+════ 2018–2019 (betimleyici; seçimde kullanılmadı) ════
+  W0                            5 işlem · net %  +3.11 (gerç   +31.1 / açık   +0.0) · düşüş % 7.73 · PF  4.14 · beklenti  +6.21 · ort +1.257R [-0.56, +3.17] · ×2 %  +2.94 · en iyi coin yok  +1.35 · en iyi 3 yok    -8.0 · piyasada % 18 · sermaye %  2 · maliyet   0.6 ⚠<30
+  W1                           11 işlem · net %  +3.31 (gerç   +33.1 / açık   +0.0) · düşüş % 2.51 · PF  2.95 · beklenti  +3.01 · ort +0.602R [-0.13, +1.45] · ×2 %  +3.04 · en iyi coin yok  +2.83 · en iyi 3 yok   -13.1 · piyasada % 13 · sermaye %  1 · maliyet   1.4 ⚠<30
+  D0                           16 işlem · net %  +1.06 (gerç   +10.6 / açık   +0.0) · düşüş % 7.09 · PF  1.38 · beklenti  +0.66 · ort +0.141R [-0.39, +0.79] · ×2 %  +0.80 · en iyi coin yok  -0.40 · en iyi 3 yok   -27.8 · piyasada % 20 · sermaye %  2 · maliyet   2.3 ⚠<30
+  D1                           23 işlem · net %  +2.03 (gerç   +20.3 / açık   +0.0) · düşüş % 3.04 · PF  1.54 · beklenti  +0.88 · ort +0.181R [-0.21, +0.63] · ×2 %  +1.67 · en iyi coin yok  +0.28 · en iyi 3 yok   -22.7 · piyasada % 18 · sermaye %  1 · maliyet   3.0 ⚠<30
+
+════ Coin bazında (birleşik pencere dışı) ════
+  W0 en iyi: SOLUSDT 4/+77.6, DOGEUSDT 2/+34.5, BTCUSDT 7/+20.7, MXUSDT 1/+14.6, PEPEUSDT 1/+4.3, ZECUSDT 1/+1.1
+  W0 en kötü: MNTUSDT 1/-5.0, LINKUSDT 1/-5.0, RAYUSDT 1/-5.0, TURBOUSDT 1/-5.0, XRPUSDT 3/-6.8, TAOUSDT 2/-7.2
+  W1 en iyi: SOLUSDT 4/+65.2, DOGEUSDT 5/+25.9, MXUSDT 1/+14.0, BTCUSDT 8/+8.2, PEPEUSDT 1/+6.3, MNTUSDT 1/+3.4
+  W1 en kötü: RAYUSDT 1/-5.0, TURBOUSDT 1/-5.0, ENSUSDT 1/-5.2, KASUSDT 2/-6.0, TAOUSDT 2/-7.2, XRPUSDT 3/-7.5
+  D0 en iyi: SOLUSDT 2/+61.1, BTCUSDT 11/+38.5, SUIUSDT 6/+26.1, DOGEUSDT 3/+24.8, MXUSDT 1/+14.1, BNBUSDT 1/+11.6
+  D0 en kötü: AAVEUSDT 2/-5.0, KASUSDT 1/-5.0, TRXUSDT 3/-5.5, TAOUSDT 2/-5.6, ETHFIUSDT 3/-6.3, MNTUSDT 2/-6.6
+  D1 en iyi: SOLUSDT 4/+79.8, DOGEUSDT 6/+25.0, BTCUSDT 13/+21.0, MXUSDT 1/+14.2, BNBUSDT 1/+10.1, ENAUSDT 3/+7.7
+  D1 en kötü: TAOUSDT 2/-4.5, XRPUSDT 4/-4.9, AAVEUSDT 2/-4.9, EIGENUSDT 1/-5.0, KASUSDT 2/-5.1, ETHFIUSDT 3/-8.9
+
+Toplam çalıştırma (dönem × yapılandırma × maliyet): 152

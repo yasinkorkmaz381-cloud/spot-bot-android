@@ -45,6 +45,9 @@ class SecurityTest {
         assertEquals(250, c.minHistoryDays)
         assertFalse(c.entryEveryDay || c.exitTrailing || c.exitEma || c.exitIneligible || c.useTrendFilter || c.useReturn30)
         assertTrue(c.exitBtc && c.useBtcFilter && c.useReturn7 && c.useRelativeStrength && c.useRangeFilter && c.useVolumeFilter)
+        // V7: kazanan yok → uygulamanın kuralları V6 ile birebir aynı.
+        assertEquals(com.spotbot.core.rs1.Rs1Versions.V7, c)
+        assertEquals(com.spotbot.core.rs1.Rs1Versions.V6, c)
     }
 
     /** Tek strateji: eski A/B/C motoru ve strateji sınıfları derlenmiş kodda yok; kaynaklar onlara başvurmuyor. */

@@ -20,4 +20,10 @@ object Rs1Versions {
         useBtcFilter = true, useTrendFilter = false, useReturn7 = true, useReturn30 = false, useRelativeStrength = true,
         useRangeFilter = true, useVolumeFilter = true,
     )
+
+    /**
+     * V7 (docs/RS1-V7.md): ön kayıtlı 4 yapılandırmalı karşılaştırmada "kazanan yok" çıktı; kurallar V6 ile aynı kaldı.
+     * Uygulamanın kullandığı [Rs1Config] varsayılanları bu kural setine eşittir (testli).
+     */
+    val V7 = V6
 }

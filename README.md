@@ -3,9 +3,20 @@
 MEXC spot piyasasında (USDT pariteleri) çalışan, **kontrollü risk** ve **sistematik karar** odaklı otomatik
 işlem botu. Android uygulaması (Türkçe kumanda paneli) + platformdan bağımsız Kotlin çekirdeği + komut satırı.
 
-> **Durum: V3.1, tek strateji (Momentum RS-1), yalnız sanal işlem (paper trading).** Gerçek MEXC verisi kullanılır.
-> **Gerçek emir gönderilmez.** V6 araştırmasında **kanıtlanmış bir avantaj bulunamadı**; gerçek parayla kullanım için
-> dayanak yoktur.
+> **Durum: V3.2, tek strateji (Momentum RS-1), yalnız sanal işlem (paper trading).** Gerçek emir gönderilmez. V7
+> karşılaştırmasında **kazanan yok**: kurallar V6 ile aynı. **Kazanç üstünlüğü gösterilemedi**; gerçek parayla kullanım
+> için dayanak yoktur.
+
+## V3.2: V7 karşılaştırması ve gerçekleşme modeli eşitliği (12 Kasım 2026)
+
+- Ön kayıt: [`docs/RS1-V7-ONKAYIT.md`](docs/RS1-V7-ONKAYIT.md). Rapor: [`docs/RS1-V7.md`](docs/RS1-V7.md).
+- **V6 yeniden üretimi:** Byte düzeyinde aynı. Önce bulunan yeniden üretim hatası düzeltildi; kural setleri artık
+  `Rs1Versions` içinde açık sabitler.
+- **Karşılaştırma:** Haftalık/günlük giriş × V6 çıkışı / + iz süren stop. Dört yapılandırma, 9 genişleyen pencere, 8
+  ölçülü Pareto seçimi.
+- **Sonuç:** Kazanan yok; dört yapılandırmanın da pencere dışı birleşik sonucu yetersiz kanıt.
+- **Android backtest:** Araştırma motoruyla aynı modeli kullanıyor (4H gün içi stop). Yalnız günlük mumla çalışan hızlı
+  mod "yaklaşık" olarak ayrı etiketleniyor.
 
 ## V3.1: teşhis, gerçekçilik düzeltmeleri ve bağımsız test (12 Kasım 2026)
 

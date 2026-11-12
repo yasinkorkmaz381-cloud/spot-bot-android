@@ -34,6 +34,11 @@ class FakeMarket(
         Candle(t, o, hi, lo, c, d.volume / 24, t + HOUR_MS, d.quoteVolume / 24)
     }
 
+    /** 4H mumlar: aynı saatlik yolun 4'er saatlik birleşimi (günlük mumla tutarlı). */
+    fun fourHours(d: Candle): List<Candle> = hours(d).chunked(4).map { g ->
+        Candle(g.first().openTime, g.first().open, g.maxOf { it.high }, g.minOf { it.low }, g.last().close, g.sumOf { it.volume }, g.first().openTime + 4 * HOUR_MS, g.sumOf { it.quoteVolume })
+    }
+
     override suspend fun serverTime() = clock
     override suspend fun exchangeInfo() = info
     override suspend fun klines(symbol: String, timeframe: Timeframe, limit: Int, startTime: Long?, endTime: Long?): List<Candle> {
@@ -43,6 +48,7 @@ class FakeMarket(
             Timeframe.D1 -> all.filter { it.openTime <= clock }
             Timeframe.H1 -> all.filter { it.openTime <= clock && it.openTime + DAY_MS > clock - DAY_MS }.flatMap { hours(it) }
                 .filter { it.openTime + HOUR_MS <= clock }
+            Timeframe.H4 -> all.filter { it.openTime <= clock }.flatMap { d -> fourHours(d) }.filter { it.openTime + 4 * HOUR_MS <= clock }
             else -> emptyList()
         }
         return list.filter { (startTime == null || it.openTime >= startTime) && (endTime == null || it.openTime <= endTime) }.takeLast(limit)

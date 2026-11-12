@@ -109,7 +109,7 @@ open class ScreenshotTest {
     }
 
     @Test
-    fun backtest() = capture("7-backtest") { BacktestContent(BacktestState.Done(SampleData.result(closeAtEnd = true), BacktestPeriod.HOLDOUT, 0), { _, _ -> }) }
+    fun backtest() = capture("7-backtest") { BacktestContent(BacktestState.Done(SampleData.result(closeAtEnd = true), BacktestPeriod.HOLDOUT, 0), { _, _, _ -> }) }
 
     @Test
     fun settings() = capture("8-ayarlar") { SettingsContent(true, SampleData.cfg, {}, {}) }

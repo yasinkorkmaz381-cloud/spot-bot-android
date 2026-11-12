@@ -51,7 +51,7 @@ import com.spotbot.core.rs1.Rs1Result
 
 class BacktestViewModel(private val runner: BacktestRunner) : ViewModel() {
     val state = runner.state
-    fun run(period: BacktestPeriod, costs: Rs1Costs) = runner.run(period, costs)
+    fun run(period: BacktestPeriod, costs: Rs1Costs, mode: com.spotbot.core.rs1.BacktestMode) = runner.run(period, costs, mode)
 }
 
 @Composable
@@ -61,7 +61,9 @@ fun BacktestScreen(modifier: Modifier = Modifier, viewModel: BacktestViewModel =
 }
 
 @Composable
-fun BacktestContent(state: BacktestState, onRun: (BacktestPeriod, Rs1Costs) -> Unit, modifier: Modifier = Modifier) {
+fun BacktestContent(state: BacktestState, onRun: (BacktestPeriod, Rs1Costs, com.spotbot.core.rs1.BacktestMode) -> Unit, modifier: Modifier = Modifier) {
+    var modeName by rememberSaveable { mutableStateOf(com.spotbot.core.rs1.BacktestMode.RESEARCH.name) }
+    val mode = com.spotbot.core.rs1.BacktestMode.valueOf(modeName)
     var period by rememberSaveable { mutableStateOf(BacktestPeriod.HOLDOUT) }
     var costName by rememberSaveable { mutableStateOf(Rs1Costs.MEDIUM.name) }
     val costs = Rs1Costs.all.first { it.name == costName }
@@ -81,7 +83,12 @@ fun BacktestContent(state: BacktestState, onRun: (BacktestPeriod, Rs1Costs) -> U
                     "Yön başına: ücret %%0,05 + kayma %%0,05 + yarım spread %%%.3f".format(costs.halfSpread * 100).replace('.', ','),
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Button(onClick = { onRun(period, costs) }, enabled = !running, modifier = Modifier.fillMaxWidth()) { Text(if (running) "Çalışıyor…" else "Backtest'i çalıştır") }
+                Text("Gerçekleşme modu", style = MaterialTheme.typography.titleSmall)
+                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    com.spotbot.core.rs1.BacktestMode.entries.forEach { m -> FilterChip(selected = m == mode, onClick = { modeName = m.name }, label = { Text(m.title) }) }
+                }
+                Text(mode.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Button(onClick = { onRun(period, costs, mode) }, enabled = !running, modifier = Modifier.fillMaxWidth()) { Text(if (running) "Çalışıyor…" else "Backtest'i çalıştır") }
             }
         }
         when (state) {
@@ -93,7 +100,12 @@ fun BacktestContent(state: BacktestState, onRun: (BacktestPeriod, Rs1Costs) -> U
                 }
             }
             is BacktestState.Failed -> item { InfoBanner("Backtest çalıştırılamadı (yazılım/veri sorunu): ${state.message}", containerColor = MaterialTheme.colorScheme.errorContainer, contentColor = MaterialTheme.colorScheme.onErrorContainer) }
-            is BacktestState.Done -> resultItems(state.result, state.period, state.failedSymbols, state.evidence, state.doubled)
+            is BacktestState.Done -> {
+                if (state.mode == com.spotbot.core.rs1.BacktestMode.APPROXIMATE) item {
+                    InfoBanner("YAKLAŞIK MOD: stoplar yalnız günlük mumla çözüldü; gün içi boşluklar görülmedi. Bu sonuç araştırma testiyle eşdeğer değildir.", containerColor = MaterialTheme.colorScheme.tertiaryContainer, contentColor = MaterialTheme.colorScheme.onTertiaryContainer)
+                }
+                resultItems(state.result, state.period, state.failedSymbols, state.evidence, state.doubled)
+            }
             BacktestState.Idle -> item {
                 InfoBanner("Yalnız Momentum RS-1 hesaplanır. Backtest ve paper trading aynı karar motorunu kullanır. Son test dönemi, araştırmanın dokunulmamış bağımsız test dönemidir.")
             }
@@ -133,7 +145,10 @@ private fun androidx.compose.foundation.lazy.LazyListScope.resultItems(
     }
     item {
         SectionCard("Kanıt durumu (ön kayıtlı ölçütler)") {
-            com.spotbot.android.ui.common.EvidenceView(evidence, "Bu backtest dönemi")
+            // Kanıt sınıfı verilmediyse sonuçtan hesaplanır (iki kat maliyet çalıştırması yoksa o şart sağlanmamış sayılır).
+            com.spotbot.android.ui.common.EvidenceView(
+                evidence ?: r.takeIf { it.trades.isNotEmpty() }?.let { com.spotbot.core.rs1.Rs1Evidence.classify(it, doubled) }, "Bu backtest dönemi",
+            )
             if (period != BacktestPeriod.TRAIN && period != BacktestPeriod.VALIDATION) {
                 Text(
                     "Not: 2020–2026 dönemleri araştırmada görüldü; burada çıkan sonuç bağımsız test değildir. Bağımsız test 2018–2019'da yapıldı (yetersiz kanıt).",
@@ -171,7 +186,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.resultItems(
             "Evren: bugün MEXC'de bulunan ${r.symbols} USDT paritesi (borsadan kaldırılanlar indirilemez: hayatta kalma yanlılığı). " +
                 "Spread ≤ %0,15 ve emir defteri derinliği şartları geçmişte ölçülemediği için backtest'te uygulanmaz; spread maliyet senaryosuyla modellenir. " +
                 "Yeni listelenen coinler 250 günlük geçmişten önce işlem görmez (EMA100 ısınması). Ücret: parite bazında MEXC taker ücreti (bugünkü). " +
-                "Cihazda gün içi mum indirilmediği için stoplar günlük mumla çözülür (${r.dailyResolvedStops} stop): gün içi boşluklar görülmez, sonuç biraz iyimser olabilir." +
+                "Stop çözümü: gün içi (4H) ${r.trades.count { it.intradayResolved }}, günlük mumla ${r.dailyResolvedStops}. Ortalama sermaye kullanımı %${"%.0f".format(r.capitalUsePercent)}." +
                 if (failed > 0) " $failed paritenin verisi alınamadı." else "",
         )
     }

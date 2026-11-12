@@ -62,9 +62,12 @@ internal class V6Context(
     val intraday: Map<String, List<Candle>>,
     val fees: Map<String, Double>,
 ) {
-    private val pool = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors())
-    private val cache = HashMap<Rs1Config, Map<String, DailySeries>>()
-    private fun series(cfg: Rs1Config) = synchronized(cache) { cache.getOrPut(cfg.copy(costs = Rs1Costs.MEDIUM)) { raw.mapValues { (s, l) -> DailySeries(s, l, cfg) } } }
+    private val pool = Executors.newFixedThreadPool(minOf(4, Runtime.getRuntime().availableProcessors()))
+    // Seriler yalnız gösterge parametrelerine bağlıdır; önbellek anahtarı onlardır (bellek tasarrufu, sonuç değişmez).
+    private val cache = HashMap<Triple<Int, Int, Int>, Map<String, DailySeries>>()
+    private fun series(cfg: Rs1Config) = synchronized(cache) {
+        cache.getOrPut(Triple(cfg.emaTrend, cfg.emaExit, cfg.atrPeriod)) { raw.mapValues { (s, l) -> DailySeries(s, l, cfg) } }
+    }
     var runs = 0
 
     fun run(cfg: Rs1Config, periods: List<Pair<Long, Long>>, useFees: Boolean = true, useIntraday: Boolean = true, closeAtEnd: Boolean = false): List<Rs1Result> {
