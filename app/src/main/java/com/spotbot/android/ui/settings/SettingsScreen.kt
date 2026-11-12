@@ -64,8 +64,8 @@ fun SettingsContent(botEnabled: Boolean, cfg: Rs1Config, onBot: (Boolean) -> Uni
         }
         item {
             ExpandableCard("Uygunluk şartları") {
-                KeyValueRow("Trend", "Kapanış > EMA${cfg.emaTrend} (1D)")
-                KeyValueRow("Getiri", "${cfg.shortReturnDays} ve ${cfg.returnDays} günlük getiri > 0")
+                if (cfg.useTrendFilter) KeyValueRow("Trend", "Kapanış > EMA${cfg.emaTrend} (1D)")
+                KeyValueRow("Getiri", if (cfg.useReturn30) "${cfg.shortReturnDays} ve ${cfg.returnDays} günlük getiri > 0" else "${cfg.shortReturnDays} günlük getiri > 0")
                 KeyValueRow("BTC'ye göre", "≥ ${"%.0f".format(cfg.minRelativeStrengthPoints)} puan (BTC muaf)")
                 KeyValueRow("Spread", "≤ %${cfg.maxSpreadPercent}".replace('.', ','))
                 KeyValueRow("Derinlik", "±%${cfg.depthBandPercent.toInt()} içinde ≥ ${cfg.depthMultiple.toInt()} × en büyük pozisyon")
@@ -82,8 +82,18 @@ fun SettingsContent(botEnabled: Boolean, cfg: Rs1Config, onBot: (Boolean) -> Uni
                 KeyValueRow("Coin başına / toplam", "%${cfg.maxPositionPercent.toInt()} / %${cfg.maxTotalPercent.toInt()}")
                 KeyValueRow("Günlük kayıp sınırı", "%${cfg.dailyLossPercent}".replace('.', ','))
                 KeyValueRow("Başlangıç stopu", "${cfg.initialStopAtr} × ATR14".replace('.', ','))
-                KeyValueRow("İz süren stop", "En yüksek kapanış − ${cfg.trailAtr} × ATR14".replace('.', ','))
-                KeyValueRow("Diğer çıkışlar", "BTC filtresi kapanır · 2 gün EMA${cfg.emaExit} altı · haftalık uygunluk kaybı")
+                if (cfg.exitTrailing) KeyValueRow("İz süren stop", "En yüksek kapanış − ${cfg.trailAtr} × ATR14".replace('.', ','))
+                KeyValueRow(
+                    "Diğer çıkışlar",
+                    listOfNotNull(
+                        "BTC rejimi bozulur".takeIf { cfg.exitBtc }, "2 gün EMA${cfg.emaExit} altı".takeIf { cfg.exitEma },
+                        "haftalık uygunluk kaybı".takeIf { cfg.exitIneligible },
+                    ).joinToString(" · ").ifEmpty { "yok" },
+                )
+                Text(
+                    "V6 araştırmasında ön kayıtlı kurallarla seçildi: iz süren stop, EMA50 ve uygunluk kaybı çıkışları ile EMA100 ve 30 günlük getiri şartı kaldırıldı (katkıları ölçülemedi ya da tekrarlıydı). Sabit kâr hedefi yok.",
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
                 KeyValueRow("Kaldıraç / açığa satış / ek alım", "Yok")
             }
         }

@@ -3,9 +3,44 @@
 MEXC spot piyasasında (USDT pariteleri) çalışan, **kontrollü risk** ve **sistematik karar** odaklı otomatik
 işlem botu. Android uygulaması (Türkçe kumanda paneli) + platformdan bağımsız Kotlin çekirdeği + komut satırı.
 
-> **Durum: V3.0, tek strateji (Momentum RS-1), yalnız sanal işlem (paper trading).** Gerçek MEXC verisi kullanılır.
-> **Gerçek emir gönderilmez** ve API anahtarı istenmez. Strateji dokunulmamış bağımsız testte **zarar ediyor**
-> (aşağıda); gerçek parayla kullanım için dayanak yoktur.
+> **Durum: V3.1, tek strateji (Momentum RS-1), yalnız sanal işlem (paper trading).** Gerçek MEXC verisi kullanılır.
+> **Gerçek emir gönderilmez.** V6 araştırmasında **kanıtlanmış bir avantaj bulunamadı**; gerçek parayla kullanım için
+> dayanak yoktur.
+
+## V3.1: teşhis, gerçekçilik düzeltmeleri ve bağımsız test (12 Kasım 2026)
+
+- Ön kayıt: [`docs/RS1-V6-ONKAYIT.md`](docs/RS1-V6-ONKAYIT.md).
+- Rapor: [`docs/RS1-V6.md`](docs/RS1-V6.md). Teşhis tablosu, nihai kurallar, karşılaştırma, işlem dökümü ve paper
+  trading takip planı burada.
+
+**Düzeltilen hatalar:**
+
+- Parite bazında MEXC ücreti. V5 her pariteye %0,05 uyguluyordu; API'ye göre çoğu paritede %0,08–0,2.
+- Gün içi stop boşlukları 4H/1H mumlarıyla çözülüyor.
+- EMA100 ısınması için asgari geçmiş 250 gün.
+- Paper girişi eski açılış fiyatından değil, değerlendirme anındaki emir defterinden.
+- MEXC lot kuralları.
+- Takip edilmeyen aralıklar ve stop geçmişi kaydediliyor.
+- Sunucu saati düzeltmesi.
+- 2018 verisindeki UTC+8 hizalı mumlar artık sessizce atılmıyor.
+
+**Araştırma:**
+
+- Ön kayıtlı kurallarla haftalık giriş korundu. Günlük giriş araştırmada ortalama R'yi düşürdü.
+- Çıkışlar koruyucu stop ve BTC rejimine indirildi.
+- Tekrarlı EMA100 ve 30 günlük getiri şartları kaldırıldı.
+- Seçim 16 ve 26 işlemlik dönemlere dayanıyor.
+
+**Bağımsız test (2018–2019, hiç görülmemiş veri):** 5 işlem → **yetersiz kanıt**.
+
+**Daha önce görülmüş 2025–2026 dönemi:** −0,44R, PF 0,30.
+
+**Arayüz:**
+
+- Türkiye saati (TSİ) ve UTC birlikte gösteriliyor.
+- Son veri, son başarılı değerlendirme ve sıradaki değerlendirme zamanı görünüyor.
+- Kanıt durumu yalnız ön kayıtlı ölçütlerden geliyor.
+- Stop geçmişi ve "canlı izlenmedi" işaretleri gösteriliyor.
 
 ## V3.0: tek strateji, Momentum RS-1 (11 Kasım 2026)
 

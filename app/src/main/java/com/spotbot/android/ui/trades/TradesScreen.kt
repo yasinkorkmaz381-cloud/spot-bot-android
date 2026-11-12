@@ -72,7 +72,7 @@ fun TradesContent(paper: PaperState?, archive: ArchiveSummary, modifier: Modifie
         when (tab) {
             TradesTab.OPEN -> {
                 if (r?.open.isNullOrEmpty()) item { EmptyText("Açık sanal pozisyon yok.", Modifier.padding(4.dp)) }
-                items(r?.open.orEmpty(), key = { it.key }) { PositionView(it) }
+                items(r?.open.orEmpty(), key = { it.key }) { PositionView(it, paper?.untrackedAt(it.entryTime) == true) }
             }
             TradesTab.HISTORY -> {
                 if (r != null) {
@@ -94,7 +94,7 @@ fun TradesContent(paper: PaperState?, archive: ArchiveSummary, modifier: Modifie
                     }
                 }
                 if (r?.trades.isNullOrEmpty()) item { EmptyText("Henüz kapanmış işlem yok.", Modifier.padding(4.dp)) }
-                items(r?.trades.orEmpty().sortedByDescending { it.exitTime }, key = { it.key }) { TradeRow(it, paper?.firstSeen?.get("T:" + it.key)) }
+                items(r?.trades.orEmpty().sortedByDescending { it.exitTime }, key = { it.key }) { TradeRow(it, paper?.firstSeen?.get("T:" + it.key), paper?.untrackedAt(it.exitTime) == true) }
             }
             TradesTab.WEEKLY -> {
                 item { InfoBanner("Her pazartesi 00:15 UTC değerlendirmesinin kaydı: neden işlem açıldı ya da açılmadı.") }

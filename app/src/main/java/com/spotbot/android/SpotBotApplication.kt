@@ -32,9 +32,11 @@ class AppContainer(private val app: Application) {
     val archive = ArchiveRepository(app.filesDir)
     /** Momentum RS-1'in tek parametre kaynağı. */
     val config = Rs1Config()
-    val scanner = Rs1Scanner(api, FileScanStore(app.filesDir), cfg = config)
-    val paper = Rs1Paper(api, FilePaperStore(app.filesDir), cfg = config)
-    val bot = Rs1Bot(scanner, paper, cfg = config)
+    /** MEXC sunucu saatine göre düzeltilmiş saat (cihaz saati yanlışsa pencereler kaymasın). */
+    val clock = com.spotbot.core.util.ServerClock()
+    val scanner = Rs1Scanner(api, FileScanStore(app.filesDir), clock = clock, cfg = config)
+    val paper = Rs1Paper(api, FilePaperStore(app.filesDir), clock = clock, cfg = config)
+    val bot = Rs1Bot(scanner, paper, clock, config, serverTime = { api.serverTime() })
     val backtest = BacktestRunner(api, scope, app.cacheDir, config)
 
     /** Sanal hesabı sıfırlar: mevcut kayıt silinmez, `archive-v4/paper-<zaman>.json` olarak saklanır. */

@@ -45,7 +45,14 @@ enum class BacktestPeriod(val title: String, val from: String?, val to: String?,
 sealed interface BacktestState {
     data object Idle : BacktestState
     data class Running(val message: String, val progress: Float?) : BacktestState
-    data class Done(val result: Rs1Result, val period: BacktestPeriod, val failedSymbols: Int) : BacktestState
+    data class Done(
+        val result: Rs1Result,
+        val period: BacktestPeriod,
+        val failedSymbols: Int,
+        /** Ön kayıtlı kabul ölçütleri (iki kat maliyet çalıştırmasıyla). */
+        val evidence: com.spotbot.core.rs1.Evidence? = null,
+        val doubled: Rs1Result? = null,
+    ) : BacktestState
     data class Failed(val message: String) : BacktestState
 }
 
@@ -69,6 +76,8 @@ class BacktestRunner(private val api: MarketDataApi, private val scope: Coroutin
                 val from = start - 400 * DAY_MS
                 _state.value = BacktestState.Running("Parite listesi alınıyor…", null)
                 val symbols = Rs1History.universe(api)
+                // Parite bazında taker ücreti (MEXC exchangeInfo; geçmişte de aynı olduğu varsayımdır).
+                val fees = api.exchangeInfo().associate { it.symbol to it.takerFee }
                 val dir = File(cacheDir, "rs1-1d").apply { mkdirs() }
                 val (data, failed) = Rs1History.download(
                     api, symbols, from, end,
@@ -78,8 +87,12 @@ class BacktestRunner(private val api: MarketDataApi, private val scope: Coroutin
                 )
                 _state.value = BacktestState.Running("Momentum RS-1 çalıştırılıyor…", null)
                 val cfg = base.copy(costs = costs)
-                val result = Rs1Engine(data.mapValues { (s, c) -> DailySeries(s, c, cfg) }, cfg).run(start, end)
-                _state.value = BacktestState.Done(result, period, failed.size)
+                val series = data.mapValues { (s, c) -> DailySeries(s, c, cfg) }
+                // Açık pozisyonlar dönem sonunda zorla kapatılmaz: gerçekleşmemiş olarak değerlenir.
+                val result = Rs1Engine(series, cfg, fees).run(start, end, closeAtEnd = false)
+                val dcfg = cfg.copy(costs = costs.doubled())
+                val doubled = Rs1Engine(data.mapValues { (s, c) -> DailySeries(s, c, dcfg) }, dcfg, fees).run(start, end, closeAtEnd = false)
+                _state.value = BacktestState.Done(result, period, failed.size, com.spotbot.core.rs1.Rs1Evidence.classify(result, doubled), doubled)
             } catch (e: Exception) {
                 _state.value = BacktestState.Failed(e.message ?: e::class.simpleName ?: "Hata")
             }

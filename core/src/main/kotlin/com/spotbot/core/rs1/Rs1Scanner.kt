@@ -22,7 +22,7 @@ enum class ScanStage(val title: String) {
     DATA("Güvenilir fiyat geçmişi yok (yeni listeleme, eksik gün)"),
     VOLUME("30 günlük medyan hacim < 5M USDT"),
     SPREAD("Spread > %0,15"),
-    TREND("Trend yok (EMA100, 7 ya da 30 günlük getiri)"),
+    TREND("Momentum şartı yok (7 günlük getiri ≤ 0; etkinse EMA100 / 30 günlük getiri)"),
     RELATIVE_STRENGTH("BTC'ye göre avantaj < 3 puan"),
     RANGE("Son günün aralığı > 2,5 ATR"),
     DEPTH("Emir defteri derinliği yetersiz"),

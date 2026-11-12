@@ -10,7 +10,10 @@ import java.util.Locale
 import kotlin.math.abs
 
 private val TIME = DateTimeFormatter.ofPattern("HH:mm")
-private val DATE_TIME = DateTimeFormatter.ofPattern("dd.MM HH:mm")
+private val DATE_TIME = DateTimeFormatter.ofPattern("dd.MM.yy HH:mm")
+
+/** Hesaplamalar UTC'dedir; arayüz Türkiye saatini (TSİ, UTC+3) gösterir. */
+val TURKEY: ZoneId = ZoneId.of("Europe/Istanbul")
 
 /** Fiyatı büyüklüğüne göre uygun ondalıkla biçimlendirir (BTC 2, 1–1000 arası 4, altı 6 ondalık). */
 fun formatPrice(value: Double, locale: Locale = Locale.getDefault()): String {
@@ -67,11 +70,15 @@ fun formatRatio(value: Double, locale: Locale = Locale.getDefault()): String = w
     else -> number(locale, 2, 2).format(value)
 }
 
-fun formatTime(epochMillis: Long, zone: ZoneId = ZoneId.systemDefault()): String =
+fun formatTime(epochMillis: Long, zone: ZoneId = TURKEY): String =
     TIME.withZone(zone).format(Instant.ofEpochMilli(epochMillis))
 
-fun formatDateTime(epochMillis: Long, zone: ZoneId = ZoneId.systemDefault()): String =
+fun formatDateTime(epochMillis: Long, zone: ZoneId = TURKEY): String =
     DATE_TIME.withZone(zone).format(Instant.ofEpochMilli(epochMillis))
+
+/** "12.11.26 03:15 TSİ (00:15 UTC)": değerlendirme zamanlarında iki saat birlikte gösterilir. */
+fun formatDateTimeWithUtc(epochMillis: Long): String =
+    "${formatDateTime(epochMillis)} TSİ (${TIME.withZone(java.time.ZoneOffset.UTC).format(Instant.ofEpochMilli(epochMillis))} UTC)"
 
 /** Kullanıcının girdiği ondalık metni ayrıştırır; virgül ve nokta kabul edilir. */
 fun parseDecimal(text: String): Double? = text.trim().replace(',', '.').toDoubleOrNull()

@@ -35,6 +35,10 @@ import com.spotbot.android.ui.common.Spacing
 import com.spotbot.android.ui.common.StatusPill
 import com.spotbot.android.ui.common.TradeRow
 import com.spotbot.android.ui.common.formatDateTime
+import com.spotbot.core.rs1.Rs1Evidence
+import com.spotbot.android.ui.common.formatDateTimeWithUtc
+import com.spotbot.android.ui.common.ResearchVerdict
+import com.spotbot.android.ui.common.EvidenceView
 import com.spotbot.android.ui.common.formatMoney
 import com.spotbot.android.ui.common.formatSignedMoney
 import com.spotbot.android.ui.theme.SpotBotTheme
@@ -115,12 +119,29 @@ fun PanelContent(
                     if (!botEnabled) MaterialTheme.colorScheme.onSurfaceVariant else if (software != null) colors.loss else colors.gain,
                 )
                 software?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = colors.loss) }
-                KeyValueRow("Son döngü", status.lastCycleAt?.let { formatDateTime(it) } ?: "—")
-                KeyValueRow("Sonraki haftalık değerlendirme", formatDateTime(Rs1Scanner.nextWeekly(now, config)))
+                KeyValueRow("Son döngü", status.lastCycleAt?.let { formatDateTime(it) + " TSİ" } ?: "—")
+                KeyValueRow("Son veri (tamamlanmış gün)", paper?.dataEnd?.takeIf { it > 0 }?.let { formatDateTimeWithUtc(it) } ?: "—")
+                KeyValueRow("Son başarılı değerlendirme", paper?.lastSuccessAt?.takeIf { it > 0 }?.let { formatDateTime(it) + " TSİ" } ?: "—")
+                KeyValueRow("Sıradaki giriş değerlendirmesi", formatDateTimeWithUtc(Rs1Scanner.nextWeekly(now, config)))
                 KeyValueRow("Bu haftanın canlı değerlendirmesi", if (status.weeklyRecorded) "Yapıldı" else "Yapılmadı / bekleniyor")
+                if (kotlin.math.abs(status.clockOffsetMillis) > 5_000) KeyValueRow("Cihaz saati farkı (MEXC'ye göre)", "${status.clockOffsetMillis / 1000} sn (düzeltildi)")
+                val gaps = paper?.untracked.orEmpty()
+                if (gaps.isNotEmpty()) {
+                    Text(
+                        "Takip edilmeyen aralık: ${gaps.size} (son: ${formatDateTime(gaps.last().from)} → ${formatDateTime(gaps.last().to)} TSİ). Bu aralıklardaki işlemler canlı izlenmedi; MEXC verisinden sonradan hesaplandı.",
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.tertiary,
+                    )
+                }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     if (botEnabled) OutlinedButton(onClick = onStop) { Text("Botu durdur") } else Button(onClick = onStart) { Text("Botu başlat") }
                 }
+            }
+        }
+        item {
+            SectionCard("Kanıt durumu") {
+                StatusPill(ResearchVerdict.TITLE, MaterialTheme.colorScheme.tertiary)
+                Text(ResearchVerdict.TEXT, style = MaterialTheme.typography.bodySmall)
+                EvidenceView(r?.takeIf { it.trades.isNotEmpty() }?.let { Rs1Evidence.classify(it) }, "Bu paper trading hesabı (${r?.trades?.size ?: 0} kapanmış işlem)")
             }
         }
         item {
@@ -140,10 +161,10 @@ fun PanelContent(
         }
         item { SectionLabel("Açık pozisyonlar") }
         if (r?.open.isNullOrEmpty()) item { EmptyText("Açık sanal pozisyon yok.") }
-        items(r?.open.orEmpty(), key = { "p-" + it.key }) { PositionView(it) }
+        items(r?.open.orEmpty(), key = { "p-" + it.key }) { PositionView(it, paper?.untrackedAt(it.entryTime) == true) }
         item { SectionLabel("Son işlemler") }
         if (r?.trades.isNullOrEmpty()) item { EmptyText("Henüz kapanmış işlem yok.") }
-        items(r?.trades.orEmpty().sortedByDescending { it.exitTime }.take(5), key = { "t-" + it.key }) { TradeRow(it, paper?.firstSeen?.get("T:" + it.key)) }
+        items(r?.trades.orEmpty().sortedByDescending { it.exitTime }.take(5), key = { "t-" + it.key }) { TradeRow(it, paper?.firstSeen?.get("T:" + it.key), paper?.untrackedAt(it.exitTime) == true) }
         item { BackgroundNotice(status.longestGapMinutes) }
     }
 }

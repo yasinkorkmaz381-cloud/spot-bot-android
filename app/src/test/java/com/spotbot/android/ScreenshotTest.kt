@@ -56,7 +56,11 @@ open class ScreenshotTest {
     private val now = SampleData.end + 3_600_000
 
     private fun row(s: String, r30: Double, r7: Double, rs: Double, vol: Double, spread: Double, failed: List<Rs1Condition> = emptyList(), candidate: Boolean = false, sectors: List<String> = listOf("Main")) =
-        ScanRow(s, sectors, 10.0, spread, CoinCheck(s, failed.filter { it != Rs1Condition.SPREAD && it != Rs1Condition.DEPTH }, 10.0, r7, r30, rs, vol, 1.1, 0.4, 9.0, 400), 9e5, 9e5, failed.isEmpty(), candidate, false, failed)
+        ScanRow(
+            s, sectors, 10.0, spread, CoinCheck(s, failed.filter { it != Rs1Condition.SPREAD && it != Rs1Condition.DEPTH }, 10.0, r7, r30, rs, vol, 1.1, 0.4, 9.0, 400),
+            bidDepth = 9e5, askDepth = 9e5, askVwap = 10.01, mid = 10.0, estimatedSlippagePercent = 0.1, takerFee = 0.0008, quantityStep = 0.01, minNotional = 1.0,
+            eligible = failed.isEmpty(), candidate = candidate, held = false, failed = failed,
+        )
 
     private val scan = ScanState(
         result = Rs1ScanResult(

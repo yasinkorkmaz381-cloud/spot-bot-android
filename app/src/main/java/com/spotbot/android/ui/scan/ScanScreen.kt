@@ -168,6 +168,13 @@ private fun ScanRowView(row: ScanRow, rank: Int) {
                 ),
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            if (row.estimatedSlippagePercent != null || row.takerFee.isFinite()) Text(
+                listOfNotNull(
+                    row.estimatedSlippagePercent?.let { "pozisyon büyüklüğünde tahmini kayma %%%.3f".format(it) },
+                    row.takerFee.takeIf { it.isFinite() }?.let { "ücret %%%.2f".format(it * 100) },
+                ).joinToString(" · "),
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
             if (row.failed.isNotEmpty()) Text("✕ " + row.failed.joinToString { it.title }, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.tertiary)
         }
     }

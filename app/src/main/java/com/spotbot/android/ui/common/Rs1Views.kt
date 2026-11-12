@@ -47,9 +47,9 @@ fun BtcFilterView(btc: BtcState?) {
     btc.reason?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
 }
 
-/** Açık sanal pozisyon satırı. */
+/** Açık sanal pozisyon satırı. [untracked]: giriş, uygulamanın çalışmadığı bir aralıkta oldu. */
 @Composable
-fun PositionView(p: Rs1Position) {
+fun PositionView(p: Rs1Position, untracked: Boolean = false) {
     AppCard {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(coin(p.symbol), style = MaterialTheme.typography.titleMedium)
@@ -67,15 +67,20 @@ fun PositionView(p: Rs1Position) {
             ),
         )
         Text(
-            "Giriş ${formatDateTime(p.entryTime)} · başlangıç stopu ${formatPrice(p.initialStop)}" + if (p.stop > p.initialStop) " · iz süren stop yükseldi" else "",
+            "Giriş ${formatDateTime(p.entryTime)} TSİ · başlangıç stopu ${formatPrice(p.initialStop)}" +
+                if (p.stopChanges.size > 1) " · stop ${p.stopChanges.size - 1} kez yükseldi (son: ${formatDateTime(p.stopChanges.last().time)})" else "",
             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        if (untracked) Text("Giriş, uygulamanın çalışmadığı bir aralıkta gerçekleşti; canlı izlenmedi, sonradan hesaplandı.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.tertiary)
     }
 }
 
-/** Kapanmış işlem satırı. [recordedAt] uygulamanın işlemi ilk gördüğü an (geç kayıt). */
+/**
+ * Kapanmış işlem satırı: giriş, stop değişiklikleri ve çıkış gerekçesi. [untracked]: çıkış, uygulamanın çalışmadığı bir
+ * aralıkta oldu (canlı izlenmedi); [recordedAt]: uygulamanın işlemi ilk gördüğü an.
+ */
 @Composable
-fun TradeRow(t: Rs1Trade, recordedAt: Long? = null) {
+fun TradeRow(t: Rs1Trade, recordedAt: Long? = null, untracked: Boolean = false) {
     Column(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(coin(t.symbol), style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
@@ -85,8 +90,16 @@ fun TradeRow(t: Rs1Trade, recordedAt: Long? = null) {
             "${formatDateTime(t.entryTime)} → ${formatDateTime(t.exitTime)} · ${formatPrice(t.entryPrice)} → ${formatPrice(t.exitPrice)} · ${t.reason.title}",
             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        if (recordedAt != null && recordedAt - t.exitTime > 2 * 86_400_000L) {
-            Text("Uygulama bu çıkışı ${formatDateTime(recordedAt)}'te kaydetti (o sırada çalışmıyordu).", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.tertiary)
+        Text(
+            "Stop: başlangıç ${formatPrice(t.initialStop)}" + (if (t.stopChanges.size > 1) " → ${formatPrice(t.stopChanges.last().stop)} (${t.stopChanges.size - 1} yükselme)" else "") +
+                (if (t.intradayResolved) " · stop gün içi mumla çözüldü" else "") + " · maliyet ${formatMoney(t.fees + t.friction)} USDT",
+            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        if (untracked || (recordedAt != null && recordedAt - t.exitTime > 2 * 86_400_000L)) {
+            Text(
+                "Canlı izlenmedi: uygulama o sırada çalışmıyordu; çıkış MEXC verisinden sonradan hesaplandı" + (recordedAt?.let { " (kayıt ${formatDateTime(it)})" } ?: "") + ".",
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.tertiary,
+            )
         }
     }
     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
@@ -119,4 +132,34 @@ fun BackgroundNotice(longestGapMinutes: Long = 0) {
             "Stop ve çıkışlar MEXC verisinden hesaplandığı için kaçmaz, ancak geç kaydedilebilir." +
             if (longestGapMinutes > 30) " Son çalışmada döngüler arasında $longestGapMinutes dakikalık boşluk görüldü." else "",
     )
+}
+
+/**
+ * Kanıt durumu: yalnız ön kayıtlı ölçütlerden (Rs1Evidence) ve araştırma sonucundan gelir; "kârlı" ya da "onaylı" gibi
+ * etiketler kanıtsız gösterilmez.
+ */
+@Composable
+fun EvidenceView(e: com.spotbot.core.rs1.Evidence?, title: String) {
+    val colors = SpotBotTheme.tradingColors
+    Text(title, style = MaterialTheme.typography.titleSmall)
+    if (e == null) {
+        Text("Henüz kapanmış işlem yok.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        return
+    }
+    StatusPill(
+        e.classification.title,
+        when (e.classification) {
+            com.spotbot.core.rs1.EvidenceClass.EVIDENCE -> colors.gain
+            com.spotbot.core.rs1.EvidenceClass.FAILED -> colors.loss
+            com.spotbot.core.rs1.EvidenceClass.INSUFFICIENT -> MaterialTheme.colorScheme.tertiary
+        },
+    )
+    e.checks.forEach { (k, ok) -> Text("${if (ok) "✓" else "✗"} $k", style = MaterialTheme.typography.bodySmall, color = if (ok) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant) }
+}
+
+/** V6 araştırmasının sonucu (docs/RS1-V6.md): uygulamada sabit, kanıta dayalı açıklama. */
+object ResearchVerdict {
+    const val TITLE = "Kanıtlanmış avantaj yok"
+    const val TEXT = "Bağımsız test (2018–2019): 5 işlem, yetersiz kanıt. Daha önce görülmüş 2025–2026 döneminde zarar (−0,44R, PF 0,30). " +
+        "Paper trading ileriye dönük veri toplamak içindir; kâr beklentisi kanıtlanmamıştır."
 }
