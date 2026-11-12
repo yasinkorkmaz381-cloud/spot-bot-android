@@ -97,7 +97,8 @@ internal fun v6(options: Map<String, String>) {
     say("Dönemler: araştırma ${day(research.first)}→${day(research.second - 1)} · doğrulama ${day(validation.first)}→${day(validation.second - 1)} · görülmüş ${day(seen.first)}→${day(seen.second - 1)} (seçimde kullanılmaz)")
 
     // ---- B0: V5'in birebir yeniden üretimi.
-    val v5 = Rs1Config()
+    // V6 protokolü V5 kural setinden başlar (açık sabit; varsayılanlar sonradan değişti).
+    val v5 = com.spotbot.core.rs1.Rs1Versions.V5
     val b0 = ctx.run(v5.copy(minHistoryDays = 150), listOf(date("2020-08-01") to date("2023-01-01"), validation, seen, date("2020-08-01") to dataEnd), useFees = false, useIntraday = false, closeAtEnd = true)
     say("\n════ B0 · V5'in yeniden üretimi (düz %0,05 ücret, günlük stop, 150 gün, dönem sonunda kapanış) ════")
     listOf("eğitim/araştırma", "doğrulama", "görülmüş (V5 son test)", "tüm dönem").zip(b0).forEach { (n, r) -> say(row(n, r)) }
@@ -239,7 +240,7 @@ internal fun v6Final(options: Map<String, String>) {
     }.filterValues { it.isNotEmpty() }
     val ctx = V6Context(raw, h4, loadFees(options["info"]?.let { File(it) }))
     val period = date(options["from"] ?: "2018-01-01") to date(options["to"] ?: "2020-01-01")
-    val cfg = Rs1Config()
+    val cfg = com.spotbot.core.rs1.Rs1Versions.V6
     val out = StringBuilder()
     fun say(s: String = "") { println(s); out.appendLine(s) }
     say("BAĞIMSIZ TEST · dondurulmuş Rs1Config · ${day(period.first)} → ${day(period.second - 1)} · 1D ${raw.size} parite · 4H ${ctx.intraday.size} · veri: ${q.candles} mum, yinelenen ${q.duplicates}, sırasız ${q.unsorted}")
