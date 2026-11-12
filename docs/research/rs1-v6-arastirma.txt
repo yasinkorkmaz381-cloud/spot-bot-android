@@ -1,0 +1,114 @@
+V6 protokolü · 1D 1203 parite · 4H 471 parite · ücret tablosu 1791 parite · veri sonu 2026-11-09
+Veri kontrolü: 1136260 mum · yinelenen 0 · sırasız 0 · gün başına hizalı olmayan 0 (hepsi DailySeries'te ayıklanır)
+Ücret dağılımı (evrendeki pariteler, taker): %0.00: 1, %0.05: 172, %0.08: 789, %0.20: 241
+Dönemler: araştırma 2020-08-01→2022-12-31 · doğrulama 2023-01-01→2024-12-31 · görülmüş 2025-01-01→2026-11-09 (seçimde kullanılmaz)
+
+════ B0 · V5'in yeniden üretimi (düz %0,05 ücret, günlük stop, 150 gün, dönem sonunda kapanış) ════
+  eğitim/araştırma                     42 işlem · kazanma % 31.0 · PF  1.93 · ort +0.372R (t=+1.05) · beklenen  +1.87 · net %  +7.85 (gerç.   +78.5 / açık   +0.0) · düşüş % 3.55 · ücret   1.1 · spread+kayma   2.7 · süre  7.5 g · piyasada % 25
+  doğrulama                            60 işlem · kazanma % 31.7 · PF  1.66 · ort +0.204R (t=+1.11) · beklenen  +1.01 · net %  +6.04 (gerç.   +60.4 / açık   +0.0) · düşüş % 3.55 · ücret   2.1 · spread+kayma   5.4 · süre  9.2 g · piyasada % 45
+  görülmüş (V5 son test)               45 işlem · kazanma % 20.0 · PF  0.56 · ort -0.145R (t=-1.15) · beklenen  -0.72 · net %  -3.26 (gerç.   -32.6 / açık   +0.0) · düşüş % 5.42 · ücret   1.3 · spread+kayma   3.2 · süre  7.6 g · piyasada % 28
+  tüm dönem                           147 işlem · kazanma % 27.9 · PF  1.40 · ort +0.145R (t=+1.10) · beklenen  +0.72 · net % +10.64 (gerç.  +106.4 / açık   +0.0) · düşüş % 5.42 · ücret   4.9 · spread+kayma  12.2 · süre  8.2 g · piyasada % 32
+  V5 raporu: son test 45 işlem 967,39 USDT; tüm dönem 147 işlem 1.106,37 USDT → yeniden üretim: son test 45 işlem 967.39; tüm dönem 147 işlem 1106.37
+
+════ B1 · düzeltilmiş taban (parite ücreti, 4H gün içi stop, 250 gün, açık pozisyon değerlemesi) ════
+  B1 · araştırma                       33 işlem · kazanma % 36.4 · PF  2.00 · ort +0.450R (t=+1.24) · beklenen  +2.23 · net %  +7.36 (gerç.   +73.6 / açık   +0.0) · düşüş % 3.59 · ücret   0.8 · spread+kayma   2.2 · süre  8.0 g · piyasada % 22
+  B1 · doğrulama                       59 işlem · kazanma % 30.5 · PF  1.64 · ort +0.201R (t=+1.08) · beklenen  +0.99 · net %  +5.83 (gerç.   +58.3 / açık   +0.0) · düşüş % 3.55 · ücret   2.1 · spread+kayma   5.3 · süre  9.2 g · piyasada % 44
+
+════ Adım 1 · giriş sıklığı (A haftalık / B günlük) ════
+  B günlük · araştırma                 55 işlem · kazanma % 40.0 · PF  2.34 · ort +0.427R (t=+1.70) · beklenen  +2.19 · net % +12.04 (gerç.  +120.4 / açık   +0.0) · düşüş % 3.06 · ücret   1.5 · spread+kayma   3.9 · süre  8.0 g · piyasada % 31
+  B günlük · doğrulama                 83 işlem · kazanma % 41.0 · PF  1.92 · ort +0.227R (t=+1.56) · beklenen  +1.15 · net %  +9.53 (gerç.   +95.3 / açık   +0.0) · düşüş % 2.32 · ücret   3.0 · spread+kayma   7.5 · süre  8.5 g · piyasada % 55
+  Karar: A (haftalık) kaldı — B'nin ortalama R ve PF'si iki dönemde de A'dan düşük olmamalıydı.
+
+════ Adım 2 · çıkış bileşenleri (koruyucu stop her zaman var) ════
+  iz süren stop yok · araştırma        32 işlem · kazanma % 37.5 · PF  2.24 · ort +0.550R (t=+1.34) · beklenen  +2.75 · net %  +8.81 (gerç.   +88.1 / açık   +0.0) · düşüş % 2.93 · ücret   0.8 · spread+kayma   2.2 · süre  8.8 g · piyasada % 23
+  iz süren stop yok · doğrulama        57 işlem · kazanma % 29.8 · PF  1.99 · ort +0.307R (t=+1.41) · beklenen  +1.55 · net %  +8.81 (gerç.   +88.1 / açık   +0.0) · düşüş % 3.15 · ücret   2.1 · spread+kayma   5.3 · süre 10.0 g · piyasada % 45
+    → kaldırılabilir
+  EMA50 çıkışı yok · araştırma         33 işlem · kazanma % 36.4 · PF  2.00 · ort +0.450R (t=+1.24) · beklenen  +2.23 · net %  +7.36 (gerç.   +73.6 / açık   +0.0) · düşüş % 3.59 · ücret   0.8 · spread+kayma   2.2 · süre  8.0 g · piyasada % 22
+  EMA50 çıkışı yok · doğrulama         59 işlem · kazanma % 30.5 · PF  1.64 · ort +0.201R (t=+1.08) · beklenen  +0.99 · net %  +5.83 (gerç.   +58.3 / açık   +0.0) · düşüş % 3.55 · ücret   2.1 · spread+kayma   5.3 · süre  9.2 g · piyasada % 44
+    → kaldırılabilir
+  uygunluk kaybı çıkışı yok · araştırma   24 işlem · kazanma % 50.0 · PF  3.02 · ort +0.782R (t=+1.70) · beklenen  +4.00 · net %  +9.61 (gerç.   +96.1 / açık   +0.0) · düşüş % 2.76 · ücret   0.6 · spread+kayma   1.7 · süre 13.8 g · piyasada % 25 ⚠<30
+  uygunluk kaybı çıkışı yok · doğrulama   37 işlem · kazanma % 29.7 · PF  2.00 · ort +0.433R (t=+1.01) · beklenen  +2.13 · net %  +7.88 (gerç.   +78.8 / açık   +0.0) · düşüş % 5.97 · ücret   1.4 · spread+kayma   3.6 · süre 15.5 g · piyasada % 45
+    → kaldırılabilir
+  BTC rejimi çıkışı yok · araştırma    33 işlem · kazanma % 36.4 · PF  1.71 · ort +0.350R (t=+1.03) · beklenen  +1.72 · net %  +5.68 (gerç.   +56.8 / açık   +0.0) · düşüş % 4.31 · ücret   0.8 · spread+kayma   2.2 · süre  8.9 g · piyasada % 25
+  BTC rejimi çıkışı yok · doğrulama    57 işlem · kazanma % 31.6 · PF  1.57 · ort +0.190R (t=+1.00) · beklenen  +0.93 · net %  +5.30 (gerç.   +53.0 / açık   +0.0) · düşüş % 3.42 · ücret   2.1 · spread+kayma   5.2 · süre 10.4 g · piyasada % 49
+    → korunur
+  birleşik (iz süren stop yok, EMA50 çıkışı yok, uygunluk kaybı çıkışı yok) · araştırma   16 işlem · kazanma % 50.0 · PF  7.97 · ort +3.122R (t=+1.44) · beklenen +16.06 · net % +25.69 (gerç.  +256.9 / açık   +0.0) · düşüş % 5.34 · ücret   0.5 · spread+kayma   1.6 · süre 26.6 g · piyasada % 27 ⚠<30
+  birleşik (iz süren stop yok, EMA50 çıkışı yok, uygunluk kaybı çıkışı yok) · doğrulama   26 işlem · kazanma % 46.2 · PF  3.99 · ort +1.081R (t=+1.76) · beklenen  +5.61 · net % +14.59 (gerç.  +145.9 / açık   +0.0) · düşüş % 4.18 · ücret   1.1 · spread+kayma   2.9 · süre 24.9 g · piyasada % 49 ⚠<30
+  Karar: kaldırıldı: iz süren stop yok, EMA50 çıkışı yok, uygunluk kaybı çıkışı yok
+
+════ Adım 3 · giriş filtreleri ════
+  BTC giriş filtresi yok · araştırma   50 işlem · kazanma % 42.0 · PF  6.02 · ort +1.107R (t=+1.56) · beklenen  +5.82 · net % +29.10 (gerç.  +291.0 / açık   +0.0) · düşüş % 5.34 · ücret   1.7 · spread+kayma   4.5 · süre 10.1 g · piyasada % 33
+  BTC giriş filtresi yok · doğrulama   56 işlem · kazanma % 42.9 · PF  2.93 · ort +0.485R (t=+1.65) · beklenen  +2.51 · net % +14.03 (gerç.  +140.3 / açık   +0.0) · düşüş % 4.26 · ücret   2.5 · spread+kayma   6.7 · süre 12.4 g · piyasada % 53
+    → korunur
+  EMA100 şartı yok · araştırma         16 işlem · kazanma % 50.0 · PF  7.97 · ort +3.122R (t=+1.44) · beklenen +16.06 · net % +25.69 (gerç.  +256.9 / açık   +0.0) · düşüş % 5.34 · ücret   0.5 · spread+kayma   1.6 · süre 26.6 g · piyasada % 27 ⚠<30
+  EMA100 şartı yok · doğrulama         26 işlem · kazanma % 46.2 · PF  3.99 · ort +1.081R (t=+1.76) · beklenen  +5.61 · net % +14.59 (gerç.  +145.9 / açık   +0.0) · düşüş % 4.18 · ücret   1.1 · spread+kayma   2.9 · süre 24.9 g · piyasada % 49 ⚠<30
+    → kaldırılabilir
+  7g getiri şartı yok · araştırma      14 işlem · kazanma % 64.3 · PF 17.84 · ort +3.837R (t=+1.57) · beklenen +20.07 · net % +28.09 (gerç.  +280.9 / açık   +0.0) · düşüş % 5.22 · ücret   0.6 · spread+kayma   1.5 · süre 33.9 g · piyasada % 29 ⚠<30
+  7g getiri şartı yok · doğrulama      31 işlem · kazanma % 45.2 · PF  4.07 · ort +0.982R (t=+1.89) · beklenen  +5.14 · net % +15.93 (gerç.  +159.3 / açık   +0.0) · düşüş % 4.18 · ücret   1.3 · spread+kayma   3.3 · süre 21.8 g · piyasada % 51
+    → korunur
+  30g getiri şartı yok · araştırma     16 işlem · kazanma % 50.0 · PF  7.97 · ort +3.122R (t=+1.44) · beklenen +16.06 · net % +25.69 (gerç.  +256.9 / açık   +0.0) · düşüş % 5.34 · ücret   0.5 · spread+kayma   1.6 · süre 26.6 g · piyasada % 27 ⚠<30
+  30g getiri şartı yok · doğrulama     26 işlem · kazanma % 46.2 · PF  3.99 · ort +1.081R (t=+1.76) · beklenen  +5.61 · net % +14.59 (gerç.  +145.9 / açık   +0.0) · düşüş % 4.18 · ücret   1.1 · spread+kayma   2.9 · süre 24.9 g · piyasada % 49 ⚠<30
+    → kaldırılabilir
+  BTC'ye göre ≥3 puan yok · araştırma   16 işlem · kazanma % 50.0 · PF  7.93 · ort +3.107R (t=+1.43) · beklenen +15.96 · net % +25.54 (gerç.  +255.4 / açık   +0.0) · düşüş % 5.34 · ücret   0.6 · spread+kayma   1.6 · süre 27.4 g · piyasada % 27 ⚠<30
+  BTC'ye göre ≥3 puan yok · doğrulama   30 işlem · kazanma % 46.7 · PF  4.21 · ort +1.101R (t=+2.01) · beklenen  +5.81 · net % +17.42 (gerç.  +174.2 / açık   +0.0) · düşüş % 4.18 · ücret   1.4 · spread+kayma   3.5 · süre 23.2 g · piyasada % 50
+    → korunur
+  aralık ≤2,5 ATR yok · araştırma      16 işlem · kazanma % 50.0 · PF  7.78 · ort +3.113R (t=+1.43) · beklenen +16.00 · net % +25.60 (gerç.  +256.0 / açık   +0.0) · düşüş % 5.34 · ücret   0.5 · spread+kayma   1.5 · süre 26.6 g · piyasada % 27 ⚠<30
+  aralık ≤2,5 ATR yok · doğrulama      26 işlem · kazanma % 46.2 · PF  3.99 · ort +1.081R (t=+1.76) · beklenen  +5.61 · net % +14.59 (gerç.  +145.9 / açık   +0.0) · düşüş % 4.18 · ücret   1.1 · spread+kayma   2.9 · süre 24.9 g · piyasada % 49 ⚠<30
+    → korunur
+  birleşik (EMA100 şartı yok, 30g getiri şartı yok) · araştırma   16 işlem · kazanma % 50.0 · PF  7.97 · ort +3.122R (t=+1.44) · beklenen +16.06 · net % +25.69 (gerç.  +256.9 / açık   +0.0) · düşüş % 5.34 · ücret   0.5 · spread+kayma   1.6 · süre 26.6 g · piyasada % 27 ⚠<30
+  birleşik (EMA100 şartı yok, 30g getiri şartı yok) · doğrulama   26 işlem · kazanma % 46.2 · PF  3.99 · ort +1.081R (t=+1.76) · beklenen  +5.61 · net % +14.59 (gerç.  +145.9 / açık   +0.0) · düşüş % 4.18 · ücret   1.1 · spread+kayma   2.9 · süre 24.9 g · piyasada % 49 ⚠<30
+  Karar: kaldırıldı: EMA100 şartı yok, 30g getiri şartı yok
+
+════ Adım 4 · duyarlılık (nihai yapılandırma; yalnız rapor) ════
+  RS 2 puan · araştırma                16 işlem · kazanma % 50.0 · PF  7.97 · ort +3.122R (t=+1.44) · beklenen +16.06 · net % +25.69 (gerç.  +256.9 / açık   +0.0) · düşüş % 5.34 · ücret   0.5 · spread+kayma   1.6 · süre 26.6 g · piyasada % 27 ⚠<30
+  RS 2 puan · doğrulama                26 işlem · kazanma % 50.0 · PF  4.38 · ort +1.162R (t=+1.90) · beklenen  +6.07 · net % +15.79 (gerç.  +157.9 / açık   +0.0) · düşüş % 4.18 · ücret   1.2 · spread+kayma   2.9 · süre 25.7 g · piyasada % 50 ⚠<30
+  RS 4 puan · araştırma                16 işlem · kazanma % 50.0 · PF  7.97 · ort +3.122R (t=+1.44) · beklenen +16.06 · net % +25.69 (gerç.  +256.9 / açık   +0.0) · düşüş % 5.34 · ücret   0.5 · spread+kayma   1.6 · süre 26.6 g · piyasada % 27 ⚠<30
+  RS 4 puan · doğrulama                26 işlem · kazanma % 46.2 · PF  3.94 · ort +1.066R (t=+1.74) · beklenen  +5.52 · net % +14.35 (gerç.  +143.5 / açık   +0.0) · düşüş % 4.18 · ücret   1.1 · spread+kayma   2.9 · süre 24.9 g · piyasada % 49 ⚠<30
+  stop 2 ATR · araştırma               16 işlem · kazanma % 50.0 · PF  8.82 · ort +3.927R (t=+1.47) · beklenen +20.42 · net % +32.68 (gerç.  +326.8 / açık   +0.0) · düşüş % 6.36 · ücret   0.7 · spread+kayma   2.0 · süre 26.6 g · piyasada % 27 ⚠<30
+  stop 2 ATR · doğrulama               28 işlem · kazanma % 42.9 · PF  4.08 · ort +1.421R (t=+1.93) · beklenen  +7.51 · net % +21.02 (gerç.  +210.2 / açık   +0.0) · düşüş % 4.16 · ücret   1.5 · spread+kayma   3.9 · süre 22.6 g · piyasada % 48 ⚠<30
+  stop 3 ATR · araştırma               16 işlem · kazanma % 50.0 · PF  7.38 · ort +2.584R (t=+1.42) · beklenen +13.20 · net % +21.11 (gerç.  +211.1 / açık   +0.0) · düşüş % 4.60 · ücret   0.4 · spread+kayma   1.3 · süre 26.6 g · piyasada % 27 ⚠<30
+  stop 3 ATR · doğrulama               26 işlem · kazanma % 46.2 · PF  4.20 · ort +1.042R (t=+1.95) · beklenen  +5.41 · net % +14.06 (gerç.  +140.6 / açık   +0.0) · düşüş % 3.03 · ücret   0.9 · spread+kayma   2.5 · süre 25.0 g · piyasada % 49 ⚠<30
+  hacim 3M · araştırma                 16 işlem · kazanma % 62.5 · PF 12.25 · ort +3.117R (t=+1.46) · beklenen +16.13 · net % +25.81 (gerç.  +258.1 / açık   +0.0) · düşüş % 5.34 · ücret   0.6 · spread+kayma   1.6 · süre 29.8 g · piyasada % 29 ⚠<30
+  hacim 3M · doğrulama                 28 işlem · kazanma % 42.9 · PF  3.02 · ort +0.765R (t=+1.20) · beklenen  +3.83 · net % +10.72 (gerç.  +107.2 / açık   +0.0) · düşüş % 5.63 · ücret   1.0 · spread+kayma   2.4 · süre 23.7 g · piyasada % 49 ⚠<30
+  hacim 8M · araştırma                 16 işlem · kazanma % 37.5 · PF  5.52 · ort +2.684R (t=+1.21) · beklenen +13.41 · net % +21.45 (gerç.  +214.5 / açık   +0.0) · düşüş % 5.35 · ücret   0.7 · spread+kayma   1.7 · süre 21.2 g · piyasada % 25 ⚠<30
+  hacim 8M · doğrulama                 27 işlem · kazanma % 37.0 · PF  3.33 · ort +0.954R (t=+1.59) · beklenen  +4.90 · net % +13.24 (gerç.  +132.4 / açık   +0.0) · düşüş % 4.18 · ücret   1.1 · spread+kayma   3.0 · süre 23.7 g · piyasada % 49 ⚠<30
+
+════ NİHAİ YAPILANDIRMA (dondurulacak) ════
+  giriş: haftalık (pazartesi) · çıkışlar: iz süren false, EMA50 false, uygunluk kaybı false, BTC true
+  filtreler: BTC true, EMA100 false, 7g true, 30g false, RS true, aralık true, hacim true · geçmiş 250 gün
+  duyarlılıkta kırılgan: 0 / 6
+
+════ Nihai yapılandırmanın sonuçları ════
+  araştırma                            16 işlem · kazanma % 50.0 · PF  7.97 · ort +3.122R (t=+1.44) · beklenen +16.06 · net % +25.69 (gerç.  +256.9 / açık   +0.0) · düşüş % 5.34 · ücret   0.5 · spread+kayma   1.6 · süre 26.6 g · piyasada % 27 ⚠<30
+  araştırma · ×2 maliyet               16 işlem · kazanma % 50.0 · PF  7.69 · ort +2.991R (t=+1.44) · beklenen +15.36 · net % +24.57 (gerç.  +245.7 / açık   +0.0) · düşüş % 5.14 · ücret   1.0 · spread+kayma   3.0 · süre 26.6 g · piyasada % 27 ⚠<30
+    sınıf: Yetersiz kanıt · ort R %90 GA [+0.293, +7.065] · en iyi coin olmadan beklenen +6.24 · en iyi 3 işlem olmadan net +6.4
+    BTC al-tut %+45.4 · USDT %0
+  doğrulama                            26 işlem · kazanma % 46.2 · PF  3.99 · ort +1.081R (t=+1.76) · beklenen  +5.61 · net % +14.59 (gerç.  +145.9 / açık   +0.0) · düşüş % 4.18 · ücret   1.1 · spread+kayma   2.9 · süre 24.9 g · piyasada % 49 ⚠<30
+  doğrulama · ×2 maliyet               26 işlem · kazanma % 46.2 · PF  3.78 · ort +1.021R (t=+1.71) · beklenen  +5.28 · net % +13.72 (gerç.  +137.2 / açık   +0.0) · düşüş % 4.09 · ücret   2.1 · spread+kayma   5.5 · süre 24.9 g · piyasada % 49 ⚠<30
+    sınıf: Yetersiz kanıt · ort R %90 GA [+0.152, +2.148] · en iyi coin olmadan beklenen +3.42 · en iyi 3 işlem olmadan net +12.8
+    BTC al-tut %+463.7 · USDT %0
+  görülmüş (bağımsız DEĞİL)            19 işlem · kazanma % 21.1 · PF  0.30 · ort -0.439R (t=-2.26) · beklenen  -2.18 · net %  -4.13 (gerç.   -41.3 / açık   +0.0) · düşüş % 4.49 · ücret   0.4 · spread+kayma   1.2 · süre 19.4 g · piyasada % 31 ⚠<30
+  görülmüş (bağımsız DEĞİL) · ×2 maliyet   19 işlem · kazanma % 15.8 · PF  0.29 · ort -0.451R (t=-2.36) · beklenen  -2.23 · net %  -4.24 (gerç.   -42.4 / açık   +0.0) · düşüş % 4.57 · ücret   0.9 · spread+kayma   2.4 · süre 19.4 g · piyasada % 31 ⚠<30
+    sınıf: Yetersiz kanıt · ort R %90 GA [-0.727, -0.106] · en iyi coin olmadan beklenen -2.87 · en iyi 3 işlem olmadan net -58.9
+    BTC al-tut %-19.8 · USDT %0
+  B0 (V5) · görülmüş                   45 işlem · kazanma % 20.0 · PF  0.56 · ort -0.145R (t=-1.15) · beklenen  -0.72 · net %  -3.26 (gerç.   -32.6 / açık   +0.0) · düşüş % 5.42 · ücret   1.3 · spread+kayma   3.2 · süre  7.6 g · piyasada % 28
+  B1 · görülmüş                        45 işlem · kazanma % 15.6 · PF  0.34 · ort -0.237R (t=-2.92) · beklenen  -1.16 · net %  -5.23 (gerç.   -52.3 / açık   +0.0) · düşüş % 6.02 · ücret   1.3 · spread+kayma   3.3 · süre  7.6 g · piyasada % 28
+
+════ Uygunluk kaybı çıkışlarından sonra 30 gün (gereksiz satış mı?) ════
+  B1: 44 çıkış · sonraki 30 gün ortalama %+8.5 · medyan %-4.7 · yükselen %41
+  nihai: uygunluk kaybı çıkışı yok
+
+════ Coin ve yıl bazında (nihai, araştırma + doğrulama + görülmüş) ════
+  en iyi 8: BTCUSDT 10/+207.5, SOLUSDT 5/+74.1, BNBUSDT 2/+40.8, DOGEUSDT 2/+39.3, TRXUSDT 2/+23.6, XRPUSDT 7/+19.6, MXUSDT 2/+12.3, UNIUSDT 1/+10.3
+  en kötü 8: ETHFIUSDT 1/-5.0, TURBOUSDT 1/-5.0, MNTUSDT 1/-5.0, EIGENUSDT 1/-5.0, SUIUSDT 2/-5.2, LINKUSDT 1/-5.5, TAOUSDT 2/-8.0, ETCUSDT 2/-8.3
+  2020: 2 işlem · net +208.6 USDT · ort +20.871R
+  2021: 12 işlem · net +59.3 USDT · ort +0.829R
+  2022: 2 işlem · net -11.0 USDT · ort -0.869R
+  2023: 10 işlem · net +90.3 USDT · ort +1.794R
+  2024: 16 işlem · net +55.6 USDT · ort +0.635R
+  2025: 13 işlem · net -21.0 USDT · ort -0.320R
+  2026: 6 işlem · net -20.4 USDT · ort -0.697R
+  çıkış nedenleri: BTC piyasa filtresi kapandı 44 (+1.97R), Koruyucu stop 17 (-1.00R)
+  gün içi (4H) çözülen stop: 17 · günlük mumla çözülen: 0
+
+Toplam çalıştırma (dönem × yapılandırma): 51

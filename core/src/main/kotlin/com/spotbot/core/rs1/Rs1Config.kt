@@ -23,7 +23,8 @@ data class Rs1Config(
     val minMedianVolume: Double = 5_000_000.0,
     val volumeDays: Int = 30,
     val maxRangeAtr: Double = 2.5,
-    val minHistoryDays: Int = 150,
+    /** Gösterge ısınması: EMA100 başlangıç ağırlığı 250. günde %5'in altına iner (V6 düzeltmesi; V5: 150). */
+    val minHistoryDays: Int = 250,
     val gapCheckDays: Int = 60,
     val candidates: Int = 2,
     // Risk
@@ -44,13 +45,44 @@ data class Rs1Config(
     /** Paper trading'de canlı haftalık ölçümün yapılabileceği süre (pazartesi 00:00'dan itibaren, saat). */
     val weeklyWindowHours: Int = 4,
     val costs: Rs1Costs = Rs1Costs.MEDIUM,
+    // ---- Araştırma anahtarları (docs/RS1-V6-ONKAYIT.md). Uygulamada kullanıcıya açık değildir. Aşağıdaki
+    // varsayılanlar V6 protokolünün karar kurallarıyla seçildi ve bağımsız testten ÖNCE donduruldu (12 Kasım 2026):
+    // haftalık giriş; çıkış yalnız koruyucu stop + BTC rejimi; EMA100 ve 30 günlük getiri şartı kaldırıldı.
+    /** false: yalnız haftalık giriş günü (A); true: her tamamlanmış günlük mumdan sonra (B). */
+    val entryEveryDay: Boolean = false,
+    val exitTrailing: Boolean = false,
+    val exitEma: Boolean = false,
+    /** Haftalık değerlendirmede uygunluk kaybı çıkışı. */
+    val exitIneligible: Boolean = false,
+    /** BTC filtresi kapandığında açık pozisyonlardan çıkış. */
+    val exitBtc: Boolean = true,
+    /** BTC filtresi yeni girişleri engeller mi. */
+    val useBtcFilter: Boolean = true,
+    val useTrendFilter: Boolean = false,
+    val useReturn7: Boolean = true,
+    val useReturn30: Boolean = false,
+    val useRelativeStrength: Boolean = true,
+    val useVolumeFilter: Boolean = true,
+    val useRangeFilter: Boolean = true,
 )
 
 /** Maliyet senaryosu: yön başına ücret, kayma ve yarım spread (oran). Geçmiş spread verisi olmadığı için senaryodur. */
 @Serializable
-data class Rs1Costs(val name: String, val halfSpread: Double, val fee: Double = 0.0005, val slippage: Double = 0.0005) {
+data class Rs1Costs(
+    val name: String,
+    val halfSpread: Double,
+    /** Ücret (taker) oranı; parite bazında ücret tablosu verilirse yalnız tabloda olmayan pariteler için kullanılır. */
+    val fee: Double = 0.0005,
+    val slippage: Double = 0.0005,
+    /** Bütün maliyet bileşenlerinin çarpanı (2 = iki kat maliyet dayanıklılık senaryosu). */
+    val multiplier: Double = 1.0,
+) {
     /** Alışta fiyata eklenen, satışta düşülen oran (yarım spread + kayma). */
-    val markup: Double get() = halfSpread + slippage
+    val markup: Double get() = (halfSpread + slippage) * multiplier
+
+    fun feeFor(symbol: String, table: Map<String, Double>): Double = (table[symbol] ?: fee) * multiplier
+
+    fun doubled(): Rs1Costs = copy(name = "$name ×2", multiplier = multiplier * 2)
 
     companion object {
         val OPTIMISTIC = Rs1Costs("İyimser", 0.00025)
