@@ -58,9 +58,12 @@ object Rs1Rules {
         val i = btc?.lastCompleted(t) ?: -1
         if (btc == null || i < 0 || btc.openTime[i] + DAY_MS != t || !btc.reliable(i, cfg)) return BtcState(open = false, dataMissing = true)
         val r30 = btc.ret(i, cfg.returnDays)
-        val ok = btc.close[i] > btc.emaTrend[i] && r30 > 0
+        val ok = !cfg.useBtcFilter || (btc.close[i] > btc.emaTrend[i] && r30 > 0)
         return BtcState(ok, false, btc.close[i], btc.emaTrend[i], r30 * 100)
     }
+
+    /** BTC rejimi geçerli mi (filtre anahtarından bağımsız: kapanış > EMA100 ve 30 günlük getiri > 0). */
+    fun btcRegimeOk(b: BtcState): Boolean = b.close > b.ema100 && b.return30Percent > 0
 
     /** Veri şartları. [btcReturn30] oran olarak (NaN ise göreceli güç şartı geçemez; BTC'nin kendisi muaf). */
     fun coin(s: DailySeries, t: Long, btcReturn30: Double, cfg: Rs1Config): CoinCheck {
@@ -74,12 +77,12 @@ object Rs1Rules {
         val vol = s.medianVolume(i, cfg.volumeDays)
         val rangeAtr = (s.high[i] - s.low[i]) / s.atr[i]
         val failed = buildList {
-            if (!(s.close[i] > s.emaTrend[i])) add(Rs1Condition.TREND)
-            if (!(r7 > 0)) add(Rs1Condition.RETURN_7)
-            if (!(r30 > 0)) add(Rs1Condition.RETURN_30)
-            if (s.symbol != BTC && !(rs >= cfg.minRelativeStrengthPoints)) add(Rs1Condition.RELATIVE_STRENGTH)
-            if (!(vol >= cfg.minMedianVolume)) add(Rs1Condition.VOLUME)
-            if (!(rangeAtr <= cfg.maxRangeAtr)) add(Rs1Condition.RANGE)
+            if (cfg.useTrendFilter && !(s.close[i] > s.emaTrend[i])) add(Rs1Condition.TREND)
+            if (cfg.useReturn7 && !(r7 > 0)) add(Rs1Condition.RETURN_7)
+            if (cfg.useReturn30 && !(r30 > 0)) add(Rs1Condition.RETURN_30)
+            if (cfg.useRelativeStrength && s.symbol != BTC && !(rs >= cfg.minRelativeStrengthPoints)) add(Rs1Condition.RELATIVE_STRENGTH)
+            if (cfg.useVolumeFilter && !(vol >= cfg.minMedianVolume)) add(Rs1Condition.VOLUME)
+            if (cfg.useRangeFilter && !(rangeAtr <= cfg.maxRangeAtr)) add(Rs1Condition.RANGE)
         }
         return CoinCheck(s.symbol, failed, s.close[i], r7 * 100, r30 * 100, rs, vol, rangeAtr, s.atr[i], s.emaTrend[i], i + 1)
     }

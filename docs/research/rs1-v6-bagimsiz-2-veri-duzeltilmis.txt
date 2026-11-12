@@ -1,0 +1,26 @@
+BAĞIMSIZ TEST · dondurulmuş Rs1Config · 2018-01-01 → 2019-12-31 · 1D 49 parite · 4H 49 · veri: 14217 mum, yinelenen 0, sırasız 0
+UTC'ye hizasız günlük mum (atıldı): 1364 · 4H'den kurulan UTC günü: 500 · BTC ilk UTC günü 2018-06-02
+  orta maliyet                          5 işlem · kazanma % 40.0 · PF  4.14 · ort +1.257R (t=+1.04) · beklenen  +6.21 · net %  +3.11 (gerç.   +31.1 / açık   +0.0) · düşüş % 7.73 · ücret   0.2 · spread+kayma   0.5 · süre 50.6 g · piyasada % 18 ⚠<30
+  ×2 maliyet                            5 işlem · kazanma % 40.0 · PF  3.95 · ort +1.189R (t=+1.02) · beklenen  +5.88 · net %  +2.94 (gerç.   +29.4 / açık   +0.0) · düşüş % 7.51 · ücret   0.4 · spread+kayma   0.9 · süre 50.6 g · piyasada % 18 ⚠<30
+  kötümser                              5 işlem · kazanma % 40.0 · PF  4.06 · ort +1.227R (t=+1.03) · beklenen  +6.06 · net %  +3.03 (gerç.   +30.3 / açık   +0.0) · düşüş % 7.64 · ücret   0.2 · spread+kayma   0.7 · süre 50.6 g · piyasada % 18 ⚠<30
+  V5 kuralları (B0)                    16 işlem · kazanma % 31.3 · PF  2.96 · ort +0.599R (t=+1.36) · beklenen  +3.02 · net %  +4.83 (gerç.   +48.3 / açık   +0.0) · düşüş % 2.39 · ücret   0.6 · spread+kayma   1.4 · süre  9.5 g · piyasada % 14 ⚠<30
+  BTC al-tut %-4.61 · USDT %0
+
+SINIF: Yetersiz kanıt
+  ✗ En az 30 kapanmış işlem (5)
+  ✓ Maliyet sonrası beklenen değer > 0
+  ✓ Profit factor ≥ 1,20
+  ✓ En büyük düşüş ≤ %10
+  ✓ En iyi coin olmadan beklenen değer > 0
+  ✗ En iyi 3 işlem olmadan net > 0
+  ✓ İki kat maliyette beklenen değer > 0
+  ✗ Ortalama R %90 güven aralığı alt sınırı > 0
+  beklenen +6.21 USDT · PF 4.14 · düşüş %7.73 · ort R %90 GA [-0.561, +3.166] · en iyi coin olmadan +1.35 · en iyi 3 işlem olmadan -8.0
+  coinler: LTCUSDT 1/+25.7, ETCUSDT 2/+10.1, BSVUSDT 1/-2.8, MXUSDT 1/-1.9
+  çıkış nedenleri: {BTC piyasa filtresi kapandı=4, Koruyucu stop=1}
+  girişsiz değerlendirme nedenleri: {BTC verisi eksik ya da güncel değil=58, BTC günlük kapanışı EMA100 altında=10, Pozisyon sınırı dolu (2)=16, Günlük kayıp sınırı (%1.5) tetiklendi=1, BTC 30 günlük getirisi pozitif değil=8, BTC EMA100 altında ve 30 günlük getirisi negatif=9}
+  LTCUSDT    2019-04-01 → 2019-07-23    60.6257 →    95.1010 net +25.67 +5.13R BTC piyasa filtresi kapandı
+  ETCUSDT    2019-04-01 → 2019-07-23     4.8311 →     6.3634 net +15.26 +3.05R BTC piyasa filtresi kapandı
+  ETCUSDT    2019-08-26 → 2019-08-29     7.1587 →     5.9334 net  -5.20 -1.00R Koruyucu stop
+  BSVUSDT    2019-10-28 → 2019-11-09   140.0629 →   124.2016 net  -2.79 -0.54R BTC piyasa filtresi kapandı
+  MXUSDT     2019-10-28 → 2019-11-09     0.1920 →     0.1745 net  -1.88 -0.36R BTC piyasa filtresi kapandı

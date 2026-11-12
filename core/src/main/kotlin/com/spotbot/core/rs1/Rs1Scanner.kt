@@ -37,6 +37,14 @@ data class ScanRow(
     val check: CoinCheck,
     val bidDepth: Double? = null,
     val askDepth: Double? = null,
+    /** En büyük pozisyon tutarı kadar alışın emir defteri ortalama fiyatı ve orta fiyata göre tahmini kayma (%). */
+    val askVwap: Double? = null,
+    val mid: Double? = null,
+    val estimatedSlippagePercent: Double? = null,
+    /** MEXC exchangeInfo: taker ücreti, miktar adımı, asgari emir tutarı. */
+    val takerFee: Double = Double.NaN,
+    val quantityStep: Double = 0.0,
+    val minNotional: Double = 0.0,
     /** Bütün şartlar (veri + canlı) sağlandı mı? */
     val eligible: Boolean = false,
     val candidate: Boolean = false,
@@ -147,7 +155,9 @@ class Rs1Scanner(
     /** Haftalık değerlendirme için canlı ölçümler (paper trading kaydı). */
     fun snapshot(result: Rs1ScanResult, takenAt: Long): WeeklySnapshot = WeeklySnapshot(
         result.dailyClose, takenAt,
-        result.top.associate { it.symbol to LiveCheck(it.spreadPercent, it.bidDepth ?: 0.0, it.askDepth ?: 0.0) },
+        result.top.associate {
+            it.symbol to LiveCheck(it.spreadPercent, it.bidDepth ?: 0.0, it.askDepth ?: 0.0, it.askVwap ?: 0.0, it.mid ?: Double.NaN, it.takerFee, it.quantityStep, it.minNotional)
+        },
     )
 
     private suspend fun run(held: Collection<String>, equity: Double, now: Long): Pair<Rs1ScanResult, Set<String>> {
@@ -189,7 +199,10 @@ class Rs1Scanner(
             val d = series[s.symbol]
             if (d == null || !(spread.isFinite())) { count(if (d == null) ScanStage.DATA else ScanStage.NO_PRICE); continue }
             val check = Rs1Rules.coin(d, dailyClose, btcR30, cfg)
-            rows += ScanRow(s.symbol, s.sectors, tickers[s.symbol]?.lastPrice ?: 0.0, spread, check, held = s.symbol in held)
+            rows += ScanRow(
+                s.symbol, s.sectors, tickers[s.symbol]?.lastPrice ?: 0.0, spread, check, held = s.symbol in held,
+                takerFee = s.takerFee, quantityStep = Math.pow(10.0, -s.quantityPrecision.toDouble()), minNotional = s.minNotional,
+            )
         }
         val requiredDepth = cfg.depthMultiple * cfg.maxPositionPercent / 100 * equity
         // Huni: her parite ilk elendiği aşamada sayılır.
@@ -212,15 +225,23 @@ class Rs1Scanner(
         // 2. aşama: en güçlü 20 (30 günlük getiri) + veri şartlarını geçen hepsi + açık pozisyonlar.
         val byMomentum = liquid.sortedWith(compareByDescending<ScanRow> { it.check.return30Percent }.thenBy { it.symbol })
         val stage2 = (byMomentum.take(stage2Size) + dataEligible + rows.filter { it.held }).distinctBy { it.symbol }
+        val notional = cfg.maxPositionPercent / 100 * equity
         val detailed = stage2.map { r ->
-            val (bid, ask) = runCatching { api.orderBook(r.symbol, 100).depthWithin(cfg.depthBandPercent) }.getOrNull() ?: (null to null)
+            val book = runCatching { api.orderBook(r.symbol, 100) }.getOrNull()
             requests++
+            val (bid, ask) = book?.depthWithin(cfg.depthBandPercent) ?: (null to null)
+            val mid = book?.let { b -> val bb = b.bids.firstOrNull()?.price; val aa = b.asks.firstOrNull()?.price; if (bb != null && aa != null) (bb + aa) / 2 else null }
+            val vwap = book?.let { askVwap(it.asks, notional) }
             val failed = buildList {
                 addAll(r.check.failed)
                 if (r.spreadPercent > cfg.maxSpreadPercent) add(Rs1Condition.SPREAD)
                 if (bid == null || ask == null || bid < requiredDepth || ask < requiredDepth) add(Rs1Condition.DEPTH)
             }
-            r.copy(bidDepth = bid, askDepth = ask, failed = failed, eligible = failed.isEmpty())
+            r.copy(
+                bidDepth = bid, askDepth = ask, askVwap = vwap, mid = mid,
+                estimatedSlippagePercent = if (vwap != null && mid != null) (vwap / mid - 1) * 100 else null,
+                failed = failed, eligible = failed.isEmpty(),
+            )
         }
         for (r in rows) {
             if (r.symbol in detailed.map { it.symbol }) continue
@@ -259,6 +280,19 @@ class Rs1Scanner(
 
         fun isUnsupportedProduct(s: SymbolInfo): Boolean =
             s.baseAsset in STABLE || s.sectors.any { it in EXCLUDED_PLATES } || LEVERAGED.containsMatchIn(s.baseAsset)
+
+        /** [notional] USDT'lik alışın satış tarafındaki ortalama fiyatı; defter yetmezse null. */
+        fun askVwap(asks: List<com.spotbot.core.model.PriceLevel>, notional: Double): Double? {
+            var left = notional
+            var qty = 0.0
+            for (l in asks) {
+                val take = minOf(left, l.price * l.quantity)
+                qty += take / l.price
+                left -= take
+                if (left <= 1e-9) return notional / qty
+            }
+            return null
+        }
 
         private fun spread(b: BookTicker?): Double = if (b == null || b.bid <= 0 || b.ask <= 0) Double.NaN else b.spreadPercent
 

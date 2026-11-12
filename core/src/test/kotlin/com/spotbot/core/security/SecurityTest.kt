@@ -33,15 +33,18 @@ class SecurityTest {
     }
 
     @Test
-    fun `default configuration matches the pre-registered RS-1 parameters`() {
+    fun `default configuration matches the pre-registered and frozen RS-1 parameters`() {
         val c = Rs1Config()
         assertEquals(100, c.emaTrend); assertEquals(50, c.emaExit); assertEquals(14, c.atrPeriod)
         assertEquals(3.0, c.minRelativeStrengthPoints, 0.0); assertEquals(0.15, c.maxSpreadPercent, 0.0)
         assertEquals(5_000_000.0, c.minMedianVolume, 0.0); assertEquals(2.5, c.maxRangeAtr, 0.0); assertEquals(2, c.candidates)
         assertEquals(1_000.0, c.capital, 0.0); assertEquals(0.5, c.riskPercent, 0.0); assertEquals(2, c.maxPositions)
         assertEquals(25.0, c.maxPositionPercent, 0.0); assertEquals(50.0, c.maxTotalPercent, 0.0); assertEquals(1.5, c.dailyLossPercent, 0.0)
-        assertEquals(2.5, c.initialStopAtr, 0.0); assertEquals(3.0, c.trailAtr, 0.0); assertEquals(2, c.emaExitDays)
-        assertEquals(1, c.entryWeekday); assertEquals(Rs1Costs.MEDIUM, c.costs)
+        assertEquals(2.5, c.initialStopAtr, 0.0); assertEquals(1, c.entryWeekday); assertEquals(Rs1Costs.MEDIUM, c.costs)
+        // V6'da dondurulan seçimler (docs/RS1-V6-ONKAYIT.md, commit 15271c7): bağımsız testten önce sabitlendi.
+        assertEquals(250, c.minHistoryDays)
+        assertFalse(c.entryEveryDay || c.exitTrailing || c.exitEma || c.exitIneligible || c.useTrendFilter || c.useReturn30)
+        assertTrue(c.exitBtc && c.useBtcFilter && c.useReturn7 && c.useRelativeStrength && c.useRangeFilter && c.useVolumeFilter)
     }
 
     /** Tek strateji: eski A/B/C motoru ve strateji sınıfları derlenmiş kodda yok; kaynaklar onlara başvurmuyor. */

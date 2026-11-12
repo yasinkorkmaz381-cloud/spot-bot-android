@@ -1,0 +1,25 @@
+BAĞIMSIZ TEST · dondurulmuş Rs1Config · 2018-01-01 → 2019-12-31 · 1D 49 parite · 4H 49 · veri: 14217 mum, yinelenen 0, sırasız 0
+  orta maliyet                          5 işlem · kazanma % 20.0 · PF  0.63 · ort -0.212R (t=-0.40) · beklenen  -1.06 · net %  -0.53 (gerç.    -5.3 / açık   +0.0) · düşüş % 3.37 · ücret   0.1 · spread+kayma   0.3 · süre 28.0 g · piyasada % 11 ⚠<30
+  ×2 maliyet                            5 işlem · kazanma % 20.0 · PF  0.61 · ort -0.228R (t=-0.44) · beklenen  -1.15 · net %  -0.57 (gerç.    -5.7 / açık   +0.0) · düşüş % 3.33 · ücret   0.3 · spread+kayma   0.7 · süre 28.0 g · piyasada % 11 ⚠<30
+  kötümser                              5 işlem · kazanma % 20.0 · PF  0.62 · ort -0.219R (t=-0.42) · beklenen  -1.10 · net %  -0.55 (gerç.    -5.5 / açık   +0.0) · düşüş % 3.35 · ücret   0.1 · spread+kayma   0.5 · süre 28.0 g · piyasada % 11 ⚠<30
+  V5 kuralları (B0)                    12 işlem · kazanma % 25.0 · PF  0.88 · ort -0.040R (t=-0.16) · beklenen  -0.21 · net %  -0.25 (gerç.    -2.5 / açık   +0.0) · düşüş % 2.53 · ücret   0.3 · spread+kayma   0.8 · süre  7.7 g · piyasada %  8 ⚠<30
+  BTC al-tut %+0.00 · USDT %0
+
+SINIF: Yetersiz kanıt
+  ✗ En az 30 kapanmış işlem (5)
+  ✗ Maliyet sonrası beklenen değer > 0
+  ✗ Profit factor ≥ 1,20
+  ✓ En büyük düşüş ≤ %10
+  ✗ En iyi coin olmadan beklenen değer > 0
+  ✗ En iyi 3 işlem olmadan net > 0
+  ✗ İki kat maliyette beklenen değer > 0
+  ✗ Ortalama R %90 güven aralığı alt sınırı > 0
+  beklenen -1.06 USDT · PF 0.63 · düşüş %3.37 · ort R %90 GA [-0.873, +0.707] · en iyi coin olmadan -3.63 · en iyi 3 işlem olmadan -10.0
+  coinler: ETHUSDT 1/-5.0, BTCUSDT 1/+9.2, ETCUSDT 1/-5.0, BSVUSDT 1/-2.7, MXUSDT 1/-1.8
+  çıkış nedenleri: {Koruyucu stop=2, BTC piyasa filtresi kapandı=3}
+  girişsiz değerlendirme nedenleri: {BTC verisi eksik ya da güncel değil=72, Pozisyon sınırı dolu (2)=8, Uygun adaylar zaten portföyde ya da bu değerlendirmede çıkıldı=1, BTC 30 günlük getirisi pozitif değil=8, BTC EMA100 altında ve 30 günlük getirisi negatif=9, BTC günlük kapanışı EMA100 altında=3}
+  ETHUSDT    2019-05-27 → 2019-07-15   265.7918 →   219.8353 net  -5.01 -1.00R Koruyucu stop
+  BTCUSDT    2019-05-20 → 2019-07-23  8144.1875 → 10330.6405 net  +9.22 +1.84R BTC piyasa filtresi kapandı
+  ETCUSDT    2019-08-26 → 2019-08-29     7.1587 →     5.9334 net  -5.02 -1.00R Koruyucu stop
+  BSVUSDT    2019-10-28 → 2019-11-09   140.0629 →   124.2016 net  -2.70 -0.54R BTC piyasa filtresi kapandı
+  MXUSDT     2019-10-28 → 2019-11-09     0.1920 →     0.1745 net  -1.81 -0.36R BTC piyasa filtresi kapandı

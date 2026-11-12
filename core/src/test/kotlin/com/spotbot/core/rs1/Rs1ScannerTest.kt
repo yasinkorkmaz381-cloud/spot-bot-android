@@ -11,7 +11,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class Rs1ScannerTest {
-    private val cfg = Rs1Config()
+    private val cfg = V5_RULES
     private val days = 300
     private val data = mapOf(
         BTC to series(days) { 0.002 },

@@ -38,6 +38,8 @@ fun main(args: Array<String>) = runBlocking {
         "download" -> download(options)
         "backtest" -> backtest(options)
         "research" -> research(options)
+        "v6" -> v6(options)
+        "v6final" -> v6Final(options)
         else -> println(
             """
             CryptoScan Pro — Momentum RS-1 (yalnız paper trading)
@@ -45,7 +47,9 @@ fun main(args: Array<String>) = runBlocking {
               paper                                  Paper trading motorunu bir kez çalıştırır (bugünden başlar)
               download --out klasör [--from 2020-01-01]   Bütün uygun paritelerin 1D geçmişini indirir
               backtest --data klasör [--from T] [--to T] [--cost orta|iyimser|kotumser] [--out sonuç.json]
-              research --data klasör [--out sonuç.json]   Ön kayıtlı protokol (docs/RS1-ONKAYIT.md)
+              research --data klasör [--out sonuç.json]   V5 ön kayıtlı protokolü (docs/RS1-ONKAYIT.md)
+              v6 --data 1D --h4 4H --info exchangeInfo.json [--out rapor.txt] [--csv islemler.csv]   V6 araştırma protokolü
+              v6final --data 1D --h4 4H --info exchangeInfo.json [--from 2018-01-01] [--to 2020-01-01]   Bağımsız test (bir kez)
             """.trimIndent(),
         )
     }

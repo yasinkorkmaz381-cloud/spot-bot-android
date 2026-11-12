@@ -9,7 +9,7 @@ import kotlin.math.abs
 import kotlin.math.exp
 
 class Rs1EngineTest {
-    private val cfg = Rs1Config()
+    private val cfg = V5_RULES
     /** 2024-01-01 pazartesi. */
     private val t0 = 1_704_067_200_000L
     private val days = 400
@@ -185,5 +185,78 @@ class Rs1EngineTest {
         assertFalse(isWeekday(t0 + DAY_MS, 1))
         assertTrue(isWeekday(t0 + 7 * DAY_MS, 1))
         assertTrue(abs(cfg.costs.markup - 0.00125) < 1e-12)
+    }
+
+    @Test
+    fun `an intraday gap through the stop exits at the 4H open, not at the stop`() {
+        val crashDay = 260
+        val coin = series("AAAUSDT") { if (it == crashDay) -0.30 else 0.01 }
+        val day = coin[crashDay]
+        // 4H mumlar: ilk dört mum normal, beşinci mum stopun çok altında açılır (gün içi boşluk).
+        val h4 = (0 until 6).map { k ->
+            val t = day.openTime + k * 4 * HOUR_MS
+            val px = if (k < 4) day.open else day.close
+            Candle(t, px, px * 1.001, px * 0.999, px, 1.0, t + 4 * HOUR_MS, 1e6)
+        }
+        val u = data(BTC to btcUp, "AAAUSDT" to coin)
+        val daily = Rs1Engine(u, cfg).run(start, end).trades.first { it.symbol == "AAAUSDT" && it.exitTime == day.openTime }
+        val intra = Rs1Engine(u, cfg, intraday = mapOf("AAAUSDT" to h4)).run(start, end).trades.first { it.symbol == "AAAUSDT" && it.exitTime == day.openTime }
+        assertTrue(daily.reason == ExitReason.STOP || daily.reason == ExitReason.TRAIL_STOP)
+        assertEquals(ExitReason.STOP_GAP, intra.reason)
+        assertTrue(intra.intradayResolved)
+        assertEquals(day.close * (1 - cfg.costs.markup), intra.exitPrice, 1e-9)
+        assertTrue("boşlukta gerçekleşme stop fiyatından kötü", intra.exitPrice < daily.exitPrice)
+    }
+
+    @Test
+    fun `daily evaluation mode enters on non-Mondays and never duplicates a held coin`() {
+        val u = data(BTC to btcUp, "AAAUSDT" to strong, "BBBUSDT" to series("BBBUSDT") { if (it % 30 == 15) -0.12 else 0.008 })
+        val r = Rs1Engine(u, cfg.copy(entryEveryDay = true)).run(start, end, closeAtEnd = false)
+        val entries = r.trades.map { it.entryTime } + r.open.map { it.entryTime }
+        assertTrue(entries.any { !isWeekday(it, 1) })
+        // Aynı anda aynı coinde iki pozisyon yok.
+        val intervals = r.trades.map { Triple(it.symbol, it.entryTime, it.exitTime) } + r.open.map { Triple(it.symbol, it.entryTime, Long.MAX_VALUE) }
+        for ((s, a, b) in intervals) assertEquals(1, intervals.count { it.first == s && it.second <= a && a < it.third })
+        assertTrue(r.weekly.size > 7 * r.weekly.count { isWeekday(it.time, 1) } / 2)
+    }
+
+    @Test
+    fun `stop history only rises and open positions are reported as unrealized`() {
+        val u = data(BTC to btcUp, "AAAUSDT" to strong)
+        val r = Rs1Engine(u, cfg).run(start, end, closeAtEnd = false)
+        val p = r.open.single { it.symbol == "AAAUSDT" }
+        assertTrue(p.stopChanges.size > 2)
+        assertEquals(p.initialStop, p.stopChanges.first().stop, 1e-12)
+        assertTrue(p.stopChanges.zipWithNext().all { (a, b) -> b.stop > a.stop && b.time > a.time })
+        assertEquals(p.stop, p.stopChanges.last().stop, 1e-12)
+        assertEquals(r.realizedPnl + r.unrealizedPnl, r.netPnl, 1e-6)
+        assertTrue(r.unrealizedPnl > 0)
+    }
+
+    @Test
+    fun `per-symbol fees and the double-cost scenario are applied`() {
+        val u = data(BTC to btcUp, "AAAUSDT" to series("AAAUSDT") { if (it % 30 == 15) -0.12 else 0.01 })
+        val base = Rs1Engine(u, cfg).run(start, end)
+        val dear = Rs1Engine(u, cfg, fees = mapOf("AAAUSDT" to 0.002)).run(start, end)
+        val t0 = base.trades.first { it.symbol == "AAAUSDT" }
+        val t1 = dear.trades.first { it.symbol == "AAAUSDT" && it.entryTime == t0.entryTime }
+        assertTrue(t1.fees > t0.fees * 3)
+        val doubled = Rs1Engine(u, cfg.copy(costs = cfg.costs.doubled())).run(start, end)
+        assertTrue(doubled.friction / doubled.trades.size > 1.9 * base.friction / base.trades.size)
+    }
+
+    @Test
+    fun `the frozen default configuration exits only on the protective stop or the BTC regime`() {
+        val frozen = Rs1Config()
+        assertFalse(frozen.exitTrailing || frozen.exitEma || frozen.exitIneligible || frozen.useTrendFilter || frozen.useReturn30 || frozen.entryEveryDay)
+        assertTrue(frozen.exitBtc && frozen.useBtcFilter && frozen.useReturn7 && frozen.useRelativeStrength && frozen.useRangeFilter && frozen.useVolumeFilter)
+        assertEquals(250, frozen.minHistoryDays)
+        // Uzun yükselişten sonra yavaş düşüş: V5 kurallarında EMA50/uygunluk çıkışı olur; dondurulmuş kurallarda olmaz.
+        val coin = series("AAAUSDT") { if (it < 300) 0.01 else -0.004 }
+        val u = data(BTC to btcUp, "AAAUSDT" to coin)
+        val r = Rs1Engine(u.mapValues { (s, d) -> DailySeries(s, d.bars, frozen) }, frozen).run(start, end)
+        assertTrue(r.trades.isNotEmpty())
+        assertTrue(r.trades.all { it.reason in setOf(ExitReason.STOP, ExitReason.STOP_GAP, ExitReason.BTC_FILTER, ExitReason.PERIOD_END) })
+        assertTrue(r.trades.all { it.stopChanges.size == 1 }) // iz süren stop yok: yalnız başlangıç stopu
     }
 }

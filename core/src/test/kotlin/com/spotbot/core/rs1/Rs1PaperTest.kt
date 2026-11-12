@@ -11,7 +11,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class Rs1PaperTest {
-    private val cfg = Rs1Config()
+    private val cfg = V5_RULES
     private val days = 400
     private val crashDay = 300
     private val data = mapOf(
@@ -54,9 +54,15 @@ class Rs1PaperTest {
         simulate(m, paper, end)
         val p = paper.state.value!!
         assertNull(p.lastError)
-        val bt = Rs1Engine(data.mapValues { (s, c) -> DailySeries(s, c, cfg) }, cfg).run(start, end, BacktestGate, closeAtEnd = false)
+        // 1) Paper sonucu = aynı motorun kaydedilmiş girdilerle (ölçümler, 1H mumlar, ücretler) yeniden çalıştırılması.
+        val series = data.mapValues { (s, c) -> DailySeries(s, c, cfg) }
+        val replay = Rs1Engine(series, cfg, p.feeTable(), p.intraday).run(start, end, SnapshotGate(p.snapshots, cfg), closeAtEnd = false)
+        assertEquals(replay.trades, p.result!!.trades)
+        assertEquals(replay.open, p.result!!.open)
+        // 2) Backtest ile aynı kararlar ve fiyatlar; tek fark gün içi çözümün işareti (paper 1H, backtest günlük).
+        val bt = Rs1Engine(series, cfg).run(start, end, BacktestGate, closeAtEnd = false)
         assertTrue("işlem oluşmalı: ${bt.trades.size}", bt.trades.size >= 3)
-        assertEquals(bt.trades, p.result!!.trades)
+        assertEquals(bt.trades.map { it.copy(intradayResolved = false) }, p.result!!.trades.map { it.copy(intradayResolved = false) })
         assertEquals(bt.open.map { it.key to it.stop }, p.result!!.open.map { it.key to it.stop })
         assertEquals(bt.weekly.map { it.time to it.entered }, p.result!!.weekly.map { it.time to it.entered })
     }
@@ -74,7 +80,8 @@ class Rs1PaperTest {
         runBlocking { paper.refresh() }
         val intraday = paper.state.value!!.result!!.trades.single { it.symbol == "AAAUSDT" && it.exitTime == crash }
         val bt = Rs1Engine(data.mapValues { (s, c) -> DailySeries(s, c, cfg) }, cfg).run(start, end, BacktestGate)
-        assertEquals(bt.trades.single { it.symbol == "AAAUSDT" && it.exitTime == crash }, intraday)
+        assertEquals(bt.trades.single { it.symbol == "AAAUSDT" && it.exitTime == crash }, intraday.copy(intradayResolved = false))
+        assertTrue(intraday.intradayResolved)
     }
 
     @Test
@@ -87,7 +94,7 @@ class Rs1PaperTest {
         simulate(m, paper, firstMonday + 2 * DAY_MS, skipMonday = firstMonday)
         val w = paper.state.value!!.result!!.weekly.single { it.time == firstMonday }
         assertTrue(w.entered.isEmpty())
-        assertTrue(w.noEntryReason!!.contains("canlı değerlendirme"))
+        assertTrue(w.noEntryReason!!.lowercase().contains("canlı değerlendirme"))
     }
 
     @Test
@@ -139,5 +146,41 @@ class Rs1PaperTest {
         assertTrue(!paper.recordSnapshot(permissive(monday, monday + 5 * HOUR_MS))) // 04:00 sonrası
         assertTrue(paper.recordSnapshot(permissive(monday, monday + HOUR_MS)))
         assertTrue(!paper.recordSnapshot(permissive(monday, monday + 2 * HOUR_MS))) // haftada bir kez
+    }
+
+    @Test
+    fun `entries fill at the live order book price recorded at evaluation, not at the stale open`() {
+        val m = market()
+        val paper = Rs1Paper(m, InMemoryPaperStore(), TimeSource { m.clock }, cfg)
+        val monday = (0..7).map { start + it * DAY_MS }.first { isWeekday(it, 1) }
+        runBlocking {
+            m.clock = start + 60_000L; paper.refresh()
+            m.clock = monday + 2 * HOUR_MS
+            val vwap = 1.0 // gerçek fiyattan çok farklı: dolumun buradan geldiği açıkça görülsün
+            val checks = data.keys.associateWith { LiveCheck(0.02, 1e9, 1e9, askVwap = vwap * 101, mid = 100.0, takerFee = 0.0008, quantityStep = 0.01, minNotional = 1.0) }
+            assertTrue(paper.recordSnapshot(WeeklySnapshot(monday, m.clock, checks)))
+            m.clock = monday + 3 * HOUR_MS; paper.refresh()
+        }
+        val p = paper.state.value!!.result!!.open
+        assertTrue(p.isNotEmpty())
+        for (pos in p) {
+            assertEquals(101.0 * (1 + cfg.costs.slippage), pos.entryPrice, 1e-9)
+            assertEquals(monday + 2 * HOUR_MS, pos.entryTime)
+            assertEquals(0.0, Math.round(pos.quantity * 100) - pos.quantity * 100, 1e-6) // miktar adımı 0,01
+            assertEquals(pos.entryPrice * pos.quantity * 0.0008, pos.entryFee, 1e-9) // parite ücreti
+        }
+    }
+
+    @Test
+    fun `untracked intervals are recorded when the app was not running`() = runBlocking {
+        val m = market()
+        val paper = Rs1Paper(m, InMemoryPaperStore(), TimeSource { m.clock }, cfg)
+        m.clock = start + HOUR_MS; paper.refresh()
+        m.clock = start + 2 * HOUR_MS; paper.refresh() // 1 saat > 20 dk: takip edilmeyen aralık
+        m.clock = start + 30 * HOUR_MS; paper.refresh()
+        val s = paper.state.value!!
+        assertEquals(listOf(Interval(start + HOUR_MS, start + 2 * HOUR_MS), Interval(start + 2 * HOUR_MS, start + 30 * HOUR_MS)), s.untracked)
+        assertTrue(s.untrackedAt(start + 10 * HOUR_MS))
+        assertTrue(!s.untrackedAt(start + 31 * HOUR_MS))
     }
 }

@@ -81,3 +81,6 @@ class FakeMarket(
         )
     }
 }
+
+/** V5 kural seti (motorda araştırma anahtarlarıyla hâlâ çalışır): motorun genel davranış testleri için. */
+val V5_RULES = Rs1Config(minHistoryDays = 150, exitTrailing = true, exitEma = true, exitIneligible = true, useTrendFilter = true, useReturn30 = true)

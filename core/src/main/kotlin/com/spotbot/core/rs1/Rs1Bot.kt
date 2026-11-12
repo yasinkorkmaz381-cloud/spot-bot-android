@@ -17,6 +17,8 @@ data class BotStatus(
     val weeklyRecorded: Boolean = false,
     /** Döngüler arasında beklenenden uzun ara (Android arka plan kısıtı olabilir). */
     val longestGapMinutes: Long = 0,
+    /** Cihaz saatinin MEXC sunucu saatinden farkı (ms). */
+    val clockOffsetMillis: Long = 0,
 )
 
 /**
@@ -28,6 +30,8 @@ class Rs1Bot(
     val paper: Rs1Paper,
     private val clock: TimeSource = TimeSource.System,
     private val cfg: Rs1Config = Rs1Config(),
+    /** MEXC sunucu saati (saat farkı düzeltmesi için); null ise düzeltme yapılmaz. */
+    private val serverTime: (suspend () -> Long)? = null,
 ) {
     private val _status = MutableStateFlow(BotStatus())
     val status: StateFlow<BotStatus> = _status.asStateFlow()
@@ -36,6 +40,10 @@ class Rs1Bot(
 
     /** Bir döngü: tarama (gerekirse), haftalık canlı ölçümün kaydı (penceredeyse), paper trading güncellemesi. */
     suspend fun cycle() {
+        // Saat farkı: cihaz saati MEXC sunucu saatinden saparsa düzelt (yalnız ServerClock ile).
+        (clock as? com.spotbot.core.util.ServerClock)?.let { c ->
+            serverTime?.let { st -> runCatching { st() }.getOrNull()?.let { server -> c.offsetMillis = server - (c.now() - c.offsetMillis) } }
+        }
         val now = clock.now()
         val before = _status.value.lastCycleAt
         var error: String? = null
@@ -59,6 +67,7 @@ class Rs1Bot(
                 lastCycleAt = now, lastError = error,
                 weeklyRecorded = paper.state.value?.snapshots?.any { s -> s.monday == mondayOf(now) } == true,
                 longestGapMinutes = maxOf(it.longestGapMinutes, before?.let { b -> (now - b) / 60_000L } ?: 0L),
+                clockOffsetMillis = (clock as? com.spotbot.core.util.ServerClock)?.offsetMillis ?: 0L,
             )
         }
     }

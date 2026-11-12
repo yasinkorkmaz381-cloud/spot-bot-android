@@ -40,4 +40,25 @@ object Rs1History {
         }
         return out to failed
     }
+
+    /** Normalleştirme sayıları: alınan, UTC'ye hizasız (atılan) ve 4H'den yeniden kurulan günler. */
+    data class Normalization(val aligned: Int, val misaligned: Int, val rebuiltFrom4h: Int)
+
+    /**
+     * MEXC'nin eski günlük mumları (2018-08-23 öncesi) UTC 00:00 yerine UTC 16:00'da (UTC+8 gün sınırı) başlar. Bu
+     * mumlar UTC günü olarak kullanılamaz; sessizce atılmaz, sayılır. Eksik UTC günleri, tam 6 adet 4H mum varsa
+     * onlardan kurulur (aynı borsanın verisi; değer uydurulmaz). Kurulamayan gün boş kalır.
+     */
+    fun normalizeDaily(daily: List<Candle>, h4: List<Candle>): Pair<List<Candle>, Normalization> {
+        val aligned = daily.filter { it.openTime % DAY_MS == 0L }.distinctBy { it.openTime }
+        val have = aligned.map { it.openTime }.toHashSet()
+        val rebuilt = h4.filter { it.openTime % (4 * HOUR_MS) == 0L }.distinctBy { it.openTime }
+            .groupBy { Math.floorDiv(it.openTime, DAY_MS) * DAY_MS }
+            .filter { (day, bars) -> day !in have && bars.size == 6 }
+            .map { (day, bars) ->
+                val b = bars.sortedBy { it.openTime }
+                Candle(day, b.first().open, b.maxOf { it.high }, b.minOf { it.low }, b.last().close, b.sumOf { it.volume }, day + DAY_MS, b.sumOf { it.quoteVolume })
+            }
+        return (aligned + rebuilt).sortedBy { it.openTime } to Normalization(aligned.size, daily.size - aligned.size, rebuilt.size)
+    }
 }
