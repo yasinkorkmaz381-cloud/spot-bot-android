@@ -1,28 +1,18 @@
 package com.spotbot.android
 
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
-import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performScrollToNode
-import androidx.compose.ui.test.hasText
-import androidx.compose.ui.test.onNodeWithTag
-import com.spotbot.android.bot.BacktestPeriod
-import com.spotbot.android.bot.BacktestState
-import com.spotbot.android.data.ArchiveSummary
-import com.spotbot.android.ui.backtest.BacktestContent
-import com.spotbot.android.ui.settings.SettingsContent
+import androidx.compose.ui.test.performScrollTo
+import com.spotbot.android.ui.home.HomeContent
+import com.spotbot.android.ui.opportunities.OpportunitiesContent
+import com.spotbot.android.ui.settings.parseTurkeyTime
 import com.spotbot.android.ui.theme.SpotBotTheme
-import com.spotbot.android.ui.trades.TradesContent
-import com.spotbot.core.rs1.Rs1Costs
+import com.spotbot.core.kr.BotMode
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
+import org.junit.Assert.assertNull
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -30,51 +20,49 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [36], qualifiers = "w360dp-h800dp-xhdpi")
+@Config(sdk = [36])
 class UiInteractionTest {
     @get:Rule
     val compose = createComposeRule()
 
-    private fun show(content: @Composable () -> Unit) = compose.setContent {
-        SpotBotTheme { Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) { content() } }
+    @Test
+    fun `switching off with open positions asks first and offers protect-only`() {
+        val chosen = ArrayList<BotMode>()
+        compose.setContent { SpotBotTheme { HomeContent(SampleData.state(), BotMode.FULL, true, SampleData.NOW, { chosen += it }, {}) } }
+        compose.onNodeWithText("Tamamen kapat").performScrollTo().performClick()
+        compose.onNodeWithText("Tüm takip kapatılsın mı?").assertIsDisplayed()
+        compose.onNodeWithText("Yalnız yeni girişleri durdur").performClick()
+        assertEquals(listOf(BotMode.PROTECT_ONLY), chosen)
     }
 
     @Test
-    fun `trades tabs switch between open, history, weekly and archive`() {
-        val paper = SampleData.paper()
-        show { TradesContent(paper, ArchiveSummary(emptyList(), emptyList(), null)) }
-        compose.onNodeWithText("Geçmiş").performClick()
-        compose.onNodeWithText("Net kâr/zarar").assertIsDisplayed()
-        compose.onNodeWithText("Haftalık").performClick()
-        compose.onNodeWithText("Her pazartesi", substring = true).assertIsDisplayed()
-        compose.onNodeWithText("Arşiv").performClick()
-        compose.onNodeWithText("Arşivde kapanmış işlem yok.").assertIsDisplayed()
+    fun `fully off with open positions shows an unprotected warning`() {
+        compose.setContent { SpotBotTheme { HomeContent(SampleData.state(), BotMode.OFF, true, SampleData.NOW, {}, {}) } }
+        compose.onNodeWithTag("unprotected").assertIsDisplayed()
+        compose.onNodeWithText("Tamamen kapalı").assertIsDisplayed()
     }
 
     @Test
-    fun `backtest runs the selected period and cost scenario`() {
-        var asked: Pair<BacktestPeriod, Rs1Costs>? = null
-        show { BacktestContent(BacktestState.Idle, { p, c, _ -> asked = p to c }) }
-        compose.onNodeWithText("Kötümser").performClick()
-        compose.onNodeWithText("Backtest'i çalıştır").performClick()
-        assertEquals(BacktestPeriod.HOLDOUT to Rs1Costs.PESSIMISTIC, asked)
+    fun `stop new entries keeps protection`() {
+        val chosen = ArrayList<BotMode>()
+        compose.setContent { SpotBotTheme { HomeContent(SampleData.state(), BotMode.FULL, true, SampleData.NOW, { chosen += it }, {}) } }
+        compose.onNodeWithText("Yeni girişleri durdur").performScrollTo().performClick()
+        assertEquals(listOf(BotMode.PROTECT_ONLY), chosen)
     }
 
     @Test
-    fun `resetting the paper account asks for confirmation`() {
-        var resets = 0
-        show { SettingsContent(true, SampleData.cfg, {}, { resets++ }) }
-        compose.onNodeWithText("Sanal hesabı sıfırla").performClick()
-        assertEquals(0, resets)
-        compose.onNodeWithText("Sıfırla").performClick()
-        assertEquals(1, resets)
+    fun `opportunities show the universe funnel and filter by stage`() {
+        compose.setContent { SpotBotTheme { OpportunitiesContent(SampleData.state(), SampleData.NOW) } }
+        compose.onNodeWithTag("funnel").assertIsDisplayed()
+        compose.onNodeWithText("İlk 5 → MEXC'de 3 → taranan 211").assertIsDisplayed()
+        compose.onNodeWithText("Retest bekleniyor 2").performClick()
+        compose.onNodeWithText("TAO").assertIsDisplayed()
+        compose.onNodeWithText("SOL").assertDoesNotExist()
     }
 
     @Test
-    fun `the settings screen offers no strategy selection`() {
-        show { SettingsContent(true, SampleData.cfg, {}, {}) }
-        assertTrue(compose.onAllNodesWithText("Strateji A", substring = true).fetchSemanticsNodes().isEmpty())
-        assertTrue(compose.onAllNodesWithText("Trend Pullback", substring = true).fetchSemanticsNodes().isEmpty())
-        compose.onNodeWithText("Strateji: Momentum RS-1").assertIsDisplayed()
+    fun `event times are read as Turkey time`() {
+        assertEquals(1_794_664_800_000L, parseTurkeyTime("14.11.2026 17:00"))
+        assertNull(parseTurkeyTime("yarın"))
     }
 }

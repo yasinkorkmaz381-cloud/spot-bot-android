@@ -1,7 +1,5 @@
 package com.spotbot.core.security
 
-import com.spotbot.core.rs1.Rs1Config
-import com.spotbot.core.rs1.Rs1Costs
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -33,21 +31,24 @@ class SecurityTest {
     }
 
     @Test
-    fun `default configuration matches the pre-registered and frozen RS-1 parameters`() {
-        val c = Rs1Config()
-        assertEquals(100, c.emaTrend); assertEquals(50, c.emaExit); assertEquals(14, c.atrPeriod)
-        assertEquals(3.0, c.minRelativeStrengthPoints, 0.0); assertEquals(0.15, c.maxSpreadPercent, 0.0)
-        assertEquals(5_000_000.0, c.minMedianVolume, 0.0); assertEquals(2.5, c.maxRangeAtr, 0.0); assertEquals(2, c.candidates)
-        assertEquals(1_000.0, c.capital, 0.0); assertEquals(0.5, c.riskPercent, 0.0); assertEquals(2, c.maxPositions)
-        assertEquals(25.0, c.maxPositionPercent, 0.0); assertEquals(50.0, c.maxTotalPercent, 0.0); assertEquals(1.5, c.dailyLossPercent, 0.0)
-        assertEquals(2.5, c.initialStopAtr, 0.0); assertEquals(1, c.entryWeekday); assertEquals(Rs1Costs.MEDIUM, c.costs)
-        // V6'da dondurulan seçimler (docs/RS1-V6-ONKAYIT.md, commit 15271c7): bağımsız testten önce sabitlendi.
-        assertEquals(250, c.minHistoryDays)
-        assertFalse(c.entryEveryDay || c.exitTrailing || c.exitEma || c.exitIneligible || c.useTrendFilter || c.useReturn30)
-        assertTrue(c.exitBtc && c.useBtcFilter && c.useReturn7 && c.useRelativeStrength && c.useRangeFilter && c.useVolumeFilter)
-        // V7: kazanan yok → uygulamanın kuralları V6 ile birebir aynı.
-        assertEquals(com.spotbot.core.rs1.Rs1Versions.V7, c)
-        assertEquals(com.spotbot.core.rs1.Rs1Versions.V6, c)
+    fun `default configuration matches the pre-registered KR parameters`() {
+        val c = com.spotbot.core.kr.KrConfig()
+        assertEquals(50, c.emaTrend4h); assertEquals(6, c.emaSlopeBars); assertEquals(3, c.swingSide); assertEquals(72, c.levelLookbackHours)
+        assertEquals(1.5, c.breakoutVolumeMultiple, 0.0); assertEquals(8, c.retestBars); assertEquals(0.25, c.retestToleranceAtr, 0.0)
+        assertEquals(0.75, c.maxChaseAtr, 0.0); assertEquals(0.25, c.stopBufferAtr, 0.0); assertEquals(1.5, c.targetAtr1h, 0.0)
+        assertEquals(1.2, c.minNetRewardRisk, 0.0); assertEquals(0.40, c.maxCostShareOfTarget, 0.0); assertEquals(8, c.progressBars)
+        assertEquals(24, c.maxHoldBars); assertEquals(2.0, c.btcShockPercent, 0.0); assertEquals(1_000_000.0, c.minQuoteVolume24h, 0.0)
+        val r = c.risk
+        assertEquals(0.25, r.riskPercent, 0.0); assertEquals(1.0, r.maxOpenRiskPercent, 0.0); assertEquals(4, r.maxPositions)
+        assertEquals(20.0, r.maxPositionPercent, 0.0); assertEquals(70.0, r.maxTotalPercent, 0.0); assertEquals(2.0, r.dailyLossPercent, 0.0)
+    }
+
+    /** CMC anahtarı kaynak koda gömülmez: istemci anahtarı yalnız çalışma anında sağlayıcıdan alır. */
+    @Test
+    fun `no CMC key is embedded in the sources`() {
+        val keyLike = Regex("""X-CMC_PRO_API_KEY"\s*,\s*"[0-9a-f-]{20,}""", RegexOption.IGNORE_CASE)
+        val hits = sources.filter { keyLike.containsMatchIn(it.readText()) || Regex("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}").containsMatchIn(it.readText()) }
+        assertTrue("Anahtar benzeri değer: $hits", hits.isEmpty())
     }
 
     /** Tek strateji: eski A/B/C motoru ve strateji sınıfları derlenmiş kodda yok; kaynaklar onlara başvurmuyor. */
@@ -58,12 +59,13 @@ class SecurityTest {
             "com.spotbot.core.strategy.BreakoutRetestStrategy", "com.spotbot.core.strategy.TrendPullbackStrategy",
             "com.spotbot.core.strategy.RangeStrategy", "com.spotbot.core.trading.DecisionPipeline",
             "com.spotbot.core.backtest.BacktestEngine", "com.spotbot.core.research.V3Engine",
+            "com.spotbot.core.rs1.Rs1Engine", "com.spotbot.core.rs1.Rs1Paper", "com.spotbot.core.rs1.Rs1Config",
         )
         for (name in removed) {
             val present = runCatching { Class.forName(name) }.isSuccess
             assertFalse("$name hâlâ derlenmiş kodda", present)
         }
-        val references = listOf("StrategyId", "TradingEngine", "BREAKOUT_RETEST", "TREND_PULLBACK", "DecisionPipeline", "BacktestEngine")
+        val references = listOf("StrategyId", "TradingEngine", "BREAKOUT_RETEST", "TREND_PULLBACK", "DecisionPipeline", "BacktestEngine", "core.rs1", "Rs1Engine", "Rs1Paper")
         val hits = sources.filter { it.extension == "kt" }.flatMap { f -> references.filter { f.readText().contains(it) }.map { "${f.path}: $it" } }
         assertTrue("Eski strateji başvurusu: $hits", hits.isEmpty())
     }

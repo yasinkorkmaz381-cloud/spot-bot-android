@@ -6,13 +6,13 @@
     <string name="channel_trades">İşlem bildirimleri</string>
     <string name="channel_alerts">Kritik uyarılar</string>
 
-    <string name="status_running">Çalışıyor</string>
     <string name="status_error">Hata</string>
-    <string name="notif_status_text">Momentum RS-1 · sermaye %1$s USDT · açık pozisyon: %2$d (sanal)</string>
+    <string name="notif_status_text">%1$s · açık pozisyon: %2$d (sanal)</string>
     <string name="notif_opened">%1$s alındı (sanal)</string>
-    <string name="notif_opened_text">Giriş %1$s · stop %2$s</string>
+    <string name="notif_opened_text">Giriş %1$s · stop %2$s · hedef %3$s</string>
     <string name="notif_closed">%1$s kapandı (sanal)</string>
     <string name="notif_closed_text">%1$s · net %2$s USDT</string>
     <string name="notif_problem">Bot uyarısı</string>
-    <string name="action_stop_bot">Botu kapat</string>
+    <string name="action_protect_only">Yeni girişleri durdur</string>
+    <string name="action_full">Yeni girişleri aç</string>
 </resources>

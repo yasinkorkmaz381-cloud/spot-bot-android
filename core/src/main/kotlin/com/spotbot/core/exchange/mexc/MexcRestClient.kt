@@ -178,7 +178,7 @@ internal fun parseKline(row: JsonArray): Candle = Candle(
     quoteVolume = row[7].double(),
 )
 
-internal fun parseSymbolInfo(o: JsonObject): SymbolInfo = SymbolInfo(
+fun parseSymbolInfo(o: JsonObject): SymbolInfo = SymbolInfo(
     symbol = o.string("symbol"),
     baseAsset = o.string("baseAsset"),
     quoteAsset = o.string("quoteAsset"),
@@ -199,6 +199,8 @@ internal fun parseSymbolInfo(o: JsonObject): SymbolInfo = SymbolInfo(
     buyPriceBandUp = priceFilter(o, "bidMultiplierUp"),
     sellPriceBandDown = priceFilter(o, "askMultiplierDown"),
     sectors = (o["conceptPlates"] as? kotlinx.serialization.json.JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.content }.orEmpty(),
+    fullName = (o["fullName"] as? JsonPrimitive)?.content.orEmpty(),
+    contractAddress = (o["contractAddress"] as? JsonPrimitive)?.content.orEmpty(),
 )
 
 private fun priceFilter(o: JsonObject, key: String): Double =

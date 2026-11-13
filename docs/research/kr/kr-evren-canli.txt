@@ -1,0 +1,103 @@
+CMC listesi zamanı: 2026-11-13 18:31 UTC (kaynak: CoinMarketCap Pro API /v1/cryptocurrency/listings/latest)
+İlk 300 → MEXC'de 215 → taranan 211
+  Taranıyor: 211
+  Elendi (stablecoin / tokenleştirilmiş varlık / türev): 52
+  MEXC'de USDT spot paritesi yok: 33
+  Aynı sembol, farklı varlık: 1
+  MEXC'de işlem yapılamıyor / risk etiketi: 3
+  Doğrulama fiyatı yok: 0
+-- Elendi (stablecoin / tokenleştirilmiş varlık / türev) --
+#3 USDT (Tether USDt) CMC etiketi: stablecoin
+#5 USDC (USDC) CMC etiketi: stablecoin
+#17 USDe (Ethena USDe) CMC etiketi: stablecoin
+#20 DAI (Dai) CMC etiketi: stablecoin
+#27 USD1 (World Liberty Financial USD) CMC etiketi: stablecoin
+#28 XAUt (Tether Gold) CMC etiketi: tokenized-gold
+#30 RLUSD (Ripple USD) CMC etiketi: stablecoin
+#31 USDG (Global Dollar) CMC etiketi: stablecoin
+#32 PYUSD (PayPal USD) CMC etiketi: stablecoin
+#42 PAXG (PAX Gold) CMC etiketi: tokenized-gold
+#45 U (United Stables) CMC etiketi: stablecoin
+#48 USDD (USDD) CMC etiketi: stablecoin
+#82 TUSD (TrueUSD) CMC etiketi: stablecoin
+#87 EURC (EURC) CMC etiketi: stablecoin
+#105 FDUSD (First Digital USD) CMC etiketi: stablecoin
+#201 RWUSD (RWUSD) CMC etiketi: tokenized-assets
+#203 USDY (Ondo US Dollar Yield) CMC etiketi: stablecoin
+#205 USDf (Falcon USD) CMC etiketi: stablecoin
+#207 USDGO (USDGO) CMC etiketi: stablecoin
+#208 OUSD (Open USD) CMC etiketi: stablecoin
+#211 JLP (Jupiter Perps LP) CMC etiketi: lp-tokens
+#212 GHO (GHO) CMC etiketi: stablecoin
+#216 USD0 (Usual USD) CMC etiketi: stablecoin
+#217 USDAI (USDai) CMC etiketi: stablecoin
+#224 FRAX (Legacy Frax Dollar) CMC etiketi: stablecoin
+#227 SPCXB (SpaceX Tokenized bStocks) CMC etiketi: tokenized-stock
+#230 EURCV (EUR CoinVertible) CMC etiketi: stablecoin
+#232 USAT (USAT) CMC etiketi: stablecoin
+#234 NVDAB (NVIDIA Tokenized bStocks) CMC etiketi: tokenized-stock
+#240 AUSD (AUSD) CMC etiketi: stablecoin
+#242 GUSD (GUSD) CMC etiketi: stablecoin
+#244 CRCLB (Circle Internet Group Tokenized bStocks) CMC etiketi: tokenized-stock
+#250 STRCX (Strategy PP Variable tokenized stock (xStock)) CMC etiketi: tokenized-stock
+#252 CRCLX (Circle tokenized stock (xStock)) CMC etiketi: tokenized-stock
+#254 MSTRX (MicroStrategy tokenized stock (xStock)) CMC etiketi: tokenized-stock
+#257 QQQB (Invesco QQQ Trust Tokenized bStocks) CMC etiketi: tokenized-stock
+#261 GOOGLB (Alphabet Tokenized bStocks) CMC etiketi: tokenized-stock
+#265 USDon (U.S. Dollar Tokenized Currency (Ondo)) CMC etiketi: tokenized-assets
+#266 FRXUSD (Frax USD) CMC etiketi: stablecoin
+#267 MSTRB (Strategy Tokenized bStocks) CMC etiketi: tokenized-stock
+#268 NVDAX (NVIDIA tokenized stock (xStock)) CMC etiketi: tokenized-stock
+#271 SPCXx (SpaceX tokenized stock (xStock)) CMC etiketi: tokenized-stock
+#274 SNDKB (SanDisk Tokenized bStocks) CMC etiketi: tokenized-stock
+#275 SPYX (SP500 tokenized ETF (xStock)) CMC etiketi: tokenized-stock
+#276 CRCLon (Circle Internet Group Tokenized Stock (Ondo)) CMC etiketi: tokenized-stock
+#277 lisUSD (lisUSD) CMC etiketi: stablecoin
+#278 QQQX (Nasdaq tokenized ETF (xStock)) CMC etiketi: tokenized-stock
+#280 USDsui (USDsui) CMC etiketi: stablecoin
+#283 TSLAX (Tesla tokenized stock (xStock)) CMC etiketi: tokenized-stock
+#287 XAUM (Matrixdock Gold) CMC etiketi: commodities
+#288 GOOGLX (Alphabet tokenized stock (xStock)) CMC etiketi: tokenized-stock
+#296 preSPCX (SpaceX 
+Pre-IPO stock (Republic)) CMC etiketi: tokenized-stock
+-- MEXC'de USDT spot paritesi yok --
+#13 LEO (UNUS SED LEO) 
+#60 GT (GateToken) 
+#78 DASH (Dash) 
+#131 AKT (Akash Network) 
+#145 THETA (Theta Network) 
+#170 AIOZ (AIOZ Network) 
+#171 GLM (Golem) 
+#173 SUPER (SuperVerse) 
+#210 DHN (Dohrnii) 
+#213 PEARL (Pearl (pearlresearch.ai)) 
+#215 GROW (Grow) 
+#218 SNC (SNC SCANDIC COIN) 
+#220 TIT (Titan's Tap) 
+#225 SHFL (Shuffle) 
+#228 USX (Solstice USX) 
+#229 KOGE (48 Club Token) 
+#231 BTSE (BTSE Token) 
+#237 D (DAR Open Network) 
+#239 PREDICT (Predict.fun) 
+#245 MOW (MowCat) 
+#246 BORG (SwissBorg) 
+#247 CET (CoinEx Token) 
+#249 JSM (Joseon Mun) 
+#251 ICX (ICON) 
+#255 VCNT (ViciCoin) 
+#258 RLB (Rollbit Coin) 
+#260 YELLOW (YELLOW) 
+#269 YZY (YZY MONEY) 
+#272 EUSX (Solstice eUSX) 
+#273 LBT (Law Blocks (AI)) 
+#291 ICNT (Impossible Cloud Network) 
+#293 NILA (MindWaveDAO) 
+#295 GAS (Gas) 
+-- Aynı sembol, farklı varlık --
+#112 BEAM (Beam) → BEAMUSDT MEXC BEAMUSDT fiyatı 0.00536200, CMC Beam fiyatı 0.00437565: farklı varlık
+-- MEXC'de işlem yapılamıyor / risk etiketi --
+#12 XMR (Monero) → XMRUSDT MEXC risk (ST) etiketi
+#179 PROM (Prom) → PROMUSDT İşlem kapalı / tek yönlü
+#202 RAIN (Rain) → RAINUSDT İşlem kapalı / tek yönlü
+-- Doğrulama fiyatı yok --

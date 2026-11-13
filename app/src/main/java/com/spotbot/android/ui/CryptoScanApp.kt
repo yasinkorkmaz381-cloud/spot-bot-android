@@ -5,8 +5,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.List
-import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -26,6 +26,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavDestination
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.NavDestination.Companion.hierarchy
@@ -34,86 +36,104 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import com.spotbot.android.ui.backtest.BacktestScreen
 import com.spotbot.android.ui.common.Tag
-import com.spotbot.android.ui.panel.PanelScreen
-import com.spotbot.android.ui.scan.ScanScreen
-import com.spotbot.android.ui.settings.SettingsScreen
-import com.spotbot.android.ui.trades.TradesScreen
+import com.spotbot.android.ui.detail.ArchiveContent
+import com.spotbot.android.ui.detail.DetailContent
+import com.spotbot.android.ui.home.HomeContent
+import com.spotbot.android.ui.opportunities.OpportunitiesContent
+import com.spotbot.android.ui.settings.SettingsContent
+import com.spotbot.android.ui.trades.TradesContent
 import kotlinx.serialization.Serializable
 
-@Serializable data object PanelRoute
-@Serializable data object ScanRoute
+@Serializable data object HomeRoute
+@Serializable data object OpportunitiesRoute
 @Serializable data object TradesRoute
-@Serializable data object BacktestRoute
+@Serializable data object DetailRoute
 @Serializable data object SettingsRoute
+@Serializable data object ArchiveRoute
 
+/** Ana kullanım üç bölümdür; ayrıntılar ve ayarlar üst çubuktan açılır. */
 private enum class Tab(val route: Any, val label: String, val icon: ImageVector) {
-    PANEL(PanelRoute, "Panel", Icons.Filled.Home),
-    SCAN(ScanRoute, "Tarama", Icons.Filled.Search),
+    HOME(HomeRoute, "Ana ekran", Icons.Filled.Home),
+    OPPORTUNITIES(OpportunitiesRoute, "Fırsatlar", Icons.Filled.Search),
     TRADES(TradesRoute, "İşlemler", Icons.AutoMirrored.Filled.List),
-    BACKTEST(BacktestRoute, "Backtest", Icons.Filled.DateRange),
-    SETTINGS(SettingsRoute, "Ayarlar", Icons.Filled.Settings),
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CryptoScanApp() {
+fun CryptoScanApp(vm: MainViewModel = viewModel(factory = MainViewModel.Factory)) {
     val navController = rememberNavController()
     val entry by navController.currentBackStackEntryAsState()
     val destination = entry?.destination
-    val tab = Tab.entries.firstOrNull { destination.isOn(it) }
-    val subTitle: String? = null
+    val tab = Tab.entries.firstOrNull { destination.isOn(it.route) }
+    val subTitle = when {
+        destination.isOn(DetailRoute) -> "Ayrıntılar"
+        destination.isOn(SettingsRoute) -> "Ayarlar"
+        destination.isOn(ArchiveRoute) -> "Arşiv (eski stratejiler)"
+        else -> null
+    }
+    val state by vm.state.collectAsStateWithLifecycle()
+    val settings by vm.settings.collectAsStateWithLifecycle()
+    val keyPresent by vm.keyPresent.collectAsStateWithLifecycle()
+    val archive by vm.archive.collectAsStateWithLifecycle()
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
-                title = {
-                    Text(
-                        subTitle ?: tab?.let { if (it == Tab.PANEL) "CryptoScan Pro · RS-1" else it.label } ?: "CryptoScan Pro",
-                        maxLines = 1, overflow = TextOverflow.Ellipsis,
-                    )
-                },
+                title = { Text(subTitle ?: if (tab == Tab.HOME || tab == null) "CryptoScan Pro" else tab.label, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 navigationIcon = {
-                    if (subTitle != null) {
-                        IconButton(onClick = { navController.popBackStack() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Geri") }
-                    }
+                    if (subTitle != null) IconButton(onClick = { navController.popBackStack() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Geri") }
                 },
                 actions = {
                     // İşlem modu her ekranda görünür: uygulama yalnız sanal işlem yapar.
-                    Tag("PAPER", MaterialTheme.colorScheme.tertiary, Modifier.padding(end = 12.dp))
+                    Tag("PAPER", MaterialTheme.colorScheme.tertiary, Modifier.padding(end = 4.dp))
+                    if (subTitle == null) {
+                        IconButton(onClick = { navController.navigate(DetailRoute) }) { Icon(Icons.Filled.Info, contentDescription = "Ayrıntılar") }
+                        IconButton(onClick = { navController.navigate(SettingsRoute) }) { Icon(Icons.Filled.Settings, contentDescription = "Ayarlar") }
+                    }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
             )
         },
         bottomBar = {
-            NavigationBar(containerColor = MaterialTheme.colorScheme.surfaceContainerLow) {
-                Tab.entries.forEach { t ->
-                    NavigationBarItem(
-                        selected = destination.isOn(t),
-                        onClick = {
-                            navController.navigate(t.route) {
-                                popUpTo(navController.graph.findStartDestination().id) { saveState = true }
-                                launchSingleTop = true
-                                restoreState = true
-                            }
-                        },
-                        icon = { Icon(t.icon, contentDescription = null) },
-                        label = { Text(t.label, maxLines = 1) },
-                        colors = NavigationBarItemDefaults.colors(indicatorColor = MaterialTheme.colorScheme.primaryContainer),
-                    )
+            if (subTitle == null) {
+                NavigationBar(containerColor = MaterialTheme.colorScheme.surfaceContainerLow) {
+                    Tab.entries.forEach { t ->
+                        NavigationBarItem(
+                            selected = destination.isOn(t.route),
+                            onClick = {
+                                navController.navigate(t.route) {
+                                    popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                                    launchSingleTop = true
+                                    restoreState = true
+                                }
+                            },
+                            icon = { Icon(t.icon, contentDescription = null) },
+                            label = { Text(t.label, maxLines = 1) },
+                            colors = NavigationBarItemDefaults.colors(indicatorColor = MaterialTheme.colorScheme.primaryContainer),
+                        )
+                    }
                 }
             }
         },
     ) { padding ->
-        NavHost(navController, startDestination = PanelRoute, modifier = Modifier.padding(padding).consumeWindowInsets(padding)) {
-            composable<PanelRoute> { PanelScreen() }
-            composable<ScanRoute> { ScanScreen() }
-            composable<TradesRoute> { TradesScreen() }
-            composable<BacktestRoute> { BacktestScreen() }
-            composable<SettingsRoute> { SettingsScreen() }
+        NavHost(navController, startDestination = HomeRoute, modifier = Modifier.padding(padding).consumeWindowInsets(padding)) {
+            composable<HomeRoute> {
+                HomeContent(state, settings.botMode, keyPresent, vm.now(), onMode = vm::setMode, onOpenSettings = { navController.navigate(SettingsRoute) })
+            }
+            composable<OpportunitiesRoute> { OpportunitiesContent(state, vm.now()) }
+            composable<TradesRoute> { TradesContent(state, onOpenArchive = { vm.loadArchive(); navController.navigate(ArchiveRoute) }) }
+            composable<DetailRoute> { DetailContent(state, vm.now()) }
+            composable<SettingsRoute> {
+                SettingsContent(
+                    keyPresent, state.events, onSaveKey = { vm.saveKey(it) }, onClearKey = { vm.clearKey() },
+                    onAddEvent = { t, title -> vm.addEvent(t, title) }, onRemoveEvent = { vm.removeEvent(it) }, onReset = { vm.reset() },
+                    onOpenArchive = { vm.loadArchive(); navController.navigate(ArchiveRoute) },
+                )
+            }
+            composable<ArchiveRoute> { ArchiveContent(archive) }
         }
     }
 }
 
-private fun NavDestination?.isOn(tab: Tab): Boolean = this?.hierarchy?.any { it.hasRoute(tab.route::class) } == true
+private fun NavDestination?.isOn(route: Any): Boolean = this?.hierarchy?.any { it.hasRoute(route::class) } == true

@@ -1,116 +1,123 @@
 package com.spotbot.android.ui.settings
 
+import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Switch
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewModelScope
-import androidx.lifecycle.viewmodel.compose.viewModel
-import com.spotbot.android.AppContainer
-import com.spotbot.android.ui.AppViewModels
-import com.spotbot.android.ui.BotController
-import com.spotbot.android.ui.common.BackgroundNotice
-import com.spotbot.android.ui.common.ExpandableCard
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.unit.dp
+import com.spotbot.android.ui.common.EmptyText
 import com.spotbot.android.ui.common.InfoBanner
-import com.spotbot.android.ui.common.KeyValueRow
 import com.spotbot.android.ui.common.SectionCard
 import com.spotbot.android.ui.common.Spacing
-import com.spotbot.core.rs1.Rs1Config
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
+import com.spotbot.android.ui.common.TURKEY
+import com.spotbot.android.ui.common.formatDateTime
+import com.spotbot.core.kr.EventWindow
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 
-class SettingsViewModel(private val container: AppContainer, private val controller: BotController) : ViewModel() {
-    val settings = container.settings.settings
-    val config = container.config
-    fun setBot(on: Boolean) = if (on) controller.start() else controller.stop()
-    fun resetPaper() { viewModelScope.launch(Dispatchers.IO) { container.resetPaper() } }
-}
+private val INPUT = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm")
 
-@Composable
-fun SettingsScreen(modifier: Modifier = Modifier, viewModel: SettingsViewModel = viewModel(factory = AppViewModels.Factory)) {
-    val settings by viewModel.settings.collectAsStateWithLifecycle()
-    SettingsContent(settings.botEnabled, viewModel.config, viewModel::setBot, viewModel::resetPaper, modifier)
-}
+/** Kullanıcının yazdığı TSİ zamanını ayrıştırır ("14.11.2026 21:00"). */
+fun parseTurkeyTime(text: String): Long? = runCatching {
+    LocalDateTime.parse(text.trim(), INPUT).atZone(TURKEY).toInstant().toEpochMilli()
+}.getOrNull()
 
 @Composable
-fun SettingsContent(botEnabled: Boolean, cfg: Rs1Config, onBot: (Boolean) -> Unit, onReset: () -> Unit, modifier: Modifier = Modifier) {
-    var confirmReset by rememberSaveable { mutableStateOf(false) }
-    LazyColumn(modifier.fillMaxSize(), contentPadding = PaddingValues(Spacing.screen), verticalArrangement = Arrangement.spacedBy(Spacing.cards)) {
-        item {
-            SectionCard("Bot", trailing = { Switch(checked = botEnabled, onCheckedChange = onBot) }) {
-                Text("Yalnız sanal işlem (paper trading). Gerçek emir gönderimi yok; API anahtarı istenmez.", style = MaterialTheme.typography.bodySmall)
+fun SettingsContent(
+    keyPresent: Boolean,
+    events: List<EventWindow>,
+    onSaveKey: (String) -> Unit,
+    onClearKey: () -> Unit,
+    onAddEvent: (Long, String) -> Unit,
+    onRemoveEvent: (EventWindow) -> Unit,
+    onReset: () -> Unit,
+    onOpenArchive: () -> Unit,
+) {
+    val context = LocalContext.current
+    var key by remember { mutableStateOf("") }
+    var eventTime by remember { mutableStateOf("") }
+    var eventTitle by remember { mutableStateOf("") }
+    var confirmReset by remember { mutableStateOf(false) }
+    Column(
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(Spacing.screen),
+        verticalArrangement = Arrangement.spacedBy(Spacing.cards),
+    ) {
+        SectionCard("CoinMarketCap API anahtarı") {
+            Text(
+                if (keyPresent) "Anahtar kayıtlı (cihazda şifreli; bir daha gösterilmez)." else "Coin evreni CMC'nin resmî API'sinden alınır. Ücretsiz Basic plan anahtarı yeterlidir.",
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            OutlinedTextField(
+                value = key, onValueChange = { key = it }, singleLine = true, label = { Text(if (keyPresent) "Yeni anahtar" else "API anahtarı") },
+                visualTransformation = PasswordVisualTransformation(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = { onSaveKey(key); key = "" }, enabled = key.isNotBlank()) { Text("Kaydet") }
+                if (keyPresent) OutlinedButton(onClick = onClearKey) { Text("Sil") }
             }
         }
-        item {
-            SectionCard("Strateji: Momentum RS-1") {
-                Text("Uygulamada tek strateji vardır. Parametreler ilk sürüm araştırma değerleridir; verilerle doğrulanmadan değiştirilmez.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                KeyValueRow("BTC filtresi", "Kapanış > EMA${cfg.emaTrend} ve ${cfg.returnDays} günlük getiri > 0")
-                KeyValueRow("Giriş", "Pazartesi 00:15 UTC, en güçlü ${cfg.candidates} uygun coin")
+        SectionCard("Makro olay pencereleri") {
+            Text(
+                "Uygulamada doğrulanmış makro takvim kaynağı yok. Bildiğiniz olayları (ör. FOMC) TSİ olarak girin: olaydan 30 dk önce – 60 dk sonra yeni giriş yapılmaz.",
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            OutlinedTextField(eventTime, { eventTime = it }, singleLine = true, label = { Text("Zaman (GG.AA.YYYY SS:DD)") }, modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(eventTitle, { eventTitle = it }, singleLine = true, label = { Text("Başlık") }, modifier = Modifier.fillMaxWidth())
+            val parsed = parseTurkeyTime(eventTime)
+            Button(onClick = { parsed?.let { onAddEvent(it, eventTitle); eventTime = ""; eventTitle = "" } }, enabled = parsed != null) { Text("Ekle") }
+            if (events.isEmpty()) EmptyText("Olay yok.")
+            events.forEach { e ->
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("${formatDateTime(e.time)} · ${e.title}", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                    TextButton(onClick = { onRemoveEvent(e) }) { Text("Kaldır") }
+                }
             }
         }
-        item {
-            ExpandableCard("Uygunluk şartları") {
-                if (cfg.useTrendFilter) KeyValueRow("Trend", "Kapanış > EMA${cfg.emaTrend} (1D)")
-                KeyValueRow("Getiri", if (cfg.useReturn30) "${cfg.shortReturnDays} ve ${cfg.returnDays} günlük getiri > 0" else "${cfg.shortReturnDays} günlük getiri > 0")
-                KeyValueRow("BTC'ye göre", "≥ ${"%.0f".format(cfg.minRelativeStrengthPoints)} puan (BTC muaf)")
-                KeyValueRow("Spread", "≤ %${cfg.maxSpreadPercent}".replace('.', ','))
-                KeyValueRow("Derinlik", "±%${cfg.depthBandPercent.toInt()} içinde ≥ ${cfg.depthMultiple.toInt()} × en büyük pozisyon")
-                KeyValueRow("Hacim", "30 gün medyan ≥ ${(cfg.minMedianVolume / 1e6).toInt()}M USDT")
-                KeyValueRow("Son gün aralığı", "≤ ${cfg.maxRangeAtr} ATR".replace('.', ','))
-                KeyValueRow("Geçmiş", "≥ ${cfg.minHistoryDays} gün, son ${cfg.gapCheckDays} günde eksik yok")
-            }
+        SectionCard("Arka planda çalışma") {
+            Text("Android pil tasarrufu servisi durdurabilir. Bot çalışmadığı aralıklar kaydedilir ve Ayrıntılar'da gösterilir.", style = MaterialTheme.typography.bodyMedium)
+            OutlinedButton(onClick = {
+                runCatching {
+                    context.startActivity(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:${context.packageName}")))
+                }
+            }) { Text("Pil optimizasyonu muafiyeti iste") }
         }
-        item {
-            ExpandableCard("Risk ve çıkış") {
-                KeyValueRow("Sermaye", "${cfg.capital.toInt()} USDT")
-                KeyValueRow("İşlem başına risk", "%${cfg.riskPercent}".replace('.', ','))
-                KeyValueRow("En fazla pozisyon", "${cfg.maxPositions}")
-                KeyValueRow("Coin başına / toplam", "%${cfg.maxPositionPercent.toInt()} / %${cfg.maxTotalPercent.toInt()}")
-                KeyValueRow("Günlük kayıp sınırı", "%${cfg.dailyLossPercent}".replace('.', ','))
-                KeyValueRow("Başlangıç stopu", "${cfg.initialStopAtr} × ATR14".replace('.', ','))
-                if (cfg.exitTrailing) KeyValueRow("İz süren stop", "En yüksek kapanış − ${cfg.trailAtr} × ATR14".replace('.', ','))
-                KeyValueRow(
-                    "Diğer çıkışlar",
-                    listOfNotNull(
-                        "BTC rejimi bozulur".takeIf { cfg.exitBtc }, "2 gün EMA${cfg.emaExit} altı".takeIf { cfg.exitEma },
-                        "haftalık uygunluk kaybı".takeIf { cfg.exitIneligible },
-                    ).joinToString(" · ").ifEmpty { "yok" },
-                )
-                Text(
-                    "V6 araştırmasında ön kayıtlı kurallarla seçildi: iz süren stop, EMA50 ve uygunluk kaybı çıkışları ile EMA100 ve 30 günlük getiri şartı kaldırıldı (katkıları ölçülemedi ya da tekrarlıydı). Sabit kâr hedefi yok.",
-                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                KeyValueRow("Kaldıraç / açığa satış / ek alım", "Yok")
-            }
+        SectionCard("Sanal hesap") {
+            InfoBanner("Bu sürüm yalnız sanal (paper) işlem yapar; gerçek emir gönderen kod yoktur.")
+            OutlinedButton(onClick = { confirmReset = true }) { Text("Sanal hesabı sıfırla") }
+            TextButton(onClick = onOpenArchive) { Text("Arşivi aç") }
         }
-        item {
-            SectionCard("Sanal hesap") {
-                Text("Sıfırlama, mevcut kaydı silmez: arşive taşır ve paper trading'i bugünden yeniden başlatır.", style = MaterialTheme.typography.bodySmall)
-                OutlinedButton(onClick = { confirmReset = true }) { Text("Sanal hesabı sıfırla") }
-            }
-        }
-        item { BackgroundNotice() }
-        item { InfoBanner("Eski A/B/C stratejileri kaldırıldı. Geçmiş işlemleri İşlemler → Arşiv'de salt okunur olarak görebilirsiniz.") }
     }
     if (confirmReset) {
         AlertDialog(
             onDismissRequest = { confirmReset = false },
             title = { Text("Sanal hesap sıfırlansın mı?") },
-            text = { Text("Mevcut paper trading kaydı arşivlenir ve bugünden yeni bir 1.000 USDT sanal hesap başlar.") },
+            text = { Text("Mevcut kayıt silinmez, arşive taşınır. Bakiye 1.000 USDT'ye döner.") },
             confirmButton = { TextButton(onClick = { confirmReset = false; onReset() }) { Text("Sıfırla") } },
             dismissButton = { TextButton(onClick = { confirmReset = false }) { Text("Vazgeç") } },
         )

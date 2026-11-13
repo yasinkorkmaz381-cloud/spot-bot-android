@@ -4,6 +4,7 @@ import kotlinx.serialization.Serializable
 
 /** Kullanılan zaman dilimleri. [mexcInterval] REST adıdır ([mexcStream] eski WebSocket adı, kullanılmıyor). */
 enum class Timeframe(val label: String, val mexcInterval: String, val mexcStream: String, val millis: Long) {
+    M1("1M", "1m", "Min1", 60_000L),
     M5("5M", "5m", "Min5", 5 * 60_000L),
     M15("15M", "15m", "Min15", 15 * 60_000L),
     H1("1H", "60m", "Min60", 60 * 60_000L),
@@ -69,6 +70,9 @@ data class SymbolInfo(
     val sellPriceBandDown: Double = 0.0,
     /** MEXC sektör/ürün etiketleri (conceptPlates): "MEME", "AI", "DeFi", "Tokenized Stocks", "Stablecoins"… */
     val sectors: List<String> = emptyList(),
+    /** MEXC'nin varlık adı (fullName) ve sözleşme adresi (contractAddress); CMC eşleşmesi için. */
+    val fullName: String = "",
+    val contractAddress: String = "",
 ) {
     val canTradeBothSides: Boolean get() = tradeSideType == 1
 }

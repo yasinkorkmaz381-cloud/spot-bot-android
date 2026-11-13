@@ -21,7 +21,7 @@ import androidx.core.content.ContextCompat
 import com.spotbot.android.MainActivity
 import com.spotbot.android.R
 import com.spotbot.android.SpotBotApplication
-import com.spotbot.android.ui.common.formatMoney
+import com.spotbot.core.kr.BotMode
 import com.spotbot.android.ui.common.formatPrice
 import com.spotbot.android.ui.common.formatSignedMoney
 import kotlinx.coroutines.CoroutineScope
@@ -33,8 +33,10 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 /**
- * Ön plan servisi: Momentum RS-1 döngüsünü ([com.spotbot.core.rs1.Rs1Bot.cycle]) birkaç dakikada bir çalıştırır.
- * Android pil kısıtları servisi geciktirebilir ya da durdurabilir; bu durum Panel'de gösterilir.
+ * Ön plan servisi: Kırılım–Retest döngüsünü ([com.spotbot.core.kr.KrPaper.cycle]) çalıştırır.
+ * - FULL: tarama + yeni giriş + koruma; PROTECT_ONLY: yalnız açık pozisyonların stop/hedef takibi.
+ * - OFF: servis durur. Açık pozisyon varken bu durum arayüzde kırmızı uyarıyla gösterilir.
+ * Android pil kısıtları servisi geciktirebilir; kaçan aralıklar paper kaydında "izleme boşluğu" olarak tutulur.
  */
 class BotService : Service() {
 
@@ -42,6 +44,7 @@ class BotService : Service() {
     private var scope: CoroutineScope? = null
     private var wakeLock: PowerManager.WakeLock? = null
     private val notified = HashSet<String>()
+    private var lastClockSync = 0L
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -51,9 +54,12 @@ class BotService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (intent?.action == ACTION_STOP) {
-            container.settings.update { it.copy(botEnabled = false) }
-            container.bot.setRunning(false)
+        when (intent?.action) {
+            ACTION_OFF -> container.settings.update { it.copy(botMode = BotMode.OFF) }
+            ACTION_PROTECT -> container.settings.update { it.copy(botMode = BotMode.PROTECT_ONLY) }
+            ACTION_FULL -> container.settings.update { it.copy(botMode = BotMode.FULL) }
+        }
+        if (container.settings.settings.value.botMode == BotMode.OFF) {
             ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
             stopSelf()
             return START_NOT_STICKY
@@ -63,8 +69,6 @@ class BotService : Service() {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE else 0,
         )
         acquireWakeLock()
-        container.settings.update { it.copy(botEnabled = true) }
-        container.bot.setRunning(true)
         if (scope == null) loop()
         return START_STICKY
     }
@@ -72,7 +76,6 @@ class BotService : Service() {
     override fun onDestroy() {
         scope?.cancel()
         scope = null
-        container.bot.setRunning(false)
         wakeLock?.takeIf { it.isHeld }?.release()
         super.onDestroy()
     }
@@ -81,48 +84,66 @@ class BotService : Service() {
         val s = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         scope = s
         // Var olan kayıtlar için bildirim gönderme; yalnız bundan sonra oluşanlar.
-        container.paper.state.value?.result?.let { r -> notified += r.trades.map { "T:" + it.key } + r.open.map { "P:" + it.key } }
+        container.paper.state.value.book.let { b -> notified += b.trades.map { "T:" + it.id } + b.positions.map { "P:" + it.id } }
         s.launch {
             while (isActive) {
+                val mode = container.settings.settings.value.botMode
+                if (mode == BotMode.OFF) break
                 acquireWakeLock()
-                runCatching { container.bot.cycle() }
+                if (System.currentTimeMillis() - lastClockSync > 10 * 60_000L) { container.syncClock(); lastClockSync = System.currentTimeMillis() }
+                runCatching { container.paper.cycle(mode) }
                 notifyChanges()
                 notify(NOTIFICATION_ID, statusNotification())
-                delay(CYCLE_MILLIS)
+                delay(nextDelay(mode))
             }
+            ServiceCompat.stopForeground(this@BotService, ServiceCompat.STOP_FOREGROUND_REMOVE)
+            stopSelf()
+        }
+    }
+
+    /** Açık pozisyon varken ve 15M kapanışlarının hemen ardından sık; başka zaman seyrek. */
+    private fun nextDelay(mode: BotMode): Long {
+        val open = container.paper.state.value.book.positions.isNotEmpty()
+        val sinceClose = Math.floorMod(container.clock.now(), 15 * 60_000L)
+        return when {
+            open -> 20_000L
+            mode == BotMode.FULL && sinceClose < 60_000L -> 15_000L
+            mode == BotMode.FULL -> 60_000L
+            else -> 120_000L
         }
     }
 
     private fun notifyChanges() {
-        val r = container.paper.state.value?.result ?: return
-        for (p in r.open) {
-            if (notified.add("P:" + p.key)) {
-                notify(p.key.hashCode(), simpleNotification(CHANNEL_TRADES, getString(R.string.notif_opened, p.symbol), getString(R.string.notif_opened_text, formatPrice(p.entryPrice), formatPrice(p.stop))))
+        val book = container.paper.state.value.book
+        for (p in book.positions) {
+            if (notified.add("P:" + p.id)) {
+                notify(p.id.hashCode(), simpleNotification(CHANNEL_TRADES, getString(R.string.notif_opened, p.symbol), getString(R.string.notif_opened_text, formatPrice(p.entryPrice), formatPrice(p.stop), formatPrice(p.target))))
             }
         }
-        for (t in r.trades) {
-            if (notified.add("T:" + t.key)) {
-                notify(t.key.hashCode() + 1, simpleNotification(CHANNEL_TRADES, getString(R.string.notif_closed, t.symbol), getString(R.string.notif_closed_text, t.reason.title, formatSignedMoney(t.netPnl))))
+        for (t in book.trades) {
+            if (notified.add("T:" + t.id)) {
+                notify(t.id.hashCode() + 1, simpleNotification(CHANNEL_TRADES, getString(R.string.notif_closed, t.symbol), getString(R.string.notif_closed_text, t.reason.title, formatSignedMoney(t.netPnl))))
             }
         }
-        container.bot.status.value.lastError?.let { e ->
+        container.paper.state.value.lastError?.let { e ->
             if (notified.add("E:$e")) notify(ERROR_ID, simpleNotification(CHANNEL_ALERTS, getString(R.string.notif_problem), e))
         }
     }
 
     private fun statusNotification(): Notification {
-        val r = container.paper.state.value?.result
-        val status = container.bot.status.value
-        val text = getString(R.string.notif_status_text, formatMoney(r?.endEquity ?: container.config.capital), r?.open?.size ?: 0)
-        return NotificationCompat.Builder(this, CHANNEL_STATUS)
+        val st = container.paper.state.value
+        val mode = container.settings.settings.value.botMode
+        val text = getString(R.string.notif_status_text, mode.title, st.book.positions.size)
+        val b = NotificationCompat.Builder(this, CHANNEL_STATUS)
             .setSmallIcon(R.drawable.ic_notification)
-            .setContentTitle("${getString(R.string.app_name)} · ${getString(if (status.lastError != null) R.string.status_error else R.string.status_running)}")
+            .setContentTitle(getString(R.string.app_name) + if (st.lastError != null) " · " + getString(R.string.status_error) else "")
             .setContentText(text)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setContentIntent(openApp())
-            .addAction(0, getString(R.string.action_stop_bot), servicePending(ACTION_STOP, 2))
-            .build()
+        if (mode == BotMode.FULL) b.addAction(0, getString(R.string.action_protect_only), servicePending(ACTION_PROTECT, 2))
+        else b.addAction(0, getString(R.string.action_full), servicePending(ACTION_FULL, 3))
+        return b.build()
     }
 
     private fun simpleNotification(channel: String, title: String, text: String): Notification =
@@ -161,21 +182,24 @@ class BotService : Service() {
     }
 
     companion object {
-        const val ACTION_START = "com.spotbot.android.START"
-        const val ACTION_STOP = "com.spotbot.android.STOP"
+        const val ACTION_FULL = "com.spotbot.android.FULL"
+        const val ACTION_PROTECT = "com.spotbot.android.PROTECT"
+        const val ACTION_OFF = "com.spotbot.android.OFF"
         private const val NOTIFICATION_ID = 1
         private const val ERROR_ID = 2
-        private const val CYCLE_MILLIS = 5 * 60_000L
-        private const val WAKE_LOCK_TIMEOUT_MILLIS = 15 * 60_000L
+        private const val WAKE_LOCK_TIMEOUT_MILLIS = 10 * 60_000L
         private const val CHANNEL_STATUS = "status"
         private const val CHANNEL_TRADES = "trades"
         private const val CHANNEL_ALERTS = "alerts"
 
-        fun start(context: Context) =
-            ContextCompat.startForegroundService(context, Intent(context, BotService::class.java).setAction(ACTION_START))
-
-        fun stop(context: Context) {
-            context.startService(Intent(context, BotService::class.java).setAction(ACTION_STOP))
+        fun setMode(context: Context, mode: BotMode) {
+            val action = when (mode) {
+                BotMode.FULL -> ACTION_FULL
+                BotMode.PROTECT_ONLY -> ACTION_PROTECT
+                BotMode.OFF -> ACTION_OFF
+            }
+            val intent = Intent(context, BotService::class.java).setAction(action)
+            if (mode == BotMode.OFF) context.startService(intent) else ContextCompat.startForegroundService(context, intent)
         }
 
         fun createChannels(context: Context) {
@@ -196,6 +220,7 @@ class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != Intent.ACTION_BOOT_COMPLETED) return
         val container = (context.applicationContext as SpotBotApplication).container
-        if (container.settings.settings.value.botEnabled) BotService.start(context)
+        val mode = container.settings.settings.value.botMode
+        if (mode != BotMode.OFF) BotService.setMode(context, mode)
     }
 }

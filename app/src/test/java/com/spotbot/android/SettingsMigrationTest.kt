@@ -3,6 +3,7 @@ package com.spotbot.android
 import com.spotbot.android.data.AppSettings
 import com.spotbot.android.data.ArchiveRepository
 import com.spotbot.android.data.SettingsRepository
+import com.spotbot.core.kr.BotMode
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -30,7 +31,7 @@ class SettingsMigrationTest {
         File(dir, "shadows.json").writeText("""{"BREAKOUT_RETEST":$oldPortfolio}""")
         File(dir, "decisions").mkdirs(); File(dir, "decisions/2026-11-10.json").writeText("[]")
         val repo = SettingsRepository(dir)
-        assertEquals(AppSettings(botEnabled = true, schemaVersion = SettingsRepository.SCHEMA), repo.settings.value)
+        assertEquals(AppSettings(botMode = BotMode.OFF, schemaVersion = SettingsRepository.SCHEMA), repo.settings.value)
         val archive = File(dir, SettingsRepository.ARCHIVE)
         for (name in listOf("portfolio.json", "shadows.json", "decisions", "settings-eski.json", "BILGI.txt")) {
             assertTrue("$name arşivde olmalı", File(archive, name).exists())
@@ -56,6 +57,26 @@ class SettingsMigrationTest {
         assertEquals("A", t.strategy)
         assertEquals(110.0 - 0.11 - (100.0 + 0.1), t.netPnl, 1e-9)
         assertTrue(a.note!!.contains("silinmedi"))
+    }
+
+    /** RS-1 (sürüm 3) → Kırılım–Retest (sürüm 4): RS-1 paper kaydı silinmeden archive-rs1/ altına taşınır. */
+    @Test
+    fun `RS-1 paper records move to the archive and the bot does not start by itself`() {
+        val dir = tmp.root
+        File(dir, "settings.json").writeText("""{"botEnabled":true,"schemaVersion":3}""")
+        val rs1 = """{"result":{"trades":[{"symbol":"SOLUSDT","entryTime":1762732800000,"exitTime":1763337600000,"netPnl":-4.25,"reason":"STOP"}]}}"""
+        File(dir, "paper.json").writeText(rs1)
+        File(dir, "scan.json").writeText("{}")
+        val repo = SettingsRepository(dir)
+        assertEquals(BotMode.OFF, repo.settings.value.botMode)
+        assertEquals(4, repo.settings.value.schemaVersion)
+        assertFalse(File(dir, "paper.json").exists())
+        assertEquals(rs1, File(dir, "archive-rs1/paper.json").readText())
+        assertTrue(File(dir, "archive-rs1/BILGI.txt").readText().contains("silinmedi"))
+        val a = ArchiveRepository(dir).load()
+        assertEquals(listOf("SOLUSDT"), a.trades.map { it.symbol })
+        assertEquals(-4.25, a.trades.single().netPnl, 0.0)
+        assertTrue(a.trades.single().portfolio.contains("RS-1"))
     }
 
     @Test
