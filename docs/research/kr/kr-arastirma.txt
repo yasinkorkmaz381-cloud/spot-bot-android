@@ -1,0 +1,51 @@
+Kırılım–Retest backtest — aşama: research
+Veri: MEXC 15M 351 parite (2025-11-14 → 2026-11-13), MEXC 4H; CMC günlük ilk 300 (2025-11-14 → 2026-11-11).
+Ücret ve spread: MEXC exchangeInfo / bookTicker anlık görüntüsü 2026-11-13T18:08:49Z (geçmiş ücret/spread verisi yok).
+
+== Araştırma (2025-11-28 → 2026-04-30) — MEXC 15M, maliyet: Normal ==
+İşlem 138 | Net -111.97 USDT (%-11.20) | PF 0.42 | Beklenti -0.8114 USDT/işlem | Ort. net R -0.4413 | Kazanan %18.12 | En büyük düşüş %11.35
+Maliyet 79.81 USDT | Kazanan işlemlerin brüt kârı 84.37 | Maliyet/brüt kâr %94.59
+Elde tutma ort. 46.30 dk, medyan 15.00 dk | Günde 0.90, haftada 6.27 işlem | Aktif gün 72/154.00, aktif gün başına 1.92
+Ortalama net R %90 bootstrap GA: [-0.5951, -0.2794]
+Çıkış nedenleri: Stop 99 (net -178.26), Hareket başlamadı (2 saat) 6 (net -2.68), Hedef 23 (net 79.03), En uzun süre doldu (6 saat) 3 (net 0.11), Retest yapısı bozuldu 7 (net -10.17)
+Aynı 15M mumda stop ve hedef (sıra bilinmiyor → stop sayıldı): 0
+Evren (gün başına ort.): ilk 300.00 → MEXC'de 190.01 → taranan 183.95 (min 118, maks 190)
+Coin sayısı: 70. En çok işlem: SOLUSDT 7 (1.09), BTCUSDT 7 (1.94), HYPEUSDT 5 (-8.21), SHIBUSDT 5 (-1.28), ASTERUSDT 5 (-7.61), ETHUSDT 4 (-0.12), ADAUSDT 4 (-3.81), PEPEUSDT 4 (-6.83)
+En iyi 5 coin: BEATUSDT 7.46, FOLKSUSDT 5.22, INJUSDT 4.84, STOUSDT 4.48, GALAUSDT 3.22
+En kötü 5 coin: HYPEUSDT -8.21, ASTERUSDT -7.61, PEPEUSDT -6.83, ZROUSDT -6.79, PUMPUSDT -5.92
+En iyi coin (BEATUSDT) çıkarılınca net: -119.44
+Aylık: 2025-11: 6 işlem, -2.68, 2025-12: 26 işlem, -21.52, 2026-01: 41 işlem, -44.34, 2026-02: 14 işlem, -12.63, 2026-03: 25 işlem, -20.86, 2026-04: 26 işlem, -9.95
+Huni (kaçan fırsat nedenleri, evrendeki coinler):
+  Kırılım: 4H yön yükselişte değil: 21532
+  Kırılım: kabul: 6710
+  Kırılım: Kırılım hacmi düşük: 5301
+  Kurulum bitti: Retestten önce seviye altında kapanış: 3131
+  Retest onaylandı (evrende): 2455
+  Süzgeç: 24 saatlik hacim düşük: 1405
+  Kurulum bitti: Retest süresinde gelmedi: 817
+  Giriş: Fiyat giriş bölgesinden uzaklaştı: 606
+  Kurulum bitti: Daha yeni bir kırılım geldi: 307
+  Süzgeç: BTC'ye göre zayıf: 238
+  Giriş yapıldı: 138
+  Kırılım: Gösterge geçmişi yetersiz: 125
+  Giriş: Net R:R < 1,2: 62
+  Süzgeç: Aynı coinde açık pozisyon: 3
+  Süzgeç: BTC sert düşüşte (bekle): 3
+  Kurulum bitti: Beklerken 4H yön bozuldu: 1
+
+== Araştırma (2025-11-28 → 2026-04-30) — MEXC 15M, maliyet: Normal ×2 ==
+İşlem 67 | Net -82.28 USDT (%-8.23) | PF 0.28 | Beklenti -1.2281 USDT/işlem | Ort. net R -0.5927 | Kazanan %11.94 | En büyük düşüş %8.32
+Maliyet 61.52 USDT | Kazanan işlemlerin brüt kârı 34.63 | Maliyet/brüt kâr %177.63
+Elde tutma ort. 55.30 dk, medyan 15.00 dk | Günde 0.44, haftada 3.05 işlem | Aktif gün 46/154.00, aktif gün başına 1.46
+
+== Sınırlı duyarlılık (yalnız araştırma dönemi; ana yapılandırma bu sonuçlara göre değiştirilmez) ==
+Değişiklik | İşlem | Net USDT | PF | Ort. R | En büyük düşüş %
+Ana yapılandırma | 138 | -111.97 | 0.42 | -0.4413 | 11.35
+Net R:R ≥ 1,0 | 147 | -119.15 | 0.41 | -0.4451 | 12.11
+Net R:R ≥ 1,5 | 121 | -97.36 | 0.42 | -0.4672 | 10.21
+Retest 4 mum | 123 | -93.28 | 0.44 | -0.4343 | 9.71
+Retest 12 mum | 147 | -112.96 | 0.43 | -0.4300 | 11.45
+Hedef 1,0 × ATR1H | 96 | -74.17 | 0.45 | -0.4727 | 8.47
+Hedef 2,0 × ATR1H | 145 | -123.34 | 0.40 | -0.4557 | 12.48
+Kırılım hacmi 1,2× | 160 | -135.82 | 0.38 | -0.4783 | 13.73
+Kırılım hacmi 2,0× | 100 | -88.47 | 0.38 | -0.4888 | 9.00

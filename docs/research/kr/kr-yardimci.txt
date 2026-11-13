@@ -1,0 +1,38 @@
+YARDIMCI TEST — ana sonuç değildir.
+Fiyat verisi Binance 15M (MEXC değil). Evren: CMC'nin erişilebilen en eski listesi (2025-11-14) ile MEXC'de eşleşen ve Binance'te verisi olan 70 coin, bütün dönem boyunca sabit.
+Bu liste geleceğe bakar (2025'te ilk 300'de olanlar seçildi) → sonuç yukarı yanlıdır. Maliyetler MEXC ücret/spread anlık görüntüsüyle.
+
+== Yardımcı (Binance) (2023-11-15 → 2025-10-31) — Binance 15M (yardımcı), maliyet: Normal ==
+İşlem 639 | Net -345.63 USDT (%-34.56) | PF 0.56 | Beklenti -0.5409 USDT/işlem | Ort. net R -0.3117 | Kazanan %22.38 | En büyük düşüş %34.56
+Maliyet 341.77 USDT | Kazanan işlemlerin brüt kârı 468.43 | Maliyet/brüt kâr %72.96
+Elde tutma ort. 48.43 dk, medyan 30.00 dk | Günde 0.89, haftada 6.24 işlem | Aktif gün 326/717.00, aktif gün başına 1.96
+Ortalama net R %90 bootstrap GA: [-0.3916, -0.2308]
+Çıkış nedenleri: Stop 413 (net -689.94), Hareket başlamadı (2 saat) 29 (net -7.42), Hedef 128 (net 429.57), Retest yapısı bozuldu 62 (net -86.45), En uzun süre doldu (6 saat) 7 (net 8.61)
+Aynı 15M mumda stop ve hedef (sıra bilinmiyor → stop sayıldı): 1
+Coin sayısı: 56. En çok işlem: RAYUSDT 37 (6.91), CAKEUSDT 28 (0.44), PENDLEUSDT 27 (-16.03), JUPUSDT 27 (-5.64), SHIBUSDT 23 (-4.22), PEPEUSDT 22 (-22.32), GALAUSDT 22 (-13.05), JTOUSDT 22 (-26.49)
+En iyi 5 coin: PENGUUSDT 14.61, SUNUSDT 8.13, RAYUSDT 6.91, ETHFIUSDT 6.76, AMPUSDT 6.26
+En kötü 5 coin: JTOUSDT -26.49, MANAUSDT -22.61, PEPEUSDT -22.32, LINKUSDT -20.16, LPTUSDT -19.25
+En iyi coin (PENGUUSDT) çıkarılınca net: -360.24
+Aylık: 2023-11: 10 işlem, -12.87, 2023-12: 36 işlem, -56.61, 2024-01: 24 işlem, -18.23, 2024-02: 25 işlem, 1.04, 2024-03: 45 işlem, -14.23, 2024-04: 13 işlem, -13.18, 2024-05: 25 işlem, -26.12, 2024-06: 3 işlem, -2.87, 2024-07: 32 işlem, -9.54, 2024-08: 12 işlem, 2.46, 2024-09: 33 işlem, -6.16, 2024-10: 30 işlem, -35.35, 2024-11: 65 işlem, -17.09, 2024-12: 36 işlem, -27.23, 2025-01: 27 işlem, -6.45, 2025-02: 11 işlem, -12.59, 2025-03: 7 işlem, -7.11, 2025-04: 29 işlem, -6.73, 2025-05: 44 işlem, -9.88, 2025-06: 20 işlem, -8.73, 2025-07: 52 işlem, -45.02, 2025-08: 32 işlem, -2.02, 2025-09: 15 işlem, 0.58, 2025-10: 13 işlem, -11.68
+Huni (kaçan fırsat nedenleri, evrendeki coinler):
+  Kırılım: 4H yön yükselişte değil: 28144
+  Kırılım: kabul: 13405
+  Kırılım: Kırılım hacmi düşük: 7224
+  Kurulum bitti: Retestten önce seviye altında kapanış: 6200
+  Retest onaylandı (evrende): 5177
+  Giriş: Fiyat giriş bölgesinden uzaklaştı: 3067
+  Kurulum bitti: Retest süresinde gelmedi: 1423
+  Süzgeç: BTC'ye göre zayıf: 895
+  Giriş yapıldı: 639
+  Kurulum bitti: Daha yeni bir kırılım geldi: 605
+  Süzgeç: 24 saatlik hacim düşük: 314
+  Kırılım: Gösterge geçmişi yetersiz: 313
+  Giriş: Net R:R < 1,2: 233
+  Süzgeç: BTC sert düşüşte (bekle): 19
+  Süzgeç: Aynı coinde açık pozisyon: 9
+
+== Yardımcı (Binance) (2023-11-15 → 2025-10-31) — Binance 15M (yardımcı), maliyet: Normal ×2 ==
+İşlem 315 | Net -263.26 USDT (%-26.33) | PF 0.46 | Beklenti -0.8357 USDT/işlem | Ort. net R -0.4125 | Kazanan %21.27 | En büyük düşüş %26.33
+Maliyet 274.71 USDT | Kazanan işlemlerin brüt kârı 246.66 | Maliyet/brüt kâr %111.37
+Elde tutma ort. 52.29 dk, medyan 30.00 dk | Günde 0.44, haftada 3.08 işlem | Aktif gün 203/717.00, aktif gün başına 1.55
+

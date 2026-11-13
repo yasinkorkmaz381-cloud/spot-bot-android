@@ -3,9 +3,29 @@
 MEXC spot piyasasında (USDT pariteleri) çalışan, **kontrollü risk** ve **sistematik karar** odaklı otomatik
 işlem botu. Android uygulaması (Türkçe kumanda paneli) + platformdan bağımsız Kotlin çekirdeği + komut satırı.
 
-> **Durum: V3.2, tek strateji (Momentum RS-1), yalnız sanal işlem (paper trading).** Gerçek emir gönderilmez. V7
-> karşılaştırmasında **kazanan yok**: kurallar V6 ile aynı. **Kazanç üstünlüğü gösterilemedi**; gerçek parayla kullanım
-> için dayanak yoktur.
+> **Durum: V4.0, tek strateji: Kırılım–Retest (KR), yalnız sanal işlem (paper trading).** Gerçek emir gönderilmez.
+> Ön kayıtlı backtest sonucu **Başarısız**: üç dönemde de net zarar, maliyetsiz de avantaj yok. Gerçek parayla
+> kullanım için dayanak yoktur. Rapor: [`docs/KR-RAPOR.md`](docs/KR-RAPOR.md).
+
+## V4.0: Kırılım–Retest, CMC ilk 300 evreni, sade arayüz (13 Kasım 2026)
+
+- **Ürün:** CoinMarketCap piyasa değeri ilk 300 → MEXC USDT spot eşleşmesi (günlük). Gün boyu 15M kapanışlarda tarama.
+  Tek düzen: 4H yön → önceden sabit 1H direnç → 15M kapanışla kırılım → retest → yakın hedef.
+- **Belgeler:**
+  - Ön kayıt: [`docs/KR-ONKAYIT.md`](docs/KR-ONKAYIT.md).
+  - 60 kural uyarlaması: [`docs/KR-KURALLAR.md`](docs/KR-KURALLAR.md).
+  - Rapor, işlem CSV'leri ve test çıktıları: [`docs/KR-RAPOR.md`](docs/KR-RAPOR.md), `docs/research/kr/`.
+- **Arayüz:** Ana ekran, Fırsatlar ve İşlemler. Ayrıntılar, Ayarlar ve Arşiv üst çubuktan açılır.
+- **Bot kontrolü:** "Yeni girişleri durdur" korumayı sürdürür. "Tamamen kapat" açık pozisyon varken onay ister.
+- **CMC anahtarı:** Ayarlar'dan girilir, Android Keystore ile şifreli saklanır.
+- **Eski kayıtlar:** Momentum RS-1 ve A/B/C kayıtları `archive-rs1/` ve `archive-v4/` altında, silinmeden duruyor.
+  Yeni sonuçlara karışmaz.
+- **Komut satırı:**
+  - `cryptoscan universe`: canlı CMC→MEXC eşleşmesi (`CMC_API_KEY` ortam değişkeni).
+  - `cryptoscan kr --phase research|final`: ön kayıtlı backtest.
+  - `cryptoscan kr-aux`: Binance yardımcı testi.
+
+Aşağıdaki V3.x bölümleri eski Momentum RS-1 dönemine aittir; kod aktif sistemden kaldırıldı (git geçmişinde duruyor).
 
 ## V3.2: V7 karşılaştırması ve gerçekleşme modeli eşitliği (12 Kasım 2026)
 

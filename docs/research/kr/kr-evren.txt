@@ -1,0 +1,133 @@
+CMC ilk 300 → MEXC eşleşmesi (liste: 2026-11-11 00:00 UTC, kaynak: CoinMarketCap Pro API /v1/cryptocurrency/listings/historical)
+İlk 300 → MEXC'de USDT paritesi 190 → taranan 187
+  Taranıyor: 187
+  Elendi (stablecoin / tokenleştirilmiş varlık / türev): 72
+  MEXC'de USDT spot paritesi yok: 38
+  Aynı sembol, farklı varlık: 3
+  MEXC'de işlem yapılamıyor / risk etiketi: 0
+  Doğrulama fiyatı yok: 0
+
+-- Elendi (stablecoin / tokenleştirilmiş varlık / türev) --
+#3 USDT (Tether USDt, CMC id 825) CMC etiketi: stablecoin
+#5 USDC (USDC, CMC id 3408) CMC etiketi: stablecoin
+#17 USDe (Ethena USDe, CMC id 29470) CMC etiketi: stablecoin
+#20 DAI (Dai, CMC id 4943) CMC etiketi: stablecoin
+#27 USD1 (World Liberty Financial USD, CMC id 36148) CMC etiketi: stablecoin
+#28 XAUt (Tether Gold, CMC id 5176) CMC etiketi: tokenized-gold
+#30 RLUSD (Ripple USD, CMC id 34387) CMC etiketi: stablecoin
+#31 PYUSD (PayPal USD, CMC id 27772) CMC etiketi: stablecoin
+#32 USDG (Global Dollar, CMC id 33793) CMC etiketi: stablecoin
+#43 PAXG (PAX Gold, CMC id 4705) CMC etiketi: tokenized-gold
+#45 U (United Stables, CMC id 39120) CMC etiketi: stablecoin
+#48 USDD (USDD, CMC id 19891) CMC etiketi: stablecoin
+#83 TUSD (TrueUSD, CMC id 2563) CMC etiketi: stablecoin
+#88 EURC (EURC, CMC id 20641) CMC etiketi: stablecoin
+#105 FDUSD (First Digital USD, CMC id 26081) CMC etiketi: stablecoin
+#201 stETH (Lido Staked ETH, CMC id 8085) Türev/sarılmış varlık: Lido Staked ETH
+#203 WBTC (Wrapped Bitcoin, CMC id 3717) CMC etiketi: wrapped-tokens
+#204 USDS (USDS, CMC id 33039) CMC etiketi: stablecoin
+#205 WBETH (Wrapped Beacon ETH, CMC id 24760) Türev/sarılmış varlık: Wrapped Beacon ETH
+#206 CBBTC (Coinbase Wrapped BTC, CMC id 32994) CMC etiketi: wrapped-tokens
+#207 WETH (WETH, CMC id 2396) CMC etiketi: wrapped-tokens
+#209 weETH (Wrapped eETH, CMC id 28695) CMC etiketi: wrapped-tokens
+#211 USDT0 (USDT0, CMC id 38517) CMC etiketi: stablecoin
+#212 RWUSD (RWUSD, CMC id 42538) CMC etiketi: tokenized-assets
+#215 AETHUSDT (Aave Ethereum USDT, CMC id 36457) CMC etiketi: stablecoin
+#216 USDY (Ondo US Dollar Yield, CMC id 29256) CMC etiketi: stablecoin
+#217 BFUSD (BFUSD, CMC id 37760) CMC etiketi: stablecoin
+#218 USDf (Falcon USD, CMC id 35721) CMC etiketi: stablecoin
+#222 sUSDe (Ethena Staked USDe, CMC id 29471) CMC etiketi: stablecoin
+#223 USDC.e (USD Coin Bridged, CMC id 18852) CMC etiketi: stablecoin
+#224 WTRX (Wrapped TRON, CMC id 18579) Türev/sarılmış varlık: Wrapped TRON
+#225 USDGO (USDGO, CMC id 39683) CMC etiketi: stablecoin
+#226 WBNB (Wrapped BNB, CMC id 7192) CMC etiketi: wrapped-tokens
+#227 OUSD (Open USD, CMC id 40671) CMC etiketi: stablecoin
+#228 BNSOL (Binance Staked SOL, CMC id 32882) Türev/sarılmış varlık: Binance Staked SOL
+#230 JITOSOL (Jito Staked SOL, CMC id 22533) Türev/sarılmış varlık: Jito Staked SOL
+#233 RSETH (Kelp DAO Restaked ETH, CMC id 29242) Türev/sarılmış varlık: Kelp DAO Restaked ETH
+#234 JLP (Jupiter Perps LP, CMC id 28853) CMC etiketi: lp-tokens
+#236 GHO (GHO, CMC id 23508) CMC etiketi: stablecoin
+#237 KHYPE (Kinetiq Staked HYPE, CMC id 39072) Türev/sarılmış varlık: Kinetiq Staked HYPE
+#238 slisBNB (Lista Staked BNB, CMC id 27568) Türev/sarılmış varlık: Lista Staked BNB
+#241 LSETH (Liquid Staked ETH, CMC id 23782) Türev/sarılmış varlık: Liquid Staked ETH
+#244 USD0 (Usual USD, CMC id 32307) CMC etiketi: stablecoin
+#249 USDAI (USDai, CMC id 38562) CMC etiketi: stablecoin
+#250 PUSD (Polymarket USD, CMC id 39925) CMC etiketi: stablecoin
+#251 METH (Mantle Staked Ether, CMC id 29035) Türev/sarılmış varlık: Mantle Staked Ether
+#252 WFLR (Wrapped Flare, CMC id 28183) Türev/sarılmış varlık: Wrapped Flare
+#254 cirBTC (Circle Wrapped Bitcoin, CMC id 39829) CMC etiketi: wrapped-tokens
+#255 JUPSOL (Jupiter Staked SOL, CMC id 38192) Türev/sarılmış varlık: Jupiter Staked SOL
+#256 cbETH (Coinbase Wrapped Staked ETH, CMC id 21535) Türev/sarılmış varlık: Coinbase Wrapped Staked ETH
+#259 osETH (StakeWise Staked ETH, CMC id 28476) Türev/sarılmış varlık: StakeWise Staked ETH
+#260 USDtb (Ethena Labs (USDtb), CMC id 34691) CMC etiketi: stablecoin
+#261 stkAAVE (Staked Aave, CMC id 36246) Türev/sarılmış varlık: Staked Aave
+#267 GTBTC (GTBTC, CMC id 39090) CMC etiketi: wrapped-tokens
+#268 WXTZ (Wrapped XTZ, CMC id 35930) CMC etiketi: wrapped-tokens
+#270 WHYPE (Wrapped HYPE, CMC id 35881) Türev/sarılmış varlık: Wrapped HYPE
+#272 FRAX (Legacy Frax Dollar, CMC id 6952) CMC etiketi: stablecoin
+#273 SFRXETH (Frax Staked Ether, CMC id 23177) Türev/sarılmış varlık: Frax Staked Ether
+#274 SPCXB (SpaceX Tokenized bStocks, CMC id 40217) CMC etiketi: tokenized-stock
+#278 sAVAX (BENQI Liquid Staked AVAX, CMC id 18523) Türev/sarılmış varlık: BENQI Liquid Staked AVAX
+#280 STRX (Staked TRX, CMC id 24875) Türev/sarılmış varlık: Staked TRX
+#283 EURCV (EUR CoinVertible, CMC id 32796) CMC etiketi: stablecoin
+#284 MSOL (Marinade Staked SOL, CMC id 11461) Türev/sarılmış varlık: Marinade Staked SOL
+#286 USAT (USAT, CMC id 38386) CMC etiketi: stablecoin
+#287 NVDAB (NVIDIA Tokenized bStocks, CMC id 40215) CMC etiketi: tokenized-stock
+#290 vUSDT (Venus USDT, CMC id 7957) CMC etiketi: stablecoin
+#291 CBXRP (Coinbase Wrapped XRP, CMC id 36707) Türev/sarılmış varlık: Coinbase Wrapped XRP
+#293 AUSD (AUSD, CMC id 32864) CMC etiketi: stablecoin
+#296 SOL (Wrapped Solana, CMC id 16116) Türev/sarılmış varlık: Wrapped Solana
+#297 BTC.b (Lombard Bridged BTC, CMC id 20721) Türev/sarılmış varlık: Lombard Bridged BTC
+#298 GUSD (GUSD, CMC id 38330) CMC etiketi: stablecoin
+#299 WAVAX (Wrapped AVAX, CMC id 9462) Türev/sarılmış varlık: Wrapped AVAX
+
+-- MEXC'de USDT spot paritesi yok --
+#13 LEO (UNUS SED LEO, CMC id 3957) 
+#59 GT (GateToken, CMC id 4269) 
+#79 DASH (Dash, CMC id 131) 
+#128 AKT (Akash Network, CMC id 7431) 
+#148 THETA (Theta Network, CMC id 2416) 
+#166 AIOZ (AIOZ Network, CMC id 9104) 
+#168 SUPER (SuperVerse, CMC id 8290) 
+#173 GLM (Golem, CMC id 1455) 
+#202 WSTETH (Lido wstETH, CMC id 12409) 
+#208 BTCB (Bitcoin BEP2, CMC id 4023) 
+#210 AETHWETH (Aave Ethereum WETH, CMC id 36458) 
+#219 syrupUSDC (syrupUSDC, CMC id 38779) 
+#221 BTCT (Bitcoin TRC20, CMC id 9486) 
+#229 LBTC (Lombard BTC, CMC id 33652) 
+#232 DHN (Dohrnii, CMC id 20279) 
+#235 RETH (Rocket Pool ETH, CMC id 15060) 
+#239 FBTC (Function, CMC id 32306) 
+#240 syrupUSDT (syrupUSDT, CMC id 38786) 
+#242 PEARL (Pearl (pearlresearch.ai), CMC id 41876) 
+#243 GROW (Grow, CMC id 29862) 
+#246 slisBNBx (slisBNBx, CMC id 33055) 
+#247 bUSD0 (Bond USD0, CMC id 33981) 
+#248 tBTC (tBTC, CMC id 26133) 
+#253 SolvBTC (SolvBTC, CMC id 33312) 
+#257 vBTC (Venus BTC, CMC id 7962) 
+#258 vBNB (Venus BNB, CMC id 7961) 
+#263 UNIBTC (Universal BTC, CMC id 36175) 
+#264 TIT (Titan's Tap, CMC id 36666) 
+#271 TETH (Treehouse ETH, CMC id 37574) 
+#276 rBTC (Bitcoin on Rootstock, CMC id 3626) 
+#277 BETH (Beacon ETH, CMC id 8353) 
+#279 USX (Solstice USX, CMC id 38948) 
+#281 KOGE (48 Club Token, CMC id 7184) 
+#282 SHFL (Shuffle, CMC id 29960) 
+#285 BTSE (BTSE Token, CMC id 5305) 
+#289 PREDICT (Predict.fun, CMC id 42642) 
+#292 D (DAR Open Network, CMC id 11374) 
+#295 INF (Sanctum Infinity, CMC id 12760) 
+
+-- Aynı sembol, farklı varlık --
+#69 NIGHT (Midnight, CMC id 39064) → NIGHTUSDT MEXC NIGHTUSDT fiyatı 0.0417900, CMC Midnight fiyatı 0.0474072: farklı varlık
+#114 BEAM (Beam, CMC id 28298) → BEAMUSDT MEXC BEAMUSDT fiyatı 0.00524800, CMC Beam fiyatı 0.00435461: farklı varlık
+#213 BTW (Bitway, CMC id 39158) → BTWUSDT MEXC BTWUSDT fiyatı 1.1530, CMC Bitway fiyatı 1.0044: farklı varlık
+
+-- MEXC'de işlem yapılamıyor / risk etiketi --
+
+-- Doğrulama fiyatı yok --
+
+Not: Backtestte MEXC'nin bugünkü exchangeInfo'su kullanıldı; MEXC'den kalkmış pariteler listede yok (hayatta kalma yanlılığı), ST etiketi ve işlem durumu geçmişe uygulanmadı.

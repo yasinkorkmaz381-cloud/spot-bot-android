@@ -1,7 +1,9 @@
 package com.spotbot.android.ui.settings
 
 import android.content.Intent
-import android.net.Uri
+import android.annotation.SuppressLint
+import android.content.Context
+import androidx.core.net.toUri
 import android.provider.Settings
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -101,11 +103,7 @@ fun SettingsContent(
         }
         SectionCard("Arka planda çalışma") {
             Text("Android pil tasarrufu servisi durdurabilir. Bot çalışmadığı aralıklar kaydedilir ve Ayrıntılar'da gösterilir.", style = MaterialTheme.typography.bodyMedium)
-            OutlinedButton(onClick = {
-                runCatching {
-                    context.startActivity(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:${context.packageName}")))
-                }
-            }) { Text("Pil optimizasyonu muafiyeti iste") }
+            OutlinedButton(onClick = { requestBatteryExemption(context) }) { Text("Pil optimizasyonu muafiyeti iste") }
         }
         SectionCard("Sanal hesap") {
             InfoBanner("Bu sürüm yalnız sanal (paper) işlem yapar; gerçek emir gönderen kod yoktur.")
@@ -122,4 +120,10 @@ fun SettingsContent(
             dismissButton = { TextButton(onClick = { confirmReset = false }) { Text("Vazgeç") } },
         )
     }
+}
+
+/** Kişisel kullanım uygulaması (Play Store'da yayımlanmıyor): 7/24 koruma takibi için kullanıcının açık onayıyla istenir. */
+@SuppressLint("BatteryLife")
+private fun requestBatteryExemption(context: Context) {
+    runCatching { context.startActivity(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, "package:${context.packageName}".toUri())) }
 }

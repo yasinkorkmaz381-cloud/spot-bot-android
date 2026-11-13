@@ -1,0 +1,103 @@
+Test çıktıları — Kırılım–Retest (13 Kasım 2026). Komutlar: ./gradlew :core:test --rerun-tasks; ROBOLECTRIC_REPO_URL=… ./gradlew :app:testDebugUnitTest --rerun-tasks; ./gradlew :app:lintDebug :app:assembleDebug
+
+== core: 49 test, 1 atlandı, 0 hata ==
+  LiveMexcSmokeTest: 1 test, 1 atlandı, 0 hata
+    [ATLANDI] rest endpoints return consistent closed candles
+  MexcRestClientTest: 6 test, 0 atlandı, 0 hata
+    [GEÇTİ] parses exchange info fields used for order rules
+    [GEÇTİ] converts 24h change ratio to percent and tolerates nulls
+    [GEÇTİ] client errors are not retried
+    [GEÇTİ] retries after rate limit using Retry-After
+    [GEÇTİ] history loader continues after the last returned candle so capped pages leave no gaps
+    [GEÇTİ] parses klines and sends MEXC interval names
+  KrBacktestTest: 3 test, 0 atlandı, 0 hata
+    [GEÇTİ] doubled costs lower the result and outside-universe coins are not traded
+    [GEÇTİ] one setup gives one trade entered at the next open after the retest close
+    [GEÇTİ] a rejected candidate does not use up a free position slot
+  KrPaperTest: 6 test, 0 atlandı, 0 hata
+    [GEÇTİ] decision time missed while the bot was not running is not traded
+    [GEÇTİ] a monitoring gap is recorded and an exit inside it is marked as backfilled
+    [GEÇTİ] entry is taken live once and a restart does not open it again
+    [GEÇTİ] stale CMC list stops new entries but not protection
+    [GEÇTİ] protect-only mode keeps watching the stop but opens nothing
+    [GEÇTİ] live monitoring closes at the target and keeps the fees fixed at entry
+  KrRulesTest: 7 test, 0 atlandı, 0 hata
+    [GEÇTİ] sizing - risk per trade, caps, rounding, min notional, max positions
+    [GEÇTİ] net reward-risk includes both legs' costs and the target is never pushed further
+    [GEÇTİ] daily loss counts unrealized loss
+    [GEÇTİ] a gap below the stop fills at the open, not at the stop
+    [GEÇTİ] target needs the bid to reach it (half spread above)
+    [GEÇTİ] close rules - invalidation, no progress after 8 bars, max hold
+    [GEÇTİ] stop wins when stop and target are both inside one candle and the trade is marked
+  SetupTrackerTest: 9 test, 0 atlandı, 0 hata
+    [GEÇTİ] a level is not known before its right-side bars close
+    [GEÇTİ] low volume breakout is rejected and consumes the level
+    [GEÇTİ] close back below the level cancels the setup
+    [GEÇTİ] no retest within eight candles expires the setup
+    [GEÇTİ] replaying only the last 500 candles gives the same plan as the full history
+    [GEÇTİ] breakout and retest are never the same candle
+    [GEÇTİ] stage reports the pending retest
+    [GEÇTİ] a wick above the level is not a breakout
+    [GEÇTİ] breakout on a pre-fixed level followed by a retest gives exactly one entry plan
+  UniverseTest: 3 test, 0 atlandı, 0 hata
+    [GEÇTİ] contract address match accepts even without a price, and the list is never filled past 300
+    [GEÇTİ] two top-300 assets on the same ticker keep only the closer price
+    [GEÇTİ] stablecoins and tokenized assets are excluded, missing pairs reported, conflicts separated
+  SecurityTest: 5 test, 0 atlandı, 0 hata
+    [GEÇTİ] default configuration matches the pre-registered KR parameters
+    [GEÇTİ] rest client only issues GET requests
+    [GEÇTİ] old strategies and the old trading engine cannot run
+    [GEÇTİ] no CMC key is embedded in the sources
+    [GEÇTİ] no signed order endpoints or api key handling exist in the sources
+  IndicatorsTest: 9 test, 0 atlandı, 0 hata
+    [GEÇTİ] supertrend matches reference
+    [GEÇTİ] macd matches reference
+    [GEÇTİ] sma and warmup produce NaN until enough data
+    [GEÇTİ] rsi matches reference
+    [GEÇTİ] adx and directional indicators match reference
+    [GEÇTİ] atr matches reference
+    [GEÇTİ] ema matches reference
+    [GEÇTİ] daily vwap resets at UTC midnight
+    [GEÇTİ] correlation of identical and inverted series
+
+== app: 32 test, 0 atlandı, 0 hata ==
+  FormattersTest: 5 test, 0 atlandı, 0 hata
+    [GEÇTİ] compact volumes and ratios
+    [GEÇTİ] percent places the sign and symbol per locale
+    [GEÇTİ] money and signed money
+    [GEÇTİ] decimal input accepts comma or dot
+    [GEÇTİ] prices use magnitude based precision and Turkish separators
+  ScreenshotTest: 9 test, 0 atlandı, 0 hata
+    [GEÇTİ] detail
+    [GEÇTİ] archive
+    [GEÇTİ] opportunities
+    [GEÇTİ] home
+    [GEÇTİ] homeUnprotected
+    [GEÇTİ] settings
+    [GEÇTİ] tradesOpen
+    [GEÇTİ] tradesClosed
+    [GEÇTİ] homeNoKey
+  SettingsMigrationTest: 4 test, 0 atlandı, 0 hata
+    [GEÇTİ] archived trades are readable without the old classes
+    [GEÇTİ] old engine files are archived, not deleted, and the bot preference is kept
+    [GEÇTİ] RS-1 paper records move to the archive and the bot does not start by itself
+    [GEÇTİ] a fresh install has nothing to archive
+  SmallScreenTest: 9 test, 0 atlandı, 0 hata
+    [GEÇTİ] detail
+    [GEÇTİ] archive
+    [GEÇTİ] opportunities
+    [GEÇTİ] home
+    [GEÇTİ] homeUnprotected
+    [GEÇTİ] settings
+    [GEÇTİ] tradesOpen
+    [GEÇTİ] tradesClosed
+    [GEÇTİ] homeNoKey
+  UiInteractionTest: 5 test, 0 atlandı, 0 hata
+    [GEÇTİ] stop new entries keeps protection
+    [GEÇTİ] opportunities show the universe funnel and filter by stage
+    [GEÇTİ] fully off with open positions shows an unprotected warning
+    [GEÇTİ] switching off with open positions asks first and offers protect-only
+    [GEÇTİ] event times are read as Turkey time
+
+Lint (debug): 0 sorun. APK: app/build/outputs/apk/debug/app-debug.apk (13.499.852 bayt), versionName 4.0.0-paper.
+Atlanan test: LiveMexcSmokeTest (canlı MEXC; yalnız -Plive ile çalışır).
