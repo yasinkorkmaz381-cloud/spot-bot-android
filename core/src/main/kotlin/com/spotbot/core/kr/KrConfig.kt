@@ -23,6 +23,11 @@ data class KrConfig(
     val retestBars: Int = 8,
     /** R2: retest düşüğü ≤ seviye + bu × ATR15. */
     val retestToleranceAtr: Double = 0.25,
+    /** 2. tur V3 (varsayılan kapalı): retest kapanışı mum aralığının en az bu oranında ve seviye + bu × ATR15 üstünde. */
+    val retestMinCloseFraction: Double = 0.0,
+    val retestMinCloseAboveAtr: Double = 0.0,
+    /** 2. tur V2 (varsayılan kapalı): BTC'nin 4H yönü de Y1 tanımıyla yükselişte olmalı. */
+    val requireBtcUptrend: Boolean = false,
     /** G2: dolum > seviye + bu × ATR15 ise kovalamaz. */
     val maxChaseAtr: Double = 0.75,
     /** G3: stop tamponu (ATR15). */

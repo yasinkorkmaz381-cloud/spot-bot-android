@@ -19,6 +19,9 @@ fun main(args: Array<String>) = runBlocking {
         "kr-aux" -> krAux(options)
         "universe" -> universeLive(options)
         "gecmis-test" -> appHistory(options)
+        "akis-testi" -> { streamTest(options); kotlin.system.exitProcess(0) }
+        "kr2" -> krRound2(options)
+        "paper-canli" -> { paperLive(options); kotlin.system.exitProcess(0) }
         else -> println(
             """
             CryptoScan Pro — Kırılım–Retest (yalnız paper trading)

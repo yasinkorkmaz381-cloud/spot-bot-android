@@ -85,6 +85,10 @@ fun CryptoScanApp(vm: MainViewModel = viewModel(factory = MainViewModel.Factory)
     val keyPresent by vm.keyPresent.collectAsStateWithLifecycle()
     val archive by vm.archive.collectAsStateWithLifecycle()
     val history by vm.history.collectAsStateWithLifecycle()
+    val live by vm.live.collectAsStateWithLifecycle()
+    // Saat değerleri (… sn önce) için ekran açıkken her 5 sn yeniden çiz.
+    var tick by remember { mutableStateOf(0L) }
+    androidx.compose.runtime.LaunchedEffect(Unit) { while (true) { kotlinx.coroutines.delay(5_000); tick++ } }
     val keyStatus by vm.keyStatus.collectAsStateWithLifecycle()
     val keyUnreadable by vm.keyUnreadable.collectAsStateWithLifecycle()
     var pendingExport by remember { mutableStateOf<List<com.spotbot.core.kr.KrTrade>>(emptyList()) }
@@ -135,8 +139,8 @@ fun CryptoScanApp(vm: MainViewModel = viewModel(factory = MainViewModel.Factory)
         NavHost(navController, startDestination = HomeRoute, modifier = Modifier.padding(padding).consumeWindowInsets(padding)) {
             composable<HomeRoute> {
                 HomeContent(
-                    state, settings.botMode, keyPresent, vm.now(), onMode = vm::setMode, onOpenSettings = { navController.navigate(SettingsRoute) },
-                    onOpenHistory = { navController.navigate(HistoryRoute) },
+                    state, settings.botMode, keyPresent, vm.now() + 0 * tick, onMode = vm::setMode, onOpenSettings = { navController.navigate(SettingsRoute) },
+                    onOpenHistory = { navController.navigate(HistoryRoute) }, live = live,
                 )
             }
             composable<OpportunitiesRoute> { OpportunitiesContent(state, vm.now()) }

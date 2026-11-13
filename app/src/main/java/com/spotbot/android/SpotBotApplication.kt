@@ -20,6 +20,13 @@ import com.spotbot.core.kr.KrPaper
 import com.spotbot.core.util.ServerClock
 import java.io.File
 
+/** Kalıcı kayda yazılmayan canlı durum: servis kalp atışı, sonraki tarama, fiyat akışı bağlantısı. */
+data class LiveStatus(
+    val serviceAliveAt: Long = 0L,
+    val nextScanAt: Long = 0L,
+    val stream: com.spotbot.core.exchange.mexc.StreamConnectionState = com.spotbot.core.exchange.mexc.StreamConnectionState(),
+)
+
 class SpotBotApplication : Application() {
     val container: AppContainer by lazy { AppContainer(this) }
 }
@@ -38,7 +45,9 @@ class AppContainer(private val app: Application) {
     /** MEXC sunucu saatine göre düzeltilmiş saat. */
     val clock = ServerClock()
     val cmc = CmcClient({ cmcKey.get() })
-    val paper = KrPaper(api, cmc, FileKrStore(app.filesDir), clock, config)
+    val paper = KrPaper(api, cmc, FileKrStore(app.filesDir), clock, config, CandleFileStore(File(app.filesDir, "paper-mumlar")))
+    /** Servisin canlılığı ve fiyat akışı (süreç içi; süreç ölünce sıfırlanır, arayüz "servis çalışmıyor" gösterir). */
+    val live = kotlinx.coroutines.flow.MutableStateFlow(LiveStatus())
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     /** Geçmiş test önbelleği: mumlar (bellek eşlemeli) ve günlük CMC listeleri. Ayarlar'dan temizlenebilir. */
     val candleStore = CandleFileStore(File(app.cacheDir, "gecmis-test/mumlar"))

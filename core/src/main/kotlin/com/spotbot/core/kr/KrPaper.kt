@@ -9,6 +9,9 @@ import com.spotbot.core.model.Candle
 import com.spotbot.core.model.SymbolInfo
 import com.spotbot.core.model.Timeframe
 import com.spotbot.core.util.TimeSource
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -59,6 +62,34 @@ data class ScanSummary(
     val funnel: Map<String, Int> = emptyMap(),
 )
 
+/** 3 dakikalık taramanın zamanlaması (ana ekranda gösterilir). */
+@Serializable
+data class ScanTiming(
+    val intervalMs: Long = KrPaper.SCAN_INTERVAL,
+    val lastStartedAt: Long = 0,
+    val lastFinishedAt: Long = 0,
+    /** Son hatasız biten tarama. */
+    val lastSuccessAt: Long = 0,
+    val lastDurationMs: Long = 0,
+    /** Planlanan başlangıca göre gecikme. */
+    val lastDelayMs: Long = 0,
+    val nextAt: Long = 0,
+    /** Önceki tarama bitmediği için atlanan tarama sayısı. */
+    val skippedOverlap: Int = 0,
+    val count: Long = 0,
+    val lastError: String? = null,
+)
+
+/** Açık pozisyon korumasının durumu. */
+@Serializable
+data class ProtectionStatus(
+    /** Son başarılı koruma denetimi (1 dk mumlar + anlık fiyat). */
+    val lastCheckAt: Long = 0,
+    /** "Fiyat akışı" ya da "REST". */
+    val lastPriceSource: String = "",
+    val lastError: String? = null,
+)
+
 @Serializable
 data class KrState(
     val version: Int = 1,
@@ -85,6 +116,8 @@ data class KrState(
     val lastError: String? = null,
     /** Açık pozisyonların son alış fiyatı (piyasa değeri için). */
     val marks: Map<String, Double> = emptyMap(),
+    val scanTiming: ScanTiming = ScanTiming(),
+    val protection: ProtectionStatus = ProtectionStatus(),
 ) {
     val equity: Double get() = book.equity(marks)
     /** Bugünkü (TSİ) net K/Z: gerçekleşmiş + gerçekleşmemiş. */
@@ -103,11 +136,13 @@ class MemoryKrStore(var state: KrState? = null) : KrStore {
 
 /**
  * Paper trading. Kararları backtestle aynı sınıflar verir: [SetupTracker] (kurulum), [KrFilters] (piyasa süzgeci),
- * [KrPricing] (hedef, net R:R), [KrSizing] (miktar), [KrExits] (çıkış). Farklar yalnız gerçekleşmededir:
- * - Dolum: retest kapanışından birkaç saniye sonra emir defterinden alış VWAP'ı (backtestte sonraki açılış).
- * - Sert stop: her döngüde 1 dakikalık mumlar ve anlık alış fiyatıyla (backtestte 15M mumun düşüğü).
- * - Bot çalışmadığı aralıklar kaydedilir; o aralıktaki çıkışlar "geçmişten hesaplandı" diye işaretlenir.
- * Gerçek emir gönderen hiçbir kod yoktur.
+ * [KrPricing] (hedef, net R:R), [KrSizing] (miktar), [KrExits] (çıkış). İki ayrı döngü vardır:
+ * - [scan] (3 dakikada bir, üst üste binmez): CMC evreni (günde bir), mum önbelleği (yalnız yeni kapanmış 15M mumlar),
+ *   kurulum izleyiciler. **Giriş yalnız yeni kapanmış 15M mumdaki retest onayından** doğar; 3 dakikalık tarama
+ *   kapanmamış mumu teyit saymaz. Her kurulumun kimliği (sembol + kırılım mumu + seviye) bir kez işlenir.
+ * - [protect] (daha sık; fiyat akışından gelen her kritik fiyatta da): 1 dakikalık mumlar zaman sırasıyla yeniden
+ *   oynatılır (sert stop/hedef, 15M kapanış kuralları), ardından anlık alış fiyatı. Sert stop 15M kapanışını beklemez.
+ * Bot çalışmadığı aralıklar kaydedilir; o aralıktaki çıkışlar "canlı izlenmedi" diye işaretlenir. Gerçek emir yoktur.
  */
 class KrPaper(
     private val api: MarketDataApi,
@@ -115,13 +150,22 @@ class KrPaper(
     private val store: KrStore,
     private val clock: TimeSource = TimeSource.System,
     val cfg: KrConfig = KrConfig(),
+    /** 15M mum önbelleği (yeniden başlatmada yalnız yeni mumlar indirilir). Yoksa yalnız bellekte tutulur. */
+    private val candleStore: CandleFileStore? = null,
 ) {
+    /** Durum değişiklikleri kısa kritik bölgelerde; ağ istekleri bu kilidin dışında. */
     private val lock = Mutex()
+    private val scanLock = Mutex()
+    private val protectLock = Mutex()
     private val _state = MutableStateFlow(store.load() ?: fresh())
     val state: StateFlow<KrState> = _state.asStateFlow()
-    private val m15 = HashMap<String, List<Candle>>()
-    private val h4 = HashMap<String, Pair<Long, List<Candle>>>()
+    private val m15 = java.util.concurrent.ConcurrentHashMap<String, List<Candle>>()
+    private val h4 = java.util.concurrent.ConcurrentHashMap<String, Pair<Long, List<Candle>>>()
     private var symbolInfo: List<SymbolInfo> = emptyList()
+    private var trackers: Map<String, SetupTracker> = emptyMap()
+    private var trackersClose = 0L
+    /** Fiyat akışından gelen son alış/satış (sembol → fiyat). */
+    private val ticks = java.util.concurrent.ConcurrentHashMap<String, BookTicker>()
 
     private fun fresh() = KrState(createdAt = clock.now(), book = KrBook(cfg.risk.startEquity))
 
@@ -131,25 +175,124 @@ class KrPaper(
         save(_state.value.copy(events = events.sortedBy { it.time }, eventsUpdatedAt = clock.now()))
     }
 
-    /** Bir döngü: izleme boşluğu kaydı → ücret/evren yenileme → pozisyon koruması → (yeni 15M kapanışı varsa) tarama. */
-    suspend fun cycle(mode: BotMode) = lock.withLock {
-        val now = clock.now()
-        var s = _state.value
-        try {
-            s = refreshTerms(s, now)
-            if (mode == BotMode.FULL) s = refreshUniverse(s, now)
-            val tickers = api.bookTickers().associateBy { it.symbol }
-            s = protect(s, tickers, now)
-            if (mode == BotMode.FULL) {
-                val lastClose = Timeframe.M15.lastCloseAtOrBefore(now - SETTLE_MILLIS)
-                if (lastClose > s.lastScanBar) s = scan(s, lastClose, tickers, now)
-            }
-            s = s.copy(lastError = null)
-        } catch (e: Exception) {
-            s = s.copy(lastError = e.message ?: e.toString()).log(now, "Hata: ${e.message}")
-        }
-        save(s)
+    /** Test ve tek seferlik çalıştırma kolaylığı: önce koruma, sonra (FULL ise) tarama. */
+    suspend fun cycle(mode: BotMode) {
+        protect()
+        if (mode == BotMode.FULL) scan(mode, clock.now())
     }
+
+    /** Açık pozisyonların sembolleri (fiyat akışı abonelikleri için). */
+    fun openSymbols(): Set<String> = _state.value.book.positions.map { it.symbol }.toSet()
+
+    /**
+     * Fiyat akışından gelen güncelleme. Açık bir pozisyonun stopunu/hedefini geçtiyse true döner: çağıran hemen
+     * [protect] çalıştırmalıdır (15M kapanışı beklenmez).
+     */
+    fun onTick(t: BookTicker): Boolean {
+        ticks[t.symbol] = t
+        val p = _state.value.book.positions.firstOrNull { it.symbol == t.symbol } ?: return false
+        return t.bid > 0 && (t.bid <= p.stop || t.bid >= p.target || p.pendingExit != null)
+    }
+
+    // ---- Tarama (3 dakikada bir) ----
+
+    /**
+     * Bir tarama. Önceki tarama sürüyorsa başlamaz (sayılır). [scheduledAt]: planlanan başlangıç (gecikme ölçümü).
+     * Dönüş: tarama yapıldı mı.
+     */
+    suspend fun scan(mode: BotMode, scheduledAt: Long): Boolean {
+        if (!scanLock.tryLock()) {
+            lock.withLock { val s = _state.value; save(s.copy(scanTiming = s.scanTiming.copy(skippedOverlap = s.scanTiming.skippedOverlap + 1))) }
+            return false
+        }
+        try {
+            val started = clock.now()
+            lock.withLock {
+                val s = _state.value
+                save(s.copy(scanTiming = s.scanTiming.copy(lastStartedAt = started, lastDelayMs = maxOf(0, started - scheduledAt), nextAt = nextSlot(started))))
+            }
+            val error = try {
+                scanBody(mode, started)
+                null
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                e.message ?: e.toString()
+            }
+            val finished = clock.now()
+            lock.withLock {
+                val s = _state.value
+                val t = s.scanTiming.copy(
+                    lastFinishedAt = finished, lastDurationMs = finished - started, count = s.scanTiming.count + 1,
+                    lastSuccessAt = if (error == null) finished else s.scanTiming.lastSuccessAt, lastError = error,
+                    nextAt = nextSlot(finished),
+                )
+                save(s.copy(scanTiming = t, lastError = error).let { if (error != null) it.log(finished, "Tarama hatası: $error") else it })
+            }
+            return true
+        } finally {
+            scanLock.unlock()
+        }
+    }
+
+    private suspend fun scanBody(mode: BotMode, now: Long) {
+        // A) Ağ: ücretler (6 saatte bir), evren (günde bir), anlık fiyatlar, yeni kapanmış 15M mumlar.
+        var s = _state.value
+        s = refreshTerms(s, now)
+        if (mode == BotMode.FULL) s = refreshUniverse(s, now)
+        val termsAndUniverse = s
+        val tickers = api.bookTickers().associateBy { it.symbol }
+        val lastClose = Timeframe.M15.lastCloseAtOrBefore(now - SETTLE_MILLIS)
+        val members = s.universe?.symbols.orEmpty()
+        val watch = (members + KrFilters.BTC + s.book.positions.map { it.symbol }).sorted()
+        val failed = ArrayList<String>()
+        if (lastClose > trackersClose || watch.any { it !in trackers }) {
+            val built = HashMap<String, SetupTracker>()
+            // Mumlar eşzamanlı indirilir (istemci hız sınırını kendisi uygular); kapanıştan sonraki karar gecikmesi kısalır.
+            val fetched = kotlinx.coroutines.coroutineScope {
+                val gate = kotlinx.coroutines.sync.Semaphore(FETCH_PARALLEL)
+                watch.map { sym ->
+                    async {
+                        gate.withPermit {
+                            val bars = runCatching { updateBars(sym, lastClose) }.getOrNull()
+                            val trend = if (bars == null) null else runCatching { trend(sym, lastClose, now) }.getOrNull()
+                            Triple(sym, bars, trend)
+                        }
+                    }
+                }.awaitAll()
+            }
+            for ((sym, bars, trend) in fetched) {
+                if (bars == null) { failed += sym; continue }
+                val t = SetupTracker(sym, cfg, trend)
+                val since = ArrayList<TrackerEvent>()
+                for (b in bars) {
+                    val e = t.onBar(b)
+                    if (b.closeTime > eventsAfter(s.lastScanBar, lastClose)) since += e
+                }
+                newEvents[sym] = since
+                built[sym] = t
+            }
+            trackers = built
+            trackersClose = lastClose
+        }
+        // B) Kararlar ve özet (durum kilidiyle; koruma döngüsünün yazdıklarıyla birleşir).
+        lock.withLock {
+            var st = _state.value.copy(
+                universe = termsAndUniverse.universe, universeError = termsAndUniverse.universeError, universeAttemptAt = termsAndUniverse.universeAttemptAt,
+                terms = termsAndUniverse.terms, riskFlagged = termsAndUniverse.riskFlagged, termsAt = termsAndUniverse.termsAt,
+                log = (_state.value.log + termsAndUniverse.log.filter { it.time >= now }).distinct().takeLast(400),
+            )
+            st = decide(st, lastClose, tickers, now, mode, members, watch, failed)
+            save(st)
+        }
+    }
+
+    /** İlk taramada yalnız son mum; sonra son taramadan bu yana (en fazla 1 gün). Kaçırılan kararlar "geç" sayılır. */
+    private fun eventsAfter(lastScanBar: Long, lastClose: Long) = if (lastScanBar == 0L) lastClose - M15 else maxOf(lastScanBar, lastClose - KrConfig.DAY)
+
+    private val newEvents = HashMap<String, List<TrackerEvent>>()
+
+    private fun nextSlot(t: Long): Long = t - Math.floorMod(t, SCAN_INTERVAL) + SCAN_INTERVAL + SETTLE_MILLIS
 
     // ---- Ücretler ve evren ----
 
@@ -193,108 +336,81 @@ class KrPaper(
     /** CMC listesi geçerli mi (CMC zaman damgasından en fazla [LIST_VALIDITY]). */
     fun listValid(s: KrState, now: Long): Boolean = s.universe?.let { now - it.list.cmcTimestamp <= LIST_VALIDITY } == true
 
-    // ---- Koruma (her döngü) ----
+    // ---- Koruma (taramadan ayrı, daha sık) ----
 
-    private suspend fun protect(s0: KrState, tickers: Map<String, BookTicker>, now: Long): KrState {
-        var s = s0
-        val gapFrom = s.lastMonitorAt
-        if (gapFrom > 0 && now - gapFrom > MONITOR_GAP) {
-            s = s.copy(untracked = (s.untracked + Interval(gapFrom, now)).takeLast(500))
-                .log(now, "İzleme boşluğu: ${(now - gapFrom) / 60_000} dk (uygulama/servis çalışmadı veya bağlantı yoktu)")
-        }
-        for (p in s.book.positions) {
-            var pos = p
-            val pendingBid = tickers[p.symbol]?.bid
-            if (p.pendingExit != null && pendingBid != null && pendingBid > 0) {
-                val t = KrExits.close(p, now, pendingBid * (1 - p.exitLeg.slippage), p.pendingExit, ExitSource.LIVE)
-                s = s.copy(book = s.book.close(t)).log(now, "${t.symbol} kapandı: ${t.reason.title}, net ${"%.2f".format(t.netPnl)} USDT")
-                continue
+    /**
+     * Açık pozisyonlar için: 1 dakikalık mumlar son denetimden itibaren zaman sırasıyla yeniden oynatılır (bağlantı
+     * kopmuşsa aradaki olaylar gerçekleştikleri sırayla işlenir), ardından anlık fiyat (akış taze ise akıştan, değilse
+     * REST). Aynı anda tek koruma çalışır.
+     */
+    suspend fun protect() = protectLock.withLock {
+        val now = clock.now()
+        val snapshot = _state.value
+        val positions = snapshot.book.positions
+        var error: String? = null
+        val results = ArrayList<KrExits.Replay>()
+        var source = ""
+        try {
+            val fresh = positions.associate { p -> p.symbol to ticks[p.symbol]?.takeIf { now - it.time <= STREAM_FRESH } }
+            val rest = if (positions.isNotEmpty() && fresh.values.any { it == null }) api.bookTickers().associateBy { it.symbol } else emptyMap()
+            source = when {
+                positions.isEmpty() -> ""
+                fresh.values.all { it != null } -> "Fiyat akışı"
+                fresh.values.any { it != null } -> "Fiyat akışı + REST"
+                else -> "REST"
             }
-            // 1) 1 dakikalık mumlar: son denetimden bu yana kaçan fitiller.
-            var closed: KrTrade? = null
-            for (b in minuteBars(p.symbol, pos.checkedUntil, now)) {
-                val partial = b.openTime < pos.entryTime
-                val hit = KrExits.intrabar(pos, if (partial) pos.entryPrice else b.open, b.high, b.low)
-                if (hit != null) {
-                    val backfilled = s.untracked.any { b.openTime < it.to && b.closeTime > it.from }
-                    closed = KrExits.close(
-                        pos, b.closeTime, hit.price, hit.reason, if (backfilled) ExitSource.BACKFILLED else ExitSource.LIVE,
-                        ambiguous = hit.ambiguous || partial, windowFrom = maxOf(b.openTime, pos.entryTime), windowTo = b.closeTime,
-                    )
-                    break
+            val gapFrom = snapshot.lastMonitorAt
+            // Boşluk, her pozisyon için son denetim ile giriş zamanından geç olanından başlar (giriş anında durmuş olabilir).
+            val gapStart = positions.map { maxOf(gapFrom, it.entryTime) }.filter { gapFrom > 0 && now - it > MONITOR_GAP }.minOrNull()
+            val gap = gapStart?.let { Interval(it, now) }
+            val untracked = snapshot.untracked + listOfNotNull(gap)
+            for (p in positions) {
+                val bars = minuteBars(p.symbol, p.checkedUntil, now)
+                val live = fresh[p.symbol] ?: rest[p.symbol]
+                results += KrExits.replay(p, bars, live, now, cfg) { a, b -> untracked.any { a < it.to && b > it.from } }
+            }
+            lock.withLock {
+                var s = _state.value
+                if (gap != null) {
+                    s = s.copy(untracked = (s.untracked + gap).takeLast(500))
+                        .log(now, "İzleme boşluğu: ${(gap.to - gap.from) / 1000} sn (servis çalışmadı veya bağlantı yoktu); olaylar sırayla yeniden işlendi")
                 }
-                pos = pos.copy(highest = maxOf(pos.highest, b.high), checkedUntil = b.closeTime)
-            }
-            // 2) Anlık alış fiyatı.
-            val bid = tickers[p.symbol]?.bid
-            if (closed == null && bid != null && bid > 0) {
-                closed = when {
-                    bid <= pos.stop -> KrExits.close(pos, now, bid * (1 - pos.exitLeg.slippage), ExitReason.STOP, ExitSource.LIVE)
-                    bid >= pos.target -> KrExits.close(pos, now, pos.target, ExitReason.TARGET, ExitSource.LIVE)
-                    else -> null
+                for (r in results) {
+                    if (!s.book.has(r.position.symbol)) continue
+                    val t = r.trade
+                    s = if (t != null) {
+                        s.copy(book = s.book.close(t)).log(now, "${t.symbol} kapandı: ${t.reason.title}, net ${"%.2f".format(t.netPnl)} USDT (${t.source.title})")
+                    } else s.copy(book = s.book.update(r.position))
                 }
-                if (closed == null) pos = pos.copy(highest = maxOf(pos.highest, bid), checkedUntil = now)
+                val marks = (rest.mapValues { it.value.bid } + fresh.mapNotNull { (k, v) -> v?.let { k to it.bid } }).filterValues { it > 0 }
+                val held = s.book.positions.map { it.symbol }.toSet()
+                s = s.copy(
+                    book = s.book.rollDay(now, marks), lastMonitorAt = now, lastPriceDataAt = if (positions.isEmpty()) s.lastPriceDataAt else now,
+                    marks = s.marks.filterKeys { it in held } + marks.filterKeys { it in held },
+                    protection = ProtectionStatus(now, source, null),
+                )
+                save(s)
             }
-            s = if (closed != null) {
-                s.copy(book = s.book.close(closed)).log(now, "${closed.symbol} kapandı: ${closed.reason.title}, net ${"%.2f".format(closed.netPnl)} USDT (${closed.source.title})")
-            } else {
-                s.copy(book = s.book.update(pos))
-            }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            error = e.message ?: e.toString()
+            lock.withLock { val s = _state.value; save(s.copy(protection = s.protection.copy(lastError = error))) }
         }
-        val marks = tickers.mapValues { it.value.bid }.filterValues { it > 0 }
-        val held = s.book.positions.map { it.symbol }.toSet()
-        return s.copy(book = s.book.rollDay(now, marks), lastMonitorAt = now, lastPriceDataAt = now, marks = marks.filterKeys { it in held })
     }
 
-    // ---- Tarama (her 15M kapanışı) ----
+    // ---- Kararlar (tarama içinde) ----
 
-    private suspend fun scan(s0: KrState, lastClose: Long, tickers: Map<String, BookTicker>, now: Long): KrState {
+    private suspend fun decide(
+        s0: KrState, lastClose: Long, tickers: Map<String, BookTicker>, now: Long, mode: BotMode,
+        members: Set<String>, watch: List<String>, failed: List<String>,
+    ): KrState {
         var s = s0
         val universe = s.universe
-        val members = universe?.symbols.orEmpty()
-        val watch = (members + KrFilters.BTC + s.book.positions.map { it.symbol }).sorted()
-        val trackers = HashMap<String, SetupTracker>()
-        val events = HashMap<String, List<TrackerEvent>>()
-        val failed = ArrayList<String>()
-        for (sym in watch) {
-            val bars = runCatching { updateBars(sym, lastClose) }.getOrElse { failed += sym; continue }
-            val trend = runCatching { trend(sym, lastClose, now) }.getOrNull()
-            val t = SetupTracker(sym, cfg, trend)
-            // İlk taramada yalnız son mum; sonra son taramadan bu yana (en fazla 1 gün) — kaçırılan kararlar "geç" sayılır.
-            val after = if (s.lastScanBar == 0L) lastClose - M15 else maxOf(s.lastScanBar, lastClose - KrConfig.DAY)
-            val since = ArrayList<TrackerEvent>()
-            for (b in bars) {
-                val e = t.onBar(b)
-                if (b.closeTime > after) since += e
-            }
-            trackers[sym] = t
-            events[sym] = since
-        }
-        // Kapanış kuralları (tez iptali, ilerleme yok, en uzun süre): girişten sonraki her yeni 15M kapanışı.
-        for (p in s.book.positions) {
-            val bars = m15[p.symbol].orEmpty().filter { it.closeTime > p.entryTime && it.closeTime > s.lastScanBar && it.closeTime <= lastClose }
-            var pos = p
-            var reason: ExitReason? = null
-            var at: Candle? = null
-            for (b in bars) {
-                pos = pos.copy(barsHeld = pos.barsHeld + 1, highest = maxOf(pos.highest, b.high))
-                reason = KrExits.onClose(pos, b.close, cfg)
-                if (reason != null) { at = b; break }
-            }
-            val bid = tickers[p.symbol]?.bid
-            s = if (reason != null && at != null) {
-                // Kapanış kuralı geç fark edildiyse (bot o an çalışmıyordu) sonraki mumun açılışı kullanılır ve işaretlenir.
-                val next = m15[p.symbol].orEmpty().firstOrNull { it.openTime == at.closeTime }
-                val t = if (now - at.closeTime > LATE_MILLIS && next != null) {
-                    KrExits.close(pos, next.openTime, next.open * (1 - pos.exitLeg.priceImpact), reason, ExitSource.BACKFILLED)
-                } else if (bid != null && bid > 0) {
-                    KrExits.close(pos, now, bid * (1 - pos.exitLeg.slippage), reason, ExitSource.LIVE)
-                } else null
-                if (t != null) s.copy(book = s.book.close(t)).log(now, "${t.symbol} kapandı: ${t.reason.title}, net ${"%.2f".format(t.netPnl)} USDT (${t.source.title})")
-                else s.copy(book = s.book.update(pos.copy(pendingExit = reason)))
-            } else s.copy(book = s.book.update(pos))
-        }
-
+        val trackers = this.trackers
+        // Olaylar yalnız yeni kapanmış mumlardan; aynı kapanış ikinci kez işlenmez.
+        val events: Map<String, List<TrackerEvent>> = if (lastClose > s.lastScanBar) HashMap(newEvents) else emptyMap()
+        newEvents.clear()
         val funnel = LinkedHashMap<String, Int>()
         fun count(k: String) { funnel[k] = (funnel[k] ?: 0) + 1 }
         val btc = trackers[KrFilters.BTC]?.takeIf { it.lastBar?.closeTime == lastClose }
@@ -316,9 +432,10 @@ class KrPaper(
                         processed += plan.id
                         count("Retest onaylandı (evrende)")
                         val reason = when {
+                            mode != BotMode.FULL -> Rejection.ENTRIES_OFF
                             e.time != lastClose || now - lastClose > LATE_MILLIS -> Rejection.LATE
                             !listValid(s, now) -> Rejection.LIST_STALE
-                            else -> KrFilters.market(plan, trackers.getValue(sym).barCount, btc4, btc24, cfg)
+                            else -> KrFilters.market(plan, trackers.getValue(sym).barCount, btc4, btc24, cfg, btc?.trendAt(lastClose))
                                 ?: eventBlock(s, sym, now)
                                 ?: if (s.book.has(sym)) Rejection.ALREADY_OPEN else null
                                 ?: if (s.book.dailyLossHit(marks, cfg.risk)) Rejection.DAILY_LOSS else null
@@ -375,11 +492,11 @@ class KrPaper(
                 s.book.has(sym) -> SetupStage.NOT_SUITABLE to "Açık pozisyon var"
                 else -> t.stage()
             }
-            Opportunity(sym, entry?.asset?.name ?: sym, entry?.asset?.rank ?: 0, stage, why, t?.lastBar?.close ?: Double.NaN, t?.pendingLevel ?: Double.NaN)
+            Opportunity(sym, entry?.asset?.name ?: sym, entry?.asset?.rank ?: 0, stage, why, tickers[sym]?.bid ?: t?.lastBar?.close ?: Double.NaN, t?.pendingLevel ?: Double.NaN)
         }.sortedWith(compareBy<Opportunity> { it.stage.ordinal.let { o -> listOf(2, 1, 0, 3)[o] } }.thenBy { it.rank })
         val total = s.funnel.toMutableMap().apply { funnel.forEach { (k, v) -> this[k] = (this[k] ?: 0) + v } }
         return s.copy(
-            lastScanBar = lastClose,
+            lastScanBar = maxOf(s.lastScanBar, lastClose),
             processedSetups = processed.toList().takeLast(5000),
             funnel = total,
             scan = ScanSummary(lastClose, clock.now(), universe?.top ?: 0, universe?.onMexc ?: 0, members.size, trackers.keys.count { it in members }, items, funnel),
@@ -442,6 +559,7 @@ class KrPaper(
 
     /** 15M önbelleği: ilk seferde son 500 mum, sonra yalnız yeni mumlar. Yalnız [lastClose]'a kadar kapanmış mumlar. */
     private suspend fun updateBars(sym: String, lastClose: Long): List<Candle> {
+        if (m15[sym] == null) candleStore?.load(sym, M15)?.takeIf { it.isNotEmpty() }?.let { m15[sym] = ArrayList(it.takeLast(CACHE_BARS)) }
         val cached = m15[sym].orEmpty()
         val fresh = if (cached.isEmpty() || cached.last().closeTime < lastClose - 400 * M15) {
             api.klines(sym, Timeframe.M15, limit = CACHE_BARS)
@@ -450,6 +568,8 @@ class KrPaper(
         } else emptyList()
         val merged = (cached + fresh).filter { it.closeTime <= lastClose }.associateBy { it.openTime }.values.sortedBy { it.openTime }.takeLast(CACHE_BARS)
         m15[sym] = merged
+        val newClosed = fresh.filter { it.closeTime <= lastClose }
+        if (newClosed.isNotEmpty()) runCatching { candleStore?.save(sym, M15, newClosed) }
         return merged
     }
 
@@ -470,9 +590,17 @@ class KrPaper(
     companion object {
         const val SETTLE_MILLIS = 10_000L
         const val MINUTE = 60_000L
-        const val MONITOR_GAP = 3 * 60_000L
+        /** Açık pozisyon varken bu süreden uzun denetimsiz aralık "izleme boşluğu" sayılır. */
+        const val MONITOR_GAP = 90_000L
+        /** 3 dakikalık tarama aralığı (UTC saatine hizalı; 15M kapanışları tarama anlarına denk gelir). */
+        const val SCAN_INTERVAL = 3 * 60_000L
+        /** Fiyat akışı bu süreden eskiyse REST'e düşülür. */
+        const val STREAM_FRESH = 15_000L
+        /** Açık pozisyon varken koruma döngüsünün aralığı. */
+        const val PROTECT_INTERVAL = 10_000L
         const val LATE_MILLIS = 5 * 60_000L
         const val CACHE_BARS = 500
+        const val FETCH_PARALLEL = 6
         const val TERMS_REFRESH = 6 * H1
         const val UNIVERSE_REFRESH = 24 * H1
         const val UNIVERSE_RETRY = 30 * 60_000L

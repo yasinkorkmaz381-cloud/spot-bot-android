@@ -201,7 +201,9 @@ class SetupTracker(val symbol: String, private val cfg: KrConfig, private val tr
                 trend != null && trend.closesAt(c.closeTime) && trendOk != true -> {
                     events += TrackerEvent.SetupEnded(c.closeTime, level, TrackerEvent.Reason.TREND_LOST); pending = null
                 }
-                c.low <= level + cfg.retestToleranceAtr * p.atr15 && c.close > level && c.close >= c.open -> {
+                c.low <= level + cfg.retestToleranceAtr * p.atr15 && c.close > level && c.close >= c.open &&
+                    c.close - c.low >= cfg.retestMinCloseFraction * (c.high - c.low) &&
+                    c.close >= level + cfg.retestMinCloseAboveAtr * p.atr15 -> {
                     events += TrackerEvent.RetestConfirmed(c.closeTime, plan(p, c)); pending = null
                 }
                 c.close <= level -> {

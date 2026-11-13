@@ -47,7 +47,11 @@ open class ScreenshotTest {
     private val state = SampleData.state()
     private val now = SampleData.NOW
 
-    @Test fun home() = capture("01-ana-ekran") { HomeContent(state, BotMode.FULL, true, now, {}, {}) }
+    @Test fun home() = capture("01-ana-ekran") { HomeContent(state, BotMode.FULL, true, now, {}, {}, live = SAMPLE_LIVE) }
+    @Test fun homeProtectionLost() = capture("01b-ana-ekran-koruma-izlenemiyor") {
+        HomeContent(state.copy(protection = com.spotbot.core.kr.ProtectionStatus(now - 4 * 60_000, "REST")), BotMode.FULL, true, now, {}, {},
+            live = SAMPLE_LIVE.copy(serviceAliveAt = 0))
+    }
     @Test fun homeUnprotected() = capture("02-ana-ekran-kapali-acik-pozisyon") { HomeContent(state, BotMode.OFF, true, now, {}, {}) }
     @Test fun homeNoKey() = capture("03-ana-ekran-anahtar-yok") { HomeContent(SampleData.state(open = false).copy(universe = null, scan = null), BotMode.PROTECT_ONLY, false, now, {}, {}) }
     @Test fun opportunities() = capture("04-firsatlar") { OpportunitiesContent(state, now) }

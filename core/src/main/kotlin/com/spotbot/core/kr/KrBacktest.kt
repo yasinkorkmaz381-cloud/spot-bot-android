@@ -187,7 +187,7 @@ class KrBacktest(private val cfg: KrConfig, private val costs: KrCosts = cfg.cos
                     if (e !is TrackerEvent.RetestConfirmed) continue
                     val plan = e.plan
                     count("Retest onaylandı (evrende)")
-                    val reason = KrFilters.market(plan, trackers.getValue(plan.symbol).barCount, btc4, btc24, cfg)
+                    val reason = KrFilters.market(plan, trackers.getValue(plan.symbol).barCount, btc4, btc24, cfg, btc?.trendAt(close))
                         ?: if (book.has(plan.symbol)) Rejection.ALREADY_OPEN else null
                         ?: if (dailyBlocked) Rejection.DAILY_LOSS else null
                     if (reason != null) { count("Süzgeç: ${reason.title}"); continue }

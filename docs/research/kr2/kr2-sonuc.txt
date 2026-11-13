@@ -1,0 +1,47 @@
+Kırılım–Retest 2. tur — docs/KR2-ONKAYIT.md
+Ücret/spread anlık görüntüsü: 2026-11-13T18:08:49Z. Her dönem 1.000 USDT.
+
+== Araştırma 2025-11-28 → 2026-07-31 ==
+Yapılandırma | İşlem | Net USDT | Beklenti USDT | Ort. net R | PF | Maks. düşüş % | Günlük işlem | Ort. süre dk | Toplam maliyet | Maliyet/brüt kâr % | Kazanan % | Ort. kazanç R | Ort. kayıp R
+B0 temel | 198 | -157.47 | -0.7953 | -0.4505 | 0.41 | 16.08 | 0.80 | 45.00 | 108.38 | 93.00 | 18.69 | 1.7329 | -0.9522
+B0 temel ×2 | 102 | -119.03 | -1.1670 | -0.5841 | 0.29 | 11.99 | 0.41 | 48.82 | 91.03 | 170.31 | 13.73 | 1.6097 | -0.9331
+V1 stop tamponu 1,0 ATR | 131 | -101.45 | -0.7745 | -0.3876 | 0.39 | 10.62 | 0.53 | 67.44 | 55.27 | 80.36 | 16.79 | 1.3011 | -0.7284
+V1 stop tamponu 1,0 ATR ×2 | 43 | -28.91 | -0.6724 | -0.2959 | 0.50 | 3.63 | 0.17 | 85.47 | 28.05 | 88.47 | 20.93 | 1.3266 | -0.7254
+V2 BTC 4H yön şartı | 131 | -97.44 | -0.7438 | -0.4251 | 0.42 | 10.29 | 0.53 | 42.25 | 73.10 | 97.08 | 19.08 | 1.7699 | -0.9427
+V2 BTC 4H yön şartı ×2 | 61 | -84.89 | -1.3917 | -0.7013 | 0.17 | 8.58 | 0.25 | 46.23 | 57.96 | 291.64 | 9.84 | 1.4787 | -0.9391
+V3 retest kalitesi | 129 | -110.90 | -0.8597 | -0.4219 | 0.39 | 11.85 | 0.52 | 53.95 | 68.51 | 89.39 | 20.93 | 1.4673 | -0.9220
+V3 retest kalitesi ×2 | 59 | -83.24 | -1.4108 | -0.6366 | 0.19 | 8.47 | 0.24 | 64.58 | 52.79 | 238.48 | 11.86 | 1.2576 | -0.8916
+V4 maliyet payı %25 | 198 | -157.47 | -0.7953 | -0.4505 | 0.41 | 16.08 | 0.80 | 45.00 | 108.38 | 93.00 | 18.69 | 1.7329 | -0.9522
+V4 maliyet payı %25 ×2 | 97 | -112.25 | -1.1572 | -0.5627 | 0.30 | 11.32 | 0.39 | 50.88 | 86.20 | 160.71 | 14.43 | 1.6097 | -0.9291
+
+== Seçim kuralı (ön kayıt §4) ==
+V1 stop tamponu 1,0 ATR: Δ ort. R 0.0629, işlem 131, ×2 ort. R -0.2959 (B0 ×2 -0.5841) → İYİLEŞTİRDİ
+V2 BTC 4H yön şartı: Δ ort. R 0.0254, işlem 131, ×2 ort. R -0.7013 (B0 ×2 -0.5841) → iyileştirmedi
+V3 retest kalitesi: Δ ort. R 0.0286, işlem 129, ×2 ort. R -0.6366 (B0 ×2 -0.5841) → iyileştirmedi
+V4 maliyet payı %25: Δ ort. R 0.0000, işlem 198, ×2 ort. R -0.5627 (B0 ×2 -0.5841) → iyileştirmedi
+VK = V1 stop tamponu 1,0 ATR
+Yapılandırma | İşlem | Net USDT | Beklenti USDT | Ort. net R | PF | Maks. düşüş % | Günlük işlem | Ort. süre dk | Toplam maliyet | Maliyet/brüt kâr % | Kazanan % | Ort. kazanç R | Ort. kayıp R
+VK araştırma | 131 | -101.45 | -0.7745 | -0.3876 | 0.39 | 10.62 | 0.53 | 67.44 | 55.27 | 80.36 | 16.79 | 1.3011 | -0.7284
+VK araştırma ×2 | 43 | -28.91 | -0.6724 | -0.2959 | 0.50 | 3.63 | 0.17 | 85.47 | 28.05 | 88.47 | 20.93 | 1.3266 | -0.7254
+
+== Değerlendirme 1 (MEXC; ilk turda temel kurallarla görüldü) 2026-08-01 → 2026-11-12 (bir kez) ==
+Yapılandırma | İşlem | Net USDT | Beklenti USDT | Ort. net R | PF | Maks. düşüş % | Günlük işlem | Ort. süre dk | Toplam maliyet | Maliyet/brüt kâr % | Kazanan % | Ort. kazanç R | Ort. kayıp R
+VK | 61 | -67.80 | -1.1114 | -0.4857 | 0.24 | 7.28 | 0.59 | 82.38 | 25.35 | 114.81 | 16.39 | 0.8720 | -0.7519
+VK ×2 | 24 | -28.00 | -1.1665 | -0.4856 | 0.23 | 3.21 | 0.23 | 85.63 | 16.01 | 168.50 | 20.83 | 0.6712 | -0.7900
+B0 (karşılaştırma) | 92 | -83.83 | -0.9112 | -0.5232 | 0.39 | 9.33 | 0.88 | 59.18 | 51.29 | 91.38 | 16.30 | 1.6537 | -0.9472
+
+== Değerlendirme 2 (Binance 15M 2023-11-15 → 2025-10-31; yardımcı, yanlı; ilk turda temel kurallarla görüldü) ==
+Yapılandırma | İşlem | Net USDT | Beklenti USDT | Ort. net R | PF | Maks. düşüş % | Günlük işlem | Ort. süre dk | Toplam maliyet | Maliyet/brüt kâr % | Kazanan % | Ort. kazanç R | Ort. kayıp R
+VK | 417 | -167.23 | -0.4010 | -0.1841 | 0.65 | 16.72 | 0.58 | 72.48 | 183.08 | 54.48 | 27.34 | 1.2689 | -0.7309
+VK ×2 | 124 | -54.70 | -0.4411 | -0.1825 | 0.66 | 6.27 | 0.17 | 73.43 | 75.33 | 64.90 | 28.23 | 1.2330 | -0.7392
+
+== Sınıf (ön kayıt §5) ==
+[✓] Değerlendirme 1'de ≥ 60 işlem (61)
+[✗] Net beklenti > 0 (-1.1114)
+[✗] PF ≥ 1,2 (0.24)
+[✗] En büyük düşüş ≤ %6 (%7.28)
+[✗] ×2 maliyette net > 0 (-28.00)
+[✗] Ort. R %90 GA alt sınırı > 0 (-0.6222)
+[✗] En iyi coin (ENAUSDT) çıkarılınca net > 0
+[✗] Değerlendirme 2 net > 0 (-167.23)
+SONUÇ: Başarısız

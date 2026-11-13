@@ -3,9 +3,25 @@
 MEXC spot piyasasında (USDT pariteleri) çalışan, **kontrollü risk** ve **sistematik karar** odaklı otomatik
 işlem botu. Android uygulaması (Türkçe kumanda paneli) + platformdan bağımsız Kotlin çekirdeği + komut satırı.
 
-> **Durum: V4.1, tek strateji: Kırılım–Retest (KR), yalnız sanal işlem (paper trading).** Gerçek emir gönderilmez.
+> **Durum: V4.2, tek strateji: Kırılım–Retest (KR), yalnız sanal işlem (paper trading).** Gerçek emir gönderilmez.
 > Ön kayıtlı backtest sonucu **Başarısız**: üç dönemde de net zarar, maliyetsiz de avantaj yok. Gerçek parayla
 > kullanım için dayanak yoktur. Rapor: [`docs/KR-RAPOR.md`](docs/KR-RAPOR.md).
+
+## V4.2: 3 dakikalık tarama, ayrı koruma döngüsü, 2. tur araştırma (14 Kasım 2026)
+
+- **Tarama:** CMC ilk 300 → MEXC evreni 3 dakikada bir, UTC saatine hizalı taranır. Önceki tarama bitmeden yenisi
+  başlamaz; çakışan tarama sayılır.
+- **Veri:** CMC listesi günde bir yenilenir. 15M mumlar diskte önbelleklenir ve yalnız yeni kapanan mumlar indirilir.
+- **Sinyal:** Giriş yalnız kapanmış 15M mumdan doğar. Her düzen kimliği bir kez işlenir.
+- **Koruma:** Taramadan ayrı ve daha sık çalışır (10 sn).
+  - MEXC WebSocket fiyat akışı kullanılır; stop geçilince koruma anında devreye girer.
+  - Bağlantı kesilmişse 1 dakikalık mumlar zaman sırasıyla yeniden oynatılır.
+  - Koruma izlenemiyorsa ana ekranda kırmızı uyarı çıkar.
+- **Ana ekran:** Son tarama, sonraki tarama, bağlantı ve fiyat akışı durumu.
+- **Araştırma:** İlk tur birebir yeniden üretildi. Dört gerekçeli tek değişkenli varyant ön kayıtla denendi. Sonuç
+  **Başarısız**; avantaj bulunamadı, uygulama temel kurallarla kaldı.
+  - Ön kayıt: [`docs/KR2-ONKAYIT.md`](docs/KR2-ONKAYIT.md).
+  - Rapor: [`docs/KR2-RAPOR.md`](docs/KR2-RAPOR.md).
 
 ## V4.1: uygulama içinde geçmiş test, CMC anahtar düzeltmesi (13 Kasım 2026)
 

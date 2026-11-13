@@ -55,11 +55,12 @@ data class KrBook(
 object KrFilters {
     const val BTC = "BTCUSDT"
 
-    fun market(plan: SetupPlan, barCount: Int, btcReturn4h: Double, btcReturn24h: Double, cfg: KrConfig): Rejection? = when {
+    fun market(plan: SetupPlan, barCount: Int, btcReturn4h: Double, btcReturn24h: Double, cfg: KrConfig, btcUptrend: Boolean? = null): Rejection? = when {
         barCount < cfg.minBars15 || plan.decisionTime - plan.cleanSince < cfg.dataCleanHours * H1 -> Rejection.DATA
         !(plan.quoteVolume24h >= cfg.minQuoteVolume24h) -> Rejection.LIQUIDITY
         // Çelişki/veri yoksa bekle (kural 58): BTC verisi yoksa giriş yok.
         btcReturn4h.isNaN() || btcReturn4h <= -cfg.btcShockPercent -> Rejection.BTC_SHOCK
+        cfg.requireBtcUptrend && btcUptrend != true -> Rejection.BTC_TREND
         // BTC'nin kendine göre gücü tanımsızdır; BTC bu süzgeçten muaftır.
         plan.symbol != BTC && (plan.return24hPercent.isNaN() || btcReturn24h.isNaN() ||
             plan.return24hPercent - btcReturn24h <= cfg.minRelativeStrengthPercent) -> Rejection.WEAK_RS

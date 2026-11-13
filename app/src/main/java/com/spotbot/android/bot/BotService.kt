@@ -21,7 +21,16 @@ import androidx.core.content.ContextCompat
 import com.spotbot.android.MainActivity
 import com.spotbot.android.R
 import com.spotbot.android.SpotBotApplication
+import com.spotbot.core.exchange.mexc.MexcChannels
+import com.spotbot.core.exchange.mexc.MexcWebSocketClient
+import com.spotbot.core.exchange.mexc.StreamEvent
 import com.spotbot.core.kr.BotMode
+import com.spotbot.core.kr.KrPaper
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.withTimeoutOrNull
 import com.spotbot.android.ui.common.formatPrice
 import com.spotbot.android.ui.common.formatSignedMoney
 import kotlinx.coroutines.CoroutineScope
@@ -74,42 +83,69 @@ class BotService : Service() {
     }
 
     override fun onDestroy() {
+        container.live.update { it.copy(serviceAliveAt = 0L, nextScanAt = 0L) }
         scope?.cancel()
         scope = null
         wakeLock?.takeIf { it.isHeld }?.release()
         super.onDestroy()
     }
 
+    /**
+     * Üç eşzamanlı iş:
+     * 1. Tarama: UTC saatine hizalı 3 dakikalık aralıklarla ([KrPaper.SCAN_INTERVAL]); önceki tarama sürüyorsa yenisi
+     *    başlamaz ([KrPaper.scan] sayar). Yalnız "Çalışıyor" modunda.
+     * 2. Koruma: açık pozisyon varken 10 sn'de bir, fiyat akışında stop/hedef geçilince hemen.
+     * 3. Fiyat akışı: açık pozisyonların MEXC WebSocket bookTicker kanalları (kopunca kendisi yeniden bağlanır).
+     * Ön plan servisi kullanılır: WorkManager'ın en kısa periyodik aralığı 15 dakikadır, 3 dakikalık tarama ve sürekli
+     * stop takibi için uygun değildir. Servis durursa ana ekran bunu "servis çalışmıyor" diye gösterir.
+     */
     private fun loop() {
         val s = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         scope = s
-        // Var olan kayıtlar için bildirim gönderme; yalnız bundan sonra oluşanlar.
         container.paper.state.value.book.let { b -> notified += b.trades.map { "T:" + it.id } + b.positions.map { "P:" + it.id } }
+        val urgent = Channel<Unit>(Channel.CONFLATED)
+        val stream = MexcWebSocketClient(s)
+        s.launch { stream.state.collect { st -> container.live.update { it.copy(stream = st) } } }
+        s.launch {
+            container.paper.state.map { st -> st.book.positions.map { it.symbol }.toSet() }.distinctUntilChanged().collect { symbols ->
+                stream.setSubscriptions(symbols.map { MexcChannels.bookTicker(it) }.toSet())
+                if (symbols.isEmpty()) stream.stop() else stream.start()
+            }
+        }
+        s.launch {
+            stream.events.collect { e ->
+                if (e is StreamEvent.BookTickerUpdate && container.paper.onTick(e.ticker)) urgent.trySend(Unit)
+            }
+        }
+        s.launch {
+            while (isActive) {
+                if (container.settings.settings.value.botMode == BotMode.OFF) break
+                container.live.update { it.copy(serviceAliveAt = System.currentTimeMillis()) }
+                runCatching { container.paper.protect() }
+                notifyChanges()
+                notify(NOTIFICATION_ID, statusNotification())
+                val open = container.paper.state.value.book.positions.isNotEmpty()
+                withTimeoutOrNull(if (open) KrPaper.PROTECT_INTERVAL else 60_000L) { urgent.receive() }
+            }
+        }
         s.launch {
             while (isActive) {
                 val mode = container.settings.settings.value.botMode
                 if (mode == BotMode.OFF) break
                 acquireWakeLock()
                 if (System.currentTimeMillis() - lastClockSync > 10 * 60_000L) { container.syncClock(); lastClockSync = System.currentTimeMillis() }
-                runCatching { container.paper.cycle(mode) }
-                notifyChanges()
-                notify(NOTIFICATION_ID, statusNotification())
-                delay(nextDelay(mode))
+                val now = container.clock.now()
+                val slot = now - Math.floorMod(now, KrPaper.SCAN_INTERVAL) + KrPaper.SCAN_INTERVAL + KrPaper.SETTLE_MILLIS
+                container.live.update { it.copy(nextScanAt = if (mode == BotMode.FULL) slot else 0L) }
+                delay(slot - now)
+                val m = container.settings.settings.value.botMode
+                // Ayrı coroutine: uzun süren tarama zamanlamayı kaydırmaz; çakışmayı KrPaper.scan engeller ve sayar.
+                if (m == BotMode.FULL) launch { runCatching { container.paper.scan(m, slot) }; notifyChanges() }
             }
+            stream.stop()
+            container.live.update { it.copy(serviceAliveAt = 0L, nextScanAt = 0L) }
             ServiceCompat.stopForeground(this@BotService, ServiceCompat.STOP_FOREGROUND_REMOVE)
             stopSelf()
-        }
-    }
-
-    /** Açık pozisyon varken ve 15M kapanışlarının hemen ardından sık; başka zaman seyrek. */
-    private fun nextDelay(mode: BotMode): Long {
-        val open = container.paper.state.value.book.positions.isNotEmpty()
-        val sinceClose = Math.floorMod(container.clock.now(), 15 * 60_000L)
-        return when {
-            open -> 20_000L
-            mode == BotMode.FULL && sinceClose < 60_000L -> 15_000L
-            mode == BotMode.FULL -> 60_000L
-            else -> 120_000L
         }
     }
 

@@ -61,6 +61,28 @@ class UiInteractionTest {
     }
 
     @Test
+    fun `home shows last and next scan, connection, and says clearly when protection is not watched`() {
+        val st = SampleData.state()
+        val ok = com.spotbot.android.ui.home.homeStatus(st, BotMode.FULL, SAMPLE_LIVE, SampleData.NOW)
+        org.junit.Assert.assertTrue(ok.lastScan.contains("sn önce") && ok.lastScan.contains("gecikme"))
+        org.junit.Assert.assertTrue(ok.nextScan.contains("her 3 dakikada bir"))
+        org.junit.Assert.assertTrue(ok.stream.startsWith("Bağlı"))
+        assertNull(ok.protectionWarning)
+        // Servis durduysa: tarama yapılmıyor ve koruma izlenemiyor (tarama yapılmış gibi gösterilmez).
+        val down = com.spotbot.android.ui.home.homeStatus(st, BotMode.FULL, SAMPLE_LIVE.copy(serviceAliveAt = 0), SampleData.NOW)
+        assertEquals("Servis çalışmıyor: tarama yapılmıyor", down.nextScan)
+        org.junit.Assert.assertTrue(down.protectionWarning!!.startsWith("Koruma izlenemiyor: 2 açık pozisyon"))
+        // Bağlantı gecikmesi: son denetim 2 dk önce.
+        val stale = com.spotbot.android.ui.home.homeStatus(st.copy(protection = com.spotbot.core.kr.ProtectionStatus(SampleData.NOW - 120_000, "REST")), BotMode.FULL, SAMPLE_LIVE, SampleData.NOW)
+        org.junit.Assert.assertNotNull(stale.protectionWarning)
+        // Çakışan tarama sayısı ve hata görünür.
+        val skipped = com.spotbot.android.ui.home.homeStatus(st.copy(scanTiming = st.scanTiming.copy(skippedOverlap = 2)), BotMode.FULL, SAMPLE_LIVE, SampleData.NOW)
+        org.junit.Assert.assertTrue(skipped.lastScan.contains("atlanan 2"))
+        compose.setContent { SpotBotTheme { HomeContent(st, BotMode.FULL, true, SampleData.NOW, {}, {}, live = SAMPLE_LIVE.copy(serviceAliveAt = 0)) } }
+        compose.onNodeWithTag("protection-warning").assertIsDisplayed()
+    }
+
+    @Test
     fun `event times are read as Turkey time`() {
         assertEquals(1_794_664_800_000L, parseTurkeyTime("14.11.2026 17:00"))
         assertNull(parseTurkeyTime("yarın"))

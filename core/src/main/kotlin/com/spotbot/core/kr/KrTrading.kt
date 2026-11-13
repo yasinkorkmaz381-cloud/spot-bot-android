@@ -175,6 +175,7 @@ enum class Rejection(val title: String) {
     SPREAD("Spread yüksek"),
     BOOK("Emir defteri yetersiz (kayma yüksek)"),
     BTC_SHOCK("BTC sert düşüşte (bekle)"),
+    BTC_TREND("BTC 4H yönü yükselişte değil"),
     WEAK_RS("BTC'ye göre zayıf"),
     EVENT("Olay riski penceresi / risk etiketi"),
     ALREADY_OPEN("Aynı coinde açık pozisyon"),
@@ -215,6 +216,47 @@ object KrExits {
         p.barsHeld == cfg.progressBars && p.highest < p.entryPrice + cfg.progressFraction * (p.target - p.entryPrice) -> ExitReason.NO_PROGRESS
         p.barsHeld >= cfg.maxHoldBars -> ExitReason.MAX_HOLD
         else -> null
+    }
+
+    data class Replay(val position: KrPosition, val trade: KrTrade?)
+
+    /**
+     * Paper koruması: [p] için son denetimden ([KrPosition.checkedUntil]) sonra kapanan 1 dakikalık mumlar zaman
+     * sırasıyla işlenir, sonra anlık fiyat ([live]). Her mumda öncelik: bekleyen kapanış çıkışı (bu mumun açılışından)
+     * → sert stop → hedef; çeyrek saat kapanışında (15M kapanışı) tez iptali / ilerleme yok / en uzun süre. Girişi
+     * içeren ilk dakikada stop/hedef görülürse sıra bilinmez ("belirsiz" işaretlenir). [untracked] aralığa düşen mumdan
+     * çıkan çıkış "canlı izlenmedi" (geçmişten hesaplandı) olarak işaretlenir.
+     */
+    fun replay(p: KrPosition, minuteBars: List<com.spotbot.core.model.Candle>, live: com.spotbot.core.model.BookTicker?, now: Long, cfg: KrConfig, untracked: (Long, Long) -> Boolean): Replay {
+        var pos = p
+        for (b in minuteBars.filter { it.closeTime > p.checkedUntil && it.closeTime <= now }.sortedBy { it.openTime }) {
+            val source = if (untracked(b.openTime, b.closeTime)) ExitSource.BACKFILLED else ExitSource.LIVE
+            pos.pendingExit?.let { r ->
+                return Replay(pos, close(pos, b.openTime, b.open * (1 - pos.exitLeg.priceImpact), r, source, windowFrom = b.openTime, windowTo = b.openTime))
+            }
+            val partial = b.openTime < pos.entryTime
+            val hit = intrabar(pos, if (partial) pos.entryPrice else b.open, b.high, b.low)
+            if (hit != null) {
+                return Replay(pos, close(pos, b.closeTime, hit.price, hit.reason, source, ambiguous = hit.ambiguous || partial, windowFrom = maxOf(b.openTime, pos.entryTime), windowTo = b.closeTime))
+            }
+            pos = pos.copy(highest = maxOf(pos.highest, b.high), checkedUntil = b.closeTime)
+            if (b.closeTime % KrConfig.M15 == 0L && b.closeTime > pos.entryTime) {
+                pos = pos.copy(barsHeld = pos.barsHeld + 1)
+                onClose(pos, b.close, cfg)?.let { pos = pos.copy(pendingExit = it) }
+            }
+        }
+        val bid = live?.bid
+        if (live != null && bid != null && bid > 0 && live.time >= pos.checkedUntil) {
+            val t = when {
+                pos.pendingExit != null -> close(pos, now, bid * (1 - pos.exitLeg.slippage), pos.pendingExit!!, ExitSource.LIVE)
+                bid <= pos.stop -> close(pos, now, bid * (1 - pos.exitLeg.slippage), ExitReason.STOP, ExitSource.LIVE)
+                bid >= pos.target -> close(pos, now, pos.target, ExitReason.TARGET, ExitSource.LIVE)
+                else -> null
+            }
+            if (t != null) return Replay(pos, t)
+            pos = pos.copy(highest = maxOf(pos.highest, bid))
+        }
+        return Replay(pos, null)
     }
 
     fun close(p: KrPosition, time: Long, price: Double, reason: ExitReason, source: ExitSource, ambiguous: Boolean = false, windowFrom: Long = time, windowTo: Long = time): KrTrade {

@@ -39,6 +39,7 @@ class MainViewModel(private val app: SpotBotApplication) : ViewModel() {
     private val _keyStatus = MutableStateFlow<KeyStatus?>(null)
     val keyStatus: StateFlow<KeyStatus?> = _keyStatus.asStateFlow()
     val history = c.history.state
+    val live = c.live
 
     /**
      * Anahtarı temizleyip kaydeder, CMC'de doğrular (kredi harcamaz) ve doğruysa coin listesini bot modundan bağımsız

@@ -83,6 +83,14 @@ object SampleData {
             log = listOf(LogEntry(NOW - 40 * MIN, "SUIUSDT alındı (paper): giriş 1,8432, stop 1,8214, hedef 1,8751, net R:R 1,38")),
             funnel = mapOf("Kırılım: kabul" to 41, "Kırılım: Kırılım hacmi düşük" to 133, "Retest onaylandı (evrende)" to 19, "Giriş yapıldı" to 6, "Süzgeç: BTC'ye göre zayıf" to 7),
             marks = mapOf("SUIUSDT" to 1.8511, "AVAXUSDT" to 21.31),
+            scanTiming = com.spotbot.core.kr.ScanTiming(lastStartedAt = NOW - 71_400, lastFinishedAt = NOW - 68_200, lastSuccessAt = NOW - 68_200, lastDurationMs = 3_200, lastDelayMs = 400, count = 412),
+            protection = com.spotbot.core.kr.ProtectionStatus(NOW - 6_000, "Fiyat akışı"),
         )
     }
 }
+
+/** Servis çalışıyor, fiyat akışı bağlı. */
+val SAMPLE_LIVE = LiveStatus(
+    serviceAliveAt = SampleData.NOW - 4_000, nextScanAt = SampleData.NOW + 111_800,
+    stream = com.spotbot.core.exchange.mexc.StreamConnectionState(com.spotbot.core.exchange.mexc.ConnectionStatus.CONNECTED, 1, 1, 2, SampleData.NOW - 300),
+)

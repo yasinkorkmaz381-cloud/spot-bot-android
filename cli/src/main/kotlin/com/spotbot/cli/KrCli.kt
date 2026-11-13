@@ -24,6 +24,7 @@ import com.spotbot.core.kr.UniverseStatus
 import com.spotbot.core.kr.dayKey
 import com.spotbot.core.model.Candle
 import com.spotbot.core.model.SymbolInfo
+import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonNull
@@ -373,4 +374,165 @@ suspend fun appHistory(o: Map<String, String>) {
         val a = app.map { it.symbol to it.entryTime }.toSet(); val b = r.trades.map { it.symbol to it.entryTime }.toSet()
         println("Ortak giriş: ${(a intersect b).size}; yalnız uygulamada: ${(a - b).size} ${(a - b).take(8)}; yalnız araştırmada: ${(b - a).size} ${(b - a).take(8)}")
     }
+}
+
+/** MEXC WebSocket fiyat akışı denemesi: [--sembol] için [--sn] saniye bookTicker dinler. */
+suspend fun streamTest(o: Map<String, String>): Unit = kotlinx.coroutines.coroutineScope {
+    val symbols = (o["sembol"] ?: "BTCUSDT,ETHUSDT").split(',')
+    val seconds = (o["sn"] ?: "15").toLong()
+    val ws = com.spotbot.core.exchange.mexc.MexcWebSocketClient(this)
+    var n = 0
+    val job = launch {
+        ws.events.collect { e ->
+            if (e is com.spotbot.core.exchange.mexc.StreamEvent.BookTickerUpdate) {
+                n++
+                if (n <= 5) println("${e.ticker.symbol} alış ${e.ticker.bid} satış ${e.ticker.ask}")
+            }
+        }
+    }
+    ws.setSubscriptions(symbols.map { com.spotbot.core.exchange.mexc.MexcChannels.bookTicker(it) }.toSet())
+    ws.start()
+    repeat(seconds.toInt()) { kotlinx.coroutines.delay(1000); println("t=${it + 1}s ${ws.state.value.status} msj=$n hata=${ws.state.value.lastError}") }
+    println("Durum: ${ws.state.value}")
+    println("$seconds sn'de $n fiyat güncellemesi")
+    ws.stop(); job.cancel()
+}
+
+/** 2. tur (docs/KR2-ONKAYIT.md): B0 + V1–V4 araştırmada; kuralla VK seçimi; değerlendirme 1 (MEXC) ve 2 (Binance) bir kez. */
+fun krRound2(o: Map<String, String>) {
+    val data = KrData(File(o["data"] ?: "/home/user/research-v8"))
+    val out = File(o["out"] ?: "docs/research/kr2").apply { mkdirs() }
+    val base = KrConfig()
+    val variants = linkedMapOf(
+        "B0 temel" to base,
+        "V1 stop tamponu 1,0 ATR" to base.copy(stopBufferAtr = 1.0),
+        "V2 BTC 4H yön şartı" to base.copy(requireBtcUptrend = true),
+        "V3 retest kalitesi" to base.copy(retestMinCloseFraction = 0.5, retestMinCloseAboveAtr = 0.1),
+        "V4 maliyet payı %25" to base.copy(maxCostShareOfTarget = 0.25),
+    )
+    val m15 = data.candles("mexc/m15", M15)
+    val h4 = data.candles("mexc/h4", H4).mapValues { Trend4h(it.value, base) }
+    val cacheU = HashMap<Long, Universe?>()
+    val input = KrBacktestInput(m15, h4, { d -> synchronized(cacheU) { cacheU.getOrPut(d) { data.universeAt(d, m15) } }?.symbols.orEmpty() }, data.terms, "MEXC 15M")
+    val research = Period("Araştırma", date("2025-11-28"), date("2026-08-01"))
+    val eval1 = Period("Değerlendirme 1 (MEXC; ilk turda temel kurallarla görüldü)", date("2026-08-01"), date("2026-11-13"))
+    val sb = StringBuilder()
+    sb.appendLine("Kırılım–Retest 2. tur — docs/KR2-ONKAYIT.md")
+    sb.appendLine("Ücret/spread anlık görüntüsü: ${data.snapshotTime}. Her dönem 1.000 USDT.")
+    sb.appendLine()
+    fun line(name: String, r: KrResult): String {
+        val m = KrReport.metrics(r.trades, r.startEquity, r.equityCurve, r.start, r.end)
+        val wins = r.trades.filter { it.netPnl > 0 }; val losses = r.trades.filter { it.netPnl <= 0 }
+        return "$name | ${m.trades} | ${f2(m.netPnl)} | ${f4(m.expectancy)} | ${f4(m.meanR)} | ${f2(m.profitFactor)} | ${f2(m.maxDrawdownPercent)} | ${f2(m.tradesPerDay)} | ${f2(m.avgHoldMinutes)} | ${f2(m.totalCosts)} | ${f2(m.costToGrossProfit * 100)} | ${f2(m.winRate)} | ${f4(wins.map { it.rMultiple }.average())} | ${f4(losses.map { it.rMultiple }.average())}"
+    }
+    val header = "Yapılandırma | İşlem | Net USDT | Beklenti USDT | Ort. net R | PF | Maks. düşüş % | Günlük işlem | Ort. süre dk | Toplam maliyet | Maliyet/brüt kâr % | Kazanan % | Ort. kazanç R | Ort. kayıp R"
+    sb.appendLine("== Araştırma ${day(research.start)} → ${day(research.end - 1)} ==")
+    sb.appendLine(header)
+    val res = LinkedHashMap<String, Pair<KrResult, KrResult>>()
+    for ((name, c) in variants) {
+        val n = KrBacktest(c).run(input, research.start, research.end)
+        val d = KrBacktest(c, c.costs.doubled()).run(input, research.start, research.end)
+        res[name] = n to d
+        sb.appendLine(line(name, n)); sb.appendLine(line("$name ×2", d))
+        writeCsv(n, File(out, "kr2-arastirma-${name.substringBefore(' ')}-islemler.csv"))
+        println("araştırma $name: ${n.trades.size} / ${f2(n.trades.sumOf { it.netPnl })}")
+    }
+    fun meanR(r: KrResult) = if (r.trades.isEmpty()) Double.NaN else r.trades.sumOf { it.rMultiple } / r.trades.size
+    val (b0n, b0d) = res.getValue("B0 temel")
+    sb.appendLine()
+    sb.appendLine("== Seçim kuralı (ön kayıt §4) ==")
+    val improved = ArrayList<String>()
+    for ((name, pair) in res) {
+        if (name.startsWith("B0")) continue
+        val dR = meanR(pair.first) - meanR(b0n)
+        val ok = dR >= 0.05 && pair.first.trades.size >= 60 && meanR(pair.second) >= meanR(b0d)
+        sb.appendLine("$name: Δ ort. R ${f4(dR)}, işlem ${pair.first.trades.size}, ×2 ort. R ${f4(meanR(pair.second))} (B0 ×2 ${f4(meanR(b0d))}) → ${if (ok) "İYİLEŞTİRDİ" else "iyileştirmedi"}")
+        if (ok) improved += name
+    }
+    if (improved.isEmpty()) {
+        sb.appendLine("Hiçbir varyant iyileştirmedi → B0 kalır; avantaj bulunamadı.")
+        File(out, "kr2-sonuc.txt").writeText(sb.toString()); println(sb); return
+    }
+    var vk = base
+    if ("V1 stop tamponu 1,0 ATR" in improved) vk = vk.copy(stopBufferAtr = 1.0)
+    if ("V2 BTC 4H yön şartı" in improved) vk = vk.copy(requireBtcUptrend = true)
+    if ("V3 retest kalitesi" in improved) vk = vk.copy(retestMinCloseFraction = 0.5, retestMinCloseAboveAtr = 0.1)
+    if ("V4 maliyet payı %25" in improved) vk = vk.copy(maxCostShareOfTarget = 0.25)
+    sb.appendLine("VK = ${improved.joinToString(" + ")}")
+    val vkR = KrBacktest(vk).run(input, research.start, research.end)
+    val vkRd = KrBacktest(vk, vk.costs.doubled()).run(input, research.start, research.end)
+    sb.appendLine(header); sb.appendLine(line("VK araştırma", vkR)); sb.appendLine(line("VK araştırma ×2", vkRd))
+    sb.appendLine()
+    sb.appendLine("== ${eval1.name} ${day(eval1.start)} → ${day(eval1.end - 1)} (bir kez) ==")
+    val e1 = KrBacktest(vk).run(input, eval1.start, eval1.end)
+    val e1d = KrBacktest(vk, vk.costs.doubled()).run(input, eval1.start, eval1.end)
+    val b1 = KrBacktest(base).run(input, eval1.start, eval1.end)
+    sb.appendLine(header); sb.appendLine(line("VK", e1)); sb.appendLine(line("VK ×2", e1d)); sb.appendLine(line("B0 (karşılaştırma)", b1))
+    writeCsv(e1, File(out, "kr2-degerlendirme1-VK-islemler.csv"))
+    writeCsv(e1d, File(out, "kr2-degerlendirme1-VK-islemler-x2.csv"))
+    writeDaily(e1, File(out, "kr2-degerlendirme1-VK-gunluk.csv"))
+    // Değerlendirme 2: Binance (yardımcı, yanlı).
+    val first = data.universeAt(date("2025-11-14"), m15)!!
+    val bm15 = data.candles("binance/m15", M15).filterKeys { it in first.symbols || it == "BTCUSDT" }
+    val members = first.symbols intersect bm15.keys
+    val binput = KrBacktestInput(bm15, bm15.mapValues { Trend4h(Bars.aggregate(it.value, H4), vk) }, { members }, data.terms, "Binance 15M (yardımcı)")
+    val e2 = KrBacktest(vk).run(binput, date("2023-11-15"), date("2025-11-01"))
+    val e2d = KrBacktest(vk, vk.costs.doubled()).run(binput, date("2023-11-15"), date("2025-11-01"))
+    sb.appendLine()
+    sb.appendLine("== Değerlendirme 2 (Binance 15M 2023-11-15 → 2025-10-31; yardımcı, yanlı; ilk turda temel kurallarla görüldü) ==")
+    sb.appendLine(header); sb.appendLine(line("VK", e2)); sb.appendLine(line("VK ×2", e2d))
+    writeCsv(e2, File(out, "kr2-degerlendirme2-binance-VK-islemler.csv"))
+    // Sınıf (§5).
+    val m = KrReport.metrics(e1.trades, e1.startEquity, e1.equityCurve, e1.start, e1.end)
+    val ci = KrReport.bootstrapMeanR(e1.trades)
+    val best = e1.trades.groupBy { it.symbol }.maxByOrNull { (_, t) -> t.sumOf { it.netPnl } }?.key
+    val checks = listOf(
+        "Değerlendirme 1'de ≥ 60 işlem (${m.trades})" to (m.trades >= 60),
+        "Net beklenti > 0 (${f4(m.expectancy)})" to (m.trades > 0 && m.netPnl > 0),
+        "PF ≥ 1,2 (${f2(m.profitFactor)})" to (m.profitFactor >= 1.2),
+        "En büyük düşüş ≤ %6 (%${f2(m.maxDrawdownPercent)})" to (m.maxDrawdownPercent <= 6),
+        "×2 maliyette net > 0 (${f2(e1d.trades.sumOf { it.netPnl })})" to (e1d.trades.sumOf { it.netPnl } > 0),
+        "Ort. R %90 GA alt sınırı > 0 (${f4(ci.first)})" to (ci.first > 0),
+        "En iyi coin ($best) çıkarılınca net > 0" to (e1.trades.filter { it.symbol != best }.sumOf { it.netPnl } > 0),
+        "Değerlendirme 2 net > 0 (${f2(e2.trades.sumOf { it.netPnl })})" to (e2.trades.sumOf { it.netPnl } > 0),
+    )
+    sb.appendLine()
+    sb.appendLine("== Sınıf (ön kayıt §5) ==")
+    checks.forEach { (k, ok) -> sb.appendLine((if (ok) "[✓] " else "[✗] ") + k) }
+    val verdict = when { m.trades == 0 || m.netPnl <= 0 -> "Başarısız"; checks.all { it.second } -> "Avantaj gösterildi (canlı paper doğrulaması gerekli)"; else -> "Yetersiz kanıt" }
+    sb.appendLine("SONUÇ: $verdict")
+    File(out, "kr2-sonuc.txt").writeText(sb.toString())
+    println(sb)
+}
+
+/**
+ * Uygulama servisinin döngüleri canlı veriyle (geçici kayıtla): 3 dakikalık hizalı tarama + 10 sn koruma.
+ * [--dk] dakika çalışır; her taramanın süresi, gecikmesi ve sonucu yazılır.
+ */
+suspend fun paperLive(o: Map<String, String>): Unit = kotlinx.coroutines.coroutineScope {
+    val minutes = (o["dk"] ?: "7").toLong()
+    val dir = File(o["klasor"] ?: "/home/user/research-v8/paper-canli").apply { mkdirs() }
+    val key = System.getenv("CMC_API_KEY")
+    val paper = com.spotbot.core.kr.KrPaper(MexcRestClient(), CmcClient({ key }), com.spotbot.core.kr.MemoryKrStore(), cfg = KrConfig(), candleStore = com.spotbot.core.kr.CandleFileStore(File(dir, "mumlar")))
+    val end = System.currentTimeMillis() + minutes * 60_000
+    val protect = launch { while (true) { paper.protect(); kotlinx.coroutines.delay(10_000) } }
+    while (System.currentTimeMillis() < end) {
+        val now = System.currentTimeMillis()
+        val slot = now - Math.floorMod(now, com.spotbot.core.kr.KrPaper.SCAN_INTERVAL) + com.spotbot.core.kr.KrPaper.SCAN_INTERVAL + com.spotbot.core.kr.KrPaper.SETTLE_MILLIS
+        if (slot > end) break
+        kotlinx.coroutines.delay(slot - now)
+        launch {
+            val ran = paper.scan(com.spotbot.core.kr.BotMode.FULL, slot)
+            val s = paper.state.value
+            val t = s.scanTiming
+            println("[${utc.format(java.time.Instant.ofEpochMilli(slot))} UTC] tarama ${if (ran) "yapıldı" else "ATLANDI (önceki sürüyor)"}: süre ${t.lastDurationMs} ms, gecikme ${t.lastDelayMs} ms, hata ${t.lastError}, " +
+                "evren ${s.universe?.top}→${s.universe?.onMexc}→${s.universe?.included?.size}, değerlendirilen 15M ${s.scan?.barClose?.let { utc.format(java.time.Instant.ofEpochMilli(it)) }}, " +
+                "durumlar ${s.scan?.items?.groupBy { it.stage }?.mapValues { it.value.size }}, açık ${s.book.positions.size}, işlem ${s.book.trades.size}, atlanan ${t.skippedOverlap}")
+        }
+    }
+    kotlinx.coroutines.delay(30_000)
+    protect.cancel()
+    val s = paper.state.value
+    println("Huni (bu çalıştırma): ${s.funnel}")
+    s.log.takeLast(15).forEach { println("günlük: ${utc.format(java.time.Instant.ofEpochMilli(it.time))} ${it.text}") }
 }

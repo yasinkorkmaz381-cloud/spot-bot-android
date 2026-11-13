@@ -1,0 +1,23 @@
+Uygulama döngülerinin canlı denemesi (KrPaper.scan + protect, gerçek MEXC + CMC; cryptoscan paper-canli). Tarih 13.11.2026 UTC.
+
+== 1. çalıştırma: sıralı mum indirme, boş önbellek ==
+[2026-11-13 20:09 UTC] tarama yapıldı: süre 100902 ms, gecikme 8 ms, hata null, evren 300→215→211, değerlendirilen 15M 2026-11-13 20:00, durumlar {WATCHING=21, NOT_SUITABLE=190}, açık 0, işlem 0, atlanan 0
+[2026-11-13 20:12 UTC] tarama yapıldı: süre 484 ms, gecikme 1 ms, hata null, evren 300→215→211, değerlendirilen 15M 2026-11-13 20:00, durumlar {WATCHING=21, NOT_SUITABLE=190}, açık 0, işlem 0, atlanan 0
+[2026-11-13 20:15 UTC] tarama yapıldı: süre 45578 ms, gecikme 0 ms, hata null, evren 300→215→211, değerlendirilen 15M 2026-11-13 20:15, durumlar {WATCHING=21, NOT_SUITABLE=190}, açık 0, işlem 0, atlanan 0
+[2026-11-13 20:18 UTC] tarama yapıldı: süre 680 ms, gecikme 1 ms, hata null, evren 300→215→211, değerlendirilen 15M 2026-11-13 20:15, durumlar {WATCHING=21, NOT_SUITABLE=190}, açık 0, işlem 0, atlanan 0
+[2026-11-13 20:21 UTC] tarama yapıldı: süre 579 ms, gecikme 0 ms, hata null, evren 300→215→211, değerlendirilen 15M 2026-11-13 20:15, durumlar {WATCHING=21, NOT_SUITABLE=190}, açık 0, işlem 0, atlanan 0
+[2026-11-13 20:24 UTC] tarama yapıldı: süre 835 ms, gecikme 1 ms, hata null, evren 300→215→211, değerlendirilen 15M 2026-11-13 20:15, durumlar {WATCHING=21, NOT_SUITABLE=190}, açık 0, işlem 0, atlanan 0
+Huni (bu çalıştırma): {}
+günlük: 2026-11-13 20:09 CMC listesi yenilendi: ilk 300 → MEXC'de 215 → taranan 211
+
+== 2. çalıştırma: eşzamanlı mum indirme (6), dolu disk önbelleği (yeniden başlatma) ==
+[2026-11-13 20:27 UTC] tarama yapıldı: süre 14630 ms, gecikme 8 ms, hata null, evren 300→215→211, değerlendirilen 15M 2026-11-13 20:15, durumlar {WATCHING=21, NOT_SUITABLE=190}, açık 0, işlem 0, atlanan 0
+[2026-11-13 20:30 UTC] tarama yapıldı: süre 12456 ms, gecikme 1 ms, hata null, evren 300→215→211, değerlendirilen 15M 2026-11-13 20:30, durumlar {WATCHING=21, NOT_SUITABLE=190}, açık 0, işlem 0, atlanan 0
+[2026-11-13 20:33 UTC] tarama yapıldı: süre 631 ms, gecikme 1 ms, hata null, evren 300→215→211, değerlendirilen 15M 2026-11-13 20:30, durumlar {WATCHING=21, NOT_SUITABLE=190}, açık 0, işlem 0, atlanan 0
+[2026-11-13 20:36 UTC] tarama yapıldı: süre 497 ms, gecikme 0 ms, hata null, evren 300→215→211, değerlendirilen 15M 2026-11-13 20:30, durumlar {WATCHING=21, NOT_SUITABLE=190}, açık 0, işlem 0, atlanan 0
+[2026-11-13 20:39 UTC] tarama yapıldı: süre 551 ms, gecikme 0 ms, hata null, evren 300→215→211, değerlendirilen 15M 2026-11-13 20:30, durumlar {WATCHING=21, NOT_SUITABLE=190}, açık 0, işlem 0, atlanan 0
+[2026-11-13 20:42 UTC] tarama yapıldı: süre 580 ms, gecikme 1 ms, hata null, evren 300→215→211, değerlendirilen 15M 2026-11-13 20:30, durumlar {WATCHING=21, NOT_SUITABLE=190}, açık 0, işlem 0, atlanan 0
+Huni (bu çalıştırma): {}
+günlük: 2026-11-13 20:27 CMC listesi yenilendi: ilk 300 → MEXC'de 215 → taranan 211
+
+Not: 'Huni' boş — bu iki 15M kapanışında evrendeki coinlerde kabul edilen kırılım olmadı (190 coin 4H yönü yükselişte değil). Bu sürede açık pozisyon olmadığı için koruma döngüsü yalnız boş çalıştı; koruma davranışı KrLoopsTest ile doğrulandı.
