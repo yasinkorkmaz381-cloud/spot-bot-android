@@ -1,6 +1,6 @@
-Test çıktıları — Kırılım–Retest (13 Kasım 2026). Komutlar: ./gradlew :core:test --rerun-tasks; ROBOLECTRIC_REPO_URL=… ./gradlew :app:testDebugUnitTest --rerun-tasks; ./gradlew :app:lintDebug :app:assembleDebug
+Test çıktıları — Kırılım–Retest 4.1.0-paper (13 Kasım 2026). Komutlar: ./gradlew :core:test --rerun-tasks; ROBOLECTRIC_REPO_URL=… ./gradlew :app:testDebugUnitTest --rerun-tasks; ./gradlew :app:lintDebug :app:assembleDebug
 
-== core: 49 test, 1 atlandı, 0 hata ==
+== core: 55 test, 1 atlandı, 0 hata ==
   LiveMexcSmokeTest: 1 test, 1 atlandı, 0 hata
     [ATLANDI] rest endpoints return consistent closed candles
   MexcRestClientTest: 6 test, 0 atlandı, 0 hata
@@ -14,6 +14,13 @@ Test çıktıları — Kırılım–Retest (13 Kasım 2026). Komutlar: ./gradlew
     [GEÇTİ] doubled costs lower the result and outside-universe coins are not traded
     [GEÇTİ] one setup gives one trade entered at the next open after the retest close
     [GEÇTİ] a rejected candidate does not use up a free position slot
+  KrHistoryTest: 6 test, 0 atlandı, 0 hata
+    [GEÇTİ] without historical CMC access the test is labelled as a today-list test
+    [GEÇTİ] cancel stops the run
+    [GEÇTİ] the last unpublished day uses the previous list within 48 hours and stays historical
+    [GEÇTİ] in-app history uses the same engine and gives the same trades as a direct backtest
+    [GEÇTİ] starting balance is the shared portfolio balance
+    [GEÇTİ] key sanitising keeps only the uuid
   KrPaperTest: 6 test, 0 atlandı, 0 hata
     [GEÇTİ] decision time missed while the bot was not running is not traded
     [GEÇTİ] a monitoring gap is recorded and an exit inside it is marked as backfilled
@@ -60,16 +67,23 @@ Test çıktıları — Kırılım–Retest (13 Kasım 2026). Komutlar: ./gradlew
     [GEÇTİ] daily vwap resets at UTC midnight
     [GEÇTİ] correlation of identical and inverted series
 
-== app: 32 test, 0 atlandı, 0 hata ==
+== app: 40 test, 0 atlandı, 0 hata ==
   FormattersTest: 5 test, 0 atlandı, 0 hata
     [GEÇTİ] compact volumes and ratios
     [GEÇTİ] percent places the sign and symbol per locale
     [GEÇTİ] money and signed money
     [GEÇTİ] decimal input accepts comma or dot
     [GEÇTİ] prices use magnitude based precision and Turkish separators
-  ScreenshotTest: 9 test, 0 atlandı, 0 hata
+  HistoryScreenTest: 4 test, 0 atlandı, 0 hata
+    [GEÇTİ] period and custom dates build the right request
+    [GEÇTİ] without historical CMC access the result is labelled as a today-list test
+    [GEÇTİ] start button runs the real engine and shows results, trades and CSV
+    [GEÇTİ] progress is shown and cancel stops the test
+  ScreenshotTest: 11 test, 0 atlandı, 0 hata
     [GEÇTİ] detail
     [GEÇTİ] archive
+    [GEÇTİ] settingsKeyUnreadable
+    [GEÇTİ] settingsKeyOk
     [GEÇTİ] opportunities
     [GEÇTİ] home
     [GEÇTİ] homeUnprotected
@@ -82,9 +96,11 @@ Test çıktıları — Kırılım–Retest (13 Kasım 2026). Komutlar: ./gradlew
     [GEÇTİ] old engine files are archived, not deleted, and the bot preference is kept
     [GEÇTİ] RS-1 paper records move to the archive and the bot does not start by itself
     [GEÇTİ] a fresh install has nothing to archive
-  SmallScreenTest: 9 test, 0 atlandı, 0 hata
+  SmallScreenTest: 11 test, 0 atlandı, 0 hata
     [GEÇTİ] detail
     [GEÇTİ] archive
+    [GEÇTİ] settingsKeyUnreadable
+    [GEÇTİ] settingsKeyOk
     [GEÇTİ] opportunities
     [GEÇTİ] home
     [GEÇTİ] homeUnprotected
@@ -99,5 +115,6 @@ Test çıktıları — Kırılım–Retest (13 Kasım 2026). Komutlar: ./gradlew
     [GEÇTİ] switching off with open positions asks first and offers protect-only
     [GEÇTİ] event times are read as Turkey time
 
-Lint (debug): 0 sorun. APK: app/build/outputs/apk/debug/app-debug.apk (13.499.852 bayt), versionName 4.0.0-paper.
-Atlanan test: LiveMexcSmokeTest (canlı MEXC; yalnız -Plive ile çalışır).
+Lint (debug): 0 sorun. APK: versionName 4.1.0-paper.
+Atlanan test: LiveMexcSmokeTest (canlı MEXC; yalnız -Plive ile).
+Emülatör/cihaz testi yapılamadı (ortamda KVM yok); ekran testleri Robolectric üzerinde gerçek Compose koduyla.

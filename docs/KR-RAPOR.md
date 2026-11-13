@@ -294,3 +294,109 @@ cli/build/install/cryptoscan/bin/cryptoscan kr --phase final --data <veri> --out
 
 Aynı veri ve sürümle sonuç birebir aynı çıkar. Araştırma dönemi iki ayrı çalıştırmada aynı verdi: 138 işlem,
 −111,97 USDT.
+
+## Ek (13 Kasım 2026, sürüm 4.1.0-paper): uygulama içinde geçmiş test ve CMC anahtar düzeltmesi
+
+### Geçmiş test ekranı
+
+Ana ekrandaki **Geçmiş test** düğmesi bu ekranı açar.
+
+**Dönem ve bakiye:**
+
+- Son 30 / 90 / 180 / 365 gün ya da özel tarih aralığı (GG.AA.YYYY, UTC gün sınırı).
+- Başlangıç sanal bakiyesi (50 – 10.000.000 USDT).
+
+**Çalıştırma:**
+
+- "Testi başlat" düğmesi, aşamalı ilerleme çubuğu ve "İptal" düğmesi.
+- İptal edilen testte indirilen veri önbellekte kalır; test yeniden başlatılınca veri tekrar indirilmez.
+
+**Sonuç:**
+
+- Net kâr/zarar, son bakiye, işlem sayısı, kazanma oranı, profit factor, maksimum düşüş, toplam maliyet, ortalama süre.
+- Gün başına "ilk 300 → MEXC'de → taranan" sayıları ve listenin kaynağı.
+- İşlem listesi: coin, giriş/çıkış zamanı ve fiyatı, çıkış nedeni, net sonuç.
+- CSV dışa aktarma (dosya seçiciyle).
+
+**Motor:**
+
+- Paper ile aynı: `KrHistory` veriyi hazırlar, kararları `KrBacktest` verir.
+- Tek strateji (Kırılım–Retest) ve ortak portföy bakiyesi kullanılır (§2 risk sınırları).
+- Komisyon (coin başına MEXC taker), spread (bugünkü anlık görüntü) ve her bacakta %0,05 kayma dahildir.
+
+**Evren:**
+
+- Her gün için CMC geçmiş ilk 300 listesi kullanılır. Kimlik doğrulama fiyatı o günün 00:00 UTC kapanışıdır.
+- CMC'de henüz yayımlanmamış son 1–2 günde, en fazla 48 saat önceki son liste kullanılır ve uyarı yazılır.
+- Plan geçmiş listeye izin vermezse test **"Bugünkü ilk 300 listesiyle geçmiş test"** olarak kırmızı uyarıyla
+  etiketlenir. Tarihsel liste kullanılmış gibi sunulmaz.
+
+**Veri ve önbellek:**
+
+- MEXC 15 dakikalık mumlar yaklaşık 360 gün geriye gidiyor. Daha eski bir başlangıç istenirse test verinin başladığı
+  güne kaydırılır ve bu yazılır. Isınma için 7 gün 15M ve 70 gün 4H veri ayrıca indirilir.
+- Mumlar diskte ikili biçimde tutulur ve bellek eşlemesiyle okunur; telefonda bellek yetmezliği olmaz.
+- Yalnız eksik aralık indirilir. 90 günlük test bu ortamda yaklaşık 120 MB önbellek kullandı.
+- CMC geçmiş listeleri saklanır: gün başına bir kez 2 kredi harcanır.
+
+### Gerçek veriyle deneme (aynı kod, JVM'de; `cryptoscan gecmis-test`)
+
+| Dönem | Süre | İşlem | Net | PF | Kazanan | En büyük düşüş | Maliyet |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Son 30 gün (14.10 – 13.11.2026) | 41 sn (önbellekten); ilk çalıştırma ~4 dk | 8 | −11,99 USDT | 0,00 | %0 | %1,2 | 5,07 USDT |
+| Son 90 gün (15.08 – 13.11.2026) | 6,5 dk (ilk çalıştırma) | 98 | −96,51 USDT (−%9,7) | 0,33 | %14 | %10,1 | 54,37 USDT |
+
+Her iki denemede de evren kaynağı "her gün o günün CMC ilk 300 listesi" idi.
+
+**Araştırma verisiyle karşılaştırma** (aynı aralık, dosyadaki MEXC verisi):
+
+| Dönem | Ortak giriş | Yalnız uygulamada | Yalnız araştırmada |
+| --- | --- | --- | --- |
+| 30 gün | 7 / 7 | 1 | 0 |
+| 90 gün | 83 | 15 | 4 |
+
+Farkın nedeni ölçüldü: spread anlık görüntüleri farklı zamanlarda alınmış.
+
+| Parite | 13.11 18:00 yarım spread | Uygulama denemesi anında |
+| --- | --- | --- |
+| XMR | %0,41 | %0,03 |
+| GRAM | %0,27 | %0,04 |
+
+Araştırma verisinde bu coinler maliyet süzgecine takıldı. Uygulamada geçtiler; ardından kapasite ve risk zincirleme
+değişti. Bu, "geçmiş spread verisi yok" sınırlamasının somut etkisidir: **sonuç, testin çalıştırıldığı andaki spread'e
+duyarlıdır.**
+
+Sonuç, ön kayıtlı değerlendirmeyle aynı yönde: strateji zararda.
+
+### CMC anahtar sorunu (bulunan ve düzeltilen hatalar)
+
+| Hata | Düzeltme |
+| --- | --- |
+| Anahtar kaydedildikten sonra liste hemen alınmıyordu. Önceki "anahtar yok" denemesinden sonra 30 dk bekleniyordu, liste yalnız bot "Çalışıyor" modundayken yenileniyordu | Kaydet → anahtar CMC'de doğrulanır (`/v1/key/info`, kredi harcamaz) → liste bot modundan bağımsız hemen yenilenir. Sonuç Ayarlar'da yazılır ("ilk 300 → MEXC'de → taranan"). "Coin listesini şimdi yenile" düğmesi eklendi |
+| Şifreli dosya varken anahtar çözülemiyorsa (ör. yeniden kurulum), ekran "kayıtlı" diyor, bot "anahtar yok" diyordu | "Kayıtlı" bilgisi artık anahtarın gerçekten okunabilmesine bağlı. Okunamıyorsa "yeniden girin" uyarısı çıkar. Kayıttan sonra geri okuma denetlenir |
+| Geçersiz anahtar yalnız günlükte "HTTP 401" olarak görünüyordu | CMC hata kodları Türkçe açıklanır: geçersiz, askıya alınmış, plan izin vermiyor, kredi sınırı |
+| Kopyalanan anahtar boşluk, tırnak ya da "X-CMC_PRO_API_KEY:" önekiyle kaydediliyordu | Anahtar temizlenir; metindeki UUID biçimli anahtar alınır |
+
+### Testler
+
+- **Çekirdek: 55 test (1 canlı test atlandı), 0 hata.** Yeni `KrHistoryTest`:
+  - doğrudan backtestle aynı işlemler;
+  - önbellekten ikinci çalıştırma (CMC kredisi ve mum isteği yok);
+  - başlangıç bakiyesi;
+  - "bugünkü liste" etiketi;
+  - son günde 48 saat kuralı;
+  - iptal;
+  - anahtar temizleme.
+- **Uygulama: 40 test, 0 hata.** Yeni `HistoryScreenTest` (Robolectric, uçtan uca):
+  - "Testi başlat"a basılır, gerçek `KrHistory` + `KrBacktest` sahte MEXC verisiyle çalışır, özet ve işlem görünür, CSV
+    üretilir;
+  - plan sınırında kırmızı "Bugünkü ilk 300 listesiyle geçmiş test" uyarısı;
+  - ilerleme ve iptal;
+  - dönem/tarih ayrıştırma.
+- **Lint:** 0 sorun.
+- **Test edilemeyenler:**
+  - Bu ortamda Android emülatörü yok (KVM yok). APK gerçek bir telefonda çalıştırılmadı.
+  - Ekran Robolectric üzerinde gerçek Compose koduyla test edildi; veri hattı gerçek MEXC + CMC ile JVM'de çalıştırıldı.
+  - 365 günlük test gerçek veriyle çalıştırılmadı. İlk indirme için tahminim 15–30 dk ve birkaç yüz MB; ölçülmedi.
+
+Ekran görüntüleri: `screenshots/kr/10-…13-gecmis-test-*.png`, `08b/08c-ayarlar-*.png`.

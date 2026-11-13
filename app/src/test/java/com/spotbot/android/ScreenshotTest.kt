@@ -55,6 +55,12 @@ open class ScreenshotTest {
     @Test fun tradesClosed() = capture("06-islemler-kapali") { TradesContent(state, {}, TradesTab.CLOSED) }
     @Test fun detail() = capture("07-ayrintilar") { DetailContent(state, now) }
     @Test fun settings() = capture("08-ayarlar") { SettingsContent(true, listOf(EventWindow(now + 86_400_000, "FOMC faiz kararı")), {}, {}, { _, _ -> }, {}, {}, {}) }
+    @Test fun settingsKeyOk() = capture("08b-ayarlar-anahtar-dogrulandi") {
+        SettingsContent(true, emptyList(), {}, {}, { _, _ -> }, {}, {}, {}, keyStatus = com.spotbot.android.ui.KeyStatus(com.spotbot.android.ui.KeyStatus.Kind.OK, "Anahtar geçerli (kalan aylık kredi 13.905). Liste alındı: ilk 300 → MEXC'de 215 → taranan 211."))
+    }
+    @Test fun settingsKeyUnreadable() = capture("08c-ayarlar-anahtar-okunamadi") {
+        SettingsContent(false, emptyList(), {}, {}, { _, _ -> }, {}, {}, {}, keyUnreadable = true, keyStatus = com.spotbot.android.ui.KeyStatus(com.spotbot.android.ui.KeyStatus.Kind.ERROR, "CMC anahtarı geçersiz (yanlış ya da eksik kopyalanmış olabilir)"))
+    }
     @Test fun archive() = capture("09-arsiv") {
         ArchiveContent(ArchiveSummary(listOf(ArchivedTrade("Momentum RS-1 (eski strateji)", "SOLUSDT", "RS-1", now - 9 * 86_400_000L, now - 2 * 86_400_000L, -4.25, "STOP")), listOf("archive-rs1/paper.json"), null))
     }

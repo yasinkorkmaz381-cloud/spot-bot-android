@@ -15,7 +15,10 @@ import javax.crypto.spec.GCMParameterSpec
 
 /** CMC API anahtarının saklandığı yer. Anahtar kaynak koda gömülmez; arayüzde bir daha gösterilmez. */
 interface CmcKeyStore {
+    /** Anahtar kayıtlı ve okunabiliyor (yalnız dosyanın varlığı değil). */
     val present: StateFlow<Boolean>
+    /** Kayıtlı dosya var ama çözülemiyor (ör. uygulama yeniden kuruldu, Keystore anahtarı silindi). */
+    val unreadable: StateFlow<Boolean> get() = MutableStateFlow(false)
     fun get(): String?
     fun set(key: String)
     fun clear()
@@ -27,8 +30,16 @@ interface CmcKeyStore {
  */
 class KeystoreCmcKeyStore(dir: File) : CmcKeyStore {
     private val file = File(dir, "cmc-key.bin")
-    private val _present = MutableStateFlow(file.exists())
+    private val _present = MutableStateFlow(false)
     override val present: StateFlow<Boolean> = _present.asStateFlow()
+    private val _unreadable = MutableStateFlow(false)
+    override val unreadable: StateFlow<Boolean> = _unreadable.asStateFlow()
+
+    init {
+        val ok = file.exists() && get() != null
+        _present.value = ok
+        _unreadable.value = file.exists() && !ok
+    }
 
     private fun secret(): SecretKey {
         val ks = KeyStore.getInstance(PROVIDER).apply { load(null) }
@@ -56,13 +67,17 @@ class KeystoreCmcKeyStore(dir: File) : CmcKeyStore {
         cipher.init(Cipher.ENCRYPT_MODE, secret())
         val body = cipher.doFinal(key.trim().toByteArray(Charsets.UTF_8))
         file.writeText(Base64.encodeToString(cipher.iv, Base64.NO_WRAP) + ":" + Base64.encodeToString(body, Base64.NO_WRAP))
-        _present.value = true
+        // Yazılan anahtar gerçekten geri okunabiliyor mu: "kayıtlı" ancak öyleyse gösterilir.
+        val ok = get() == key.trim()
+        _present.value = ok
+        _unreadable.value = !ok
     }
 
     @Synchronized
     override fun clear() {
         file.delete()
         _present.value = false
+        _unreadable.value = false
     }
 
     companion object {

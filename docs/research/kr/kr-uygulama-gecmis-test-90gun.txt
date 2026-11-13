@@ -1,0 +1,29 @@
+[0s] MEXC kuralları ve ücretleri 0/1
+[1s] CMC geçmiş listeleri 0/91
+[85s] CMC geçmiş listeleri 50/91
+[103s] Günlük fiyatlar (kimlik doğrulama) 1/260
+[108s] Günlük fiyatlar (kimlik doğrulama) 50/260
+[114s] Günlük fiyatlar (kimlik doğrulama) 100/260
+[120s] Günlük fiyatlar (kimlik doğrulama) 150/260
+[125s] Günlük fiyatlar (kimlik doğrulama) 200/260
+[131s] Günlük fiyatlar (kimlik doğrulama) 250/260
+[132s] Günlük fiyatlar (kimlik doğrulama) 260/260
+[136s] Mum verisi (15M + 4H) 1/241
+[182s] Mum verisi (15M + 4H) 50/241
+[231s] Mum verisi (15M + 4H) 100/241
+[281s] Mum verisi (15M + 4H) 150/241
+[333s] Mum verisi (15M + 4H) 200/241
+[385s] Mum verisi (15M + 4H) 241/241
+[385s] Test çalışıyor 10/1000
+[387s] Test çalışıyor 500/1000
+[388s] Test çalışıyor 950/1000
+Evren kaynağı: Her gün o günün CMC ilk 300 listesi
+UYARI: 2026-11-12 için CMC geçmiş listesi henüz yayımlanmamış; 2026-11-11 listesi kullanıldı (48 saat kuralı).
+UYARI: 2026-11-13 için CMC geçmiş listesi henüz yayımlanmamış; 2026-11-12 listesi kullanıldı (48 saat kuralı).
+Aralık: 2026-08-15 00:00 → 2026-11-13 19:15 UTC; verisi olan coin 241; gün başına ilk 300.00 → MEXC'de 191.35 → taranan 185.65
+İşlem 98 | Net -96.51 USDT (%-9.65) | PF 0.33 | Beklenti -0.9848 USDT/işlem | Ort. net R -0.5623 | Kazanan %14.29 | En büyük düşüş %10.14
+Maliyet 54.37 USDT | Kazanan işlemlerin brüt kârı 49.84 | Maliyet/brüt kâr %109.10
+Elde tutma ort. 54.03 dk, medyan 30.00 dk | Günde 1.08, haftada 7.55 işlem | Aktif gün 47/90.80, aktif gün başına 2.09
+Son bakiye 903.49 | Toplam maliyet 54.37 | Süre 388 sn
+KARŞILAŞTIRMA (aynı aralık, 13.11 öncesi girişler): uygulama hattı 98 işlem / net -96.51; araştırma verisi 87 işlem / net -88.51
+Ortak giriş: 83; yalnız uygulamada: 15 [(XMRUSDT, 1787598000000), (LTCUSDT, 1788402600000), (LITUSDT, 1788620400000), (龙虾USDT, 1789216200000), (XMRUSDT, 1789782300000), (INJUSDT, 1790329500000), (GRAMUSDT, 1790336700000), (XMRUSDT, 1791107100000)]; yalnız araştırmada: 4 [(SHIBUSDT, 1787325300000), (CASHCATUSDT, 1788030900000), (ARBUSDT, 1790379000000), (UNIUSDT, 1790401500000)]

@@ -38,6 +38,8 @@ import com.spotbot.android.ui.common.SectionCard
 import com.spotbot.android.ui.common.Spacing
 import com.spotbot.android.ui.common.TURKEY
 import com.spotbot.android.ui.common.formatDateTime
+import androidx.compose.ui.platform.testTag
+import com.spotbot.android.ui.KeyStatus
 import com.spotbot.core.kr.EventWindow
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
@@ -59,6 +61,10 @@ fun SettingsContent(
     onRemoveEvent: (EventWindow) -> Unit,
     onReset: () -> Unit,
     onOpenArchive: () -> Unit,
+    keyStatus: KeyStatus? = null,
+    keyUnreadable: Boolean = false,
+    onRefreshList: () -> Unit = {},
+    onClearCache: () -> Unit = {},
 ) {
     val context = LocalContext.current
     var key by remember { mutableStateOf("") }
@@ -79,9 +85,17 @@ fun SettingsContent(
                 visualTransformation = PasswordVisualTransformation(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                 modifier = Modifier.fillMaxWidth(),
             )
+            if (keyUnreadable) Text("Kayıtlı anahtar bu cihazda okunamadı (uygulama yeniden kurulmuş olabilir). Lütfen yeniden girin.", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = { onSaveKey(key); key = "" }, enabled = key.isNotBlank()) { Text("Kaydet") }
+                Button(onClick = { onSaveKey(key); key = "" }, enabled = key.isNotBlank(), modifier = Modifier.testTag("save-key")) { Text("Kaydet ve doğrula") }
                 if (keyPresent) OutlinedButton(onClick = onClearKey) { Text("Sil") }
+            }
+            if (keyPresent) TextButton(onClick = onRefreshList) { Text("Coin listesini şimdi yenile") }
+            keyStatus?.let { st ->
+                Text(
+                    st.text, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.testTag("key-status"),
+                    color = when (st.kind) { KeyStatus.Kind.OK -> com.spotbot.android.ui.theme.SpotBotTheme.tradingColors.gain; KeyStatus.Kind.ERROR -> MaterialTheme.colorScheme.error; else -> MaterialTheme.colorScheme.onSurfaceVariant },
+                )
             }
         }
         SectionCard("Makro olay pencereleri") {
@@ -108,6 +122,7 @@ fun SettingsContent(
         SectionCard("Sanal hesap") {
             InfoBanner("Bu sürüm yalnız sanal (paper) işlem yapar; gerçek emir gönderen kod yoktur.")
             OutlinedButton(onClick = { confirmReset = true }) { Text("Sanal hesabı sıfırla") }
+            TextButton(onClick = onClearCache) { Text("Geçmiş test mum önbelleğini temizle") }
             TextButton(onClick = onOpenArchive) { Text("Arşivi aç") }
         }
     }

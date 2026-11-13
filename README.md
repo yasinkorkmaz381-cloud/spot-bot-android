@@ -3,9 +3,18 @@
 MEXC spot piyasasında (USDT pariteleri) çalışan, **kontrollü risk** ve **sistematik karar** odaklı otomatik
 işlem botu. Android uygulaması (Türkçe kumanda paneli) + platformdan bağımsız Kotlin çekirdeği + komut satırı.
 
-> **Durum: V4.0, tek strateji: Kırılım–Retest (KR), yalnız sanal işlem (paper trading).** Gerçek emir gönderilmez.
+> **Durum: V4.1, tek strateji: Kırılım–Retest (KR), yalnız sanal işlem (paper trading).** Gerçek emir gönderilmez.
 > Ön kayıtlı backtest sonucu **Başarısız**: üç dönemde de net zarar, maliyetsiz de avantaj yok. Gerçek parayla
 > kullanım için dayanak yoktur. Rapor: [`docs/KR-RAPOR.md`](docs/KR-RAPOR.md).
+
+## V4.1: uygulama içinde geçmiş test, CMC anahtar düzeltmesi (13 Kasım 2026)
+
+- **Geçmiş test:** Ana ekrandaki "Geçmiş test" düğmesi. Dönemler 30/90/180/365 gün ya da özel aralık; başlangıç
+  bakiyesi ayarlanabilir. İlerleme ve iptal var. Sonuçta özet ölçüler, işlem listesi ve CSV dışa aktarma.
+- **Motor ve evren:** Paper ile aynı motor kullanılır. Evren her gün o günün CMC ilk 300 listesi. Geçmiş liste
+  alınamazsa test "Bugünkü ilk 300 listesiyle geçmiş test" olarak işaretlenir.
+- **CMC anahtarı:** Kaydedilince doğrulanır ve coin listesi hemen yenilenir. Anahtar çözülemezse ekran bunu söyler.
+- Ayrıntılar: [`docs/KR-RAPOR.md`](docs/KR-RAPOR.md), "Ek" bölümü.
 
 ## V4.0: Kırılım–Retest, CMC ilk 300 evreni, sade arayüz (13 Kasım 2026)
 

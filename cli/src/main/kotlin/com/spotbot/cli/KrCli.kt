@@ -331,3 +331,46 @@ suspend fun universeLive(o: Map<String, String>) {
     o["out"]?.let { File(it).writeText(sb.toString()) }
     println(sb)
 }
+
+/**
+ * Uygulamadaki "Geçmiş test" ekranının kullandığı hattın aynısı ([com.spotbot.core.kr.KrHistory]) — canlı MEXC ve CMC
+ * ile. [--karsilastir] verilirse aynı aralık araştırma verisiyle (dosyadan) de çalıştırılıp karşılaştırılır.
+ */
+suspend fun appHistory(o: Map<String, String>) {
+    val days = (o["gun"] ?: "30").toInt()
+    val equity = (o["bakiye"] ?: "1000").toDouble()
+    val cache = File(o["onbellek"] ?: "/home/user/research-v8/app-cache")
+    val key = System.getenv("CMC_API_KEY")
+    val cmc = CmcClient({ key })
+    val api = MexcRestClient()
+    val now = System.currentTimeMillis()
+    val today = now - Math.floorMod(now, KrConfig.DAY)
+    val from = o["from"]?.let(::date) ?: (today - days * KrConfig.DAY)
+    val to = o["to"]?.let(::date) ?: (now + 1)
+    val history = com.spotbot.core.kr.KrHistory(api, cmc, if (o["bugun"] == "true") null else cmc, com.spotbot.core.kr.CandleFileStore(File(cache, "candles")), com.spotbot.core.kr.CmcListFileCache(File(cache, "cmc")))
+    var lastPhase = ""
+    val t0 = System.currentTimeMillis()
+    val out = history.run(from, to, equity) { p ->
+        if (p.phase != lastPhase || p.done == p.total || p.done % 50 == 0) { println("[${(System.currentTimeMillis() - t0) / 1000}s] ${p.phase} ${p.done}/${p.total}"); lastPhase = p.phase }
+    }
+    val m = out.metrics
+    println("Evren kaynağı: ${out.source.title}")
+    out.warnings.forEach { println("UYARI: $it") }
+    println("Aralık: ${utc.format(java.time.Instant.ofEpochMilli(out.start))} → ${utc.format(java.time.Instant.ofEpochMilli(out.end))} UTC; verisi olan coin ${out.coinsWithData}; gün başına ilk ${f2(out.avgTop)} → MEXC'de ${f2(out.avgOnMexc)} → taranan ${f2(out.avgScanned)}")
+    println(metricsLine(m))
+    println("Son bakiye ${f2(out.result.endEquity)} | Toplam maliyet ${f2(m.totalCosts)} | Süre ${(System.currentTimeMillis() - t0) / 1000} sn")
+    o["csv"]?.let { writeCsv(out.result, File(it)) }
+    o["karsilastir"]?.let { dir ->
+        val data = KrData(File(dir))
+        val cfg = KrConfig()
+        val m15 = data.candles("mexc/m15", M15)
+        val h4 = data.candles("mexc/h4", H4).mapValues { Trend4h(it.value, cfg) }
+        val cacheU = HashMap<Long, Universe?>()
+        val input = KrBacktestInput(m15, h4, { d -> cacheU.getOrPut(d) { data.universeAt(d, m15) }?.symbols.orEmpty() }, data.terms, "araştırma verisi")
+        val r = KrBacktest(cfg.copy(risk = cfg.risk.copy(startEquity = equity))).run(input, out.start, minOf(out.end, date("2026-11-13")))
+        val app = out.result.trades.filter { it.entryTime < date("2026-11-13") }
+        println("KARŞILAŞTIRMA (aynı aralık, 13.11 öncesi girişler): uygulama hattı ${app.size} işlem / net ${f2(app.sumOf { it.netPnl })}; araştırma verisi ${r.trades.size} işlem / net ${f2(r.trades.sumOf { it.netPnl })}")
+        val a = app.map { it.symbol to it.entryTime }.toSet(); val b = r.trades.map { it.symbol to it.entryTime }.toSet()
+        println("Ortak giriş: ${(a intersect b).size}; yalnız uygulamada: ${(a - b).size} ${(a - b).take(8)}; yalnız araştırmada: ${(b - a).size} ${(b - a).take(8)}")
+    }
+}

@@ -12,8 +12,8 @@ android {
         applicationId = "com.spotbot.android"
         minSdk = 26
         targetSdk = 37
-        versionCode = 14
-        versionName = "4.0.0-paper"
+        versionCode = 15
+        versionName = "4.1.0-paper"
     }
 
     buildTypes {
@@ -74,6 +74,7 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.tooling)
 
     testImplementation(libs.junit)
+    testImplementation(testFixtures(project(":core")))
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.robolectric)
     testImplementation(libs.roborazzi)

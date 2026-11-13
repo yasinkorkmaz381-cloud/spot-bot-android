@@ -30,6 +30,22 @@ data class KrMetrics(
 )
 
 object KrReport {
+    private val TSI = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").withZone(TURKEY)
+    private fun n(x: Double) = String.format(java.util.Locale.ROOT, "%.8g", x)
+    private fun m(x: Double) = String.format(java.util.Locale.ROOT, "%.4f", x)
+
+    /** İşlem listesi CSV'si (uygulamadan dışa aktarma). Zamanlar TSİ; ondalık ayırıcı nokta. */
+    fun csv(trades: List<KrTrade>): String = buildString {
+        appendLine("coin,giris_tsi,cikis_tsi,giris_fiyat,cikis_fiyat,miktar,stop,hedef,cikis_nedeni,brut_usdt,komisyon_usdt,maliyet_usdt,net_usdt,net_r,sure_dk,stop_hedef_ayni_mum")
+        for (t in trades) {
+            appendLine(listOf(
+                t.symbol, TSI.format(java.time.Instant.ofEpochMilli(t.entryTime)), TSI.format(java.time.Instant.ofEpochMilli(t.exitTime)),
+                n(t.entryPrice), n(t.exitPrice), n(t.quantity), n(t.stop), n(t.target), t.reason.title.replace(',', ' '),
+                m(t.grossPnl), m(t.fees), m(t.costs), m(t.netPnl), m(t.rMultiple), t.holdMinutes.toString(), if (t.ambiguous) "evet" else "hayir",
+            ).joinToString(","))
+        }
+    }
+
     fun metrics(trades: List<KrTrade>, startEquity: Double, curve: List<Pair<Long, Double>>, start: Long, end: Long): KrMetrics {
         val wins = trades.filter { it.netPnl > 0 }.sumOf { it.netPnl }
         val losses = -trades.filter { it.netPnl < 0 }.sumOf { it.netPnl }

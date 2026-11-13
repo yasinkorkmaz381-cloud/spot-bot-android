@@ -1,0 +1,25 @@
+[0s] MEXC kuralları ve ücretleri 0/1
+[1s] CMC geçmiş listeleri 0/31
+[3s] Günlük fiyatlar (kimlik doğrulama) 1/224
+[8s] Günlük fiyatlar (kimlik doğrulama) 50/224
+[15s] Günlük fiyatlar (kimlik doğrulama) 100/224
+[21s] Günlük fiyatlar (kimlik doğrulama) 150/224
+[28s] Günlük fiyatlar (kimlik doğrulama) 200/224
+[31s] Günlük fiyatlar (kimlik doğrulama) 224/224
+[31s] Mum verisi (15M + 4H) 1/208
+[31s] Mum verisi (15M + 4H) 50/208
+[34s] Mum verisi (15M + 4H) 100/208
+[34s] Mum verisi (15M + 4H) 150/208
+[36s] Mum verisi (15M + 4H) 200/208
+[39s] Mum verisi (15M + 4H) 208/208
+[39s] Test çalışıyor 26/1000
+Evren kaynağı: Her gün o günün CMC ilk 300 listesi
+UYARI: 2026-11-12 için CMC geçmiş listesi henüz yayımlanmamış; 2026-11-11 listesi kullanıldı (48 saat kuralı).
+UYARI: 2026-11-13 için CMC geçmiş listesi henüz yayımlanmamış; 2026-11-12 listesi kullanıldı (48 saat kuralı).
+Aralık: 2026-10-14 00:00 → 2026-11-13 19:00 UTC; verisi olan coin 208; gün başına ilk 300.00 → MEXC'de 189.71 → taranan 185.77
+İşlem 8 | Net -11.99 USDT (%-1.20) | PF 0.00 | Beklenti -1.4984 USDT/işlem | Ort. net R -0.8968 | Kazanan %0.00 | En büyük düşüş %1.23
+Maliyet 5.07 USDT | Kazanan işlemlerin brüt kârı 0.00 | Maliyet/brüt kâr %NaN
+Elde tutma ort. 33.75 dk, medyan 30.00 dk | Günde 0.26, haftada 1.82 işlem | Aktif gün 6/30.79, aktif gün başına 1.33
+Son bakiye 988.01 | Toplam maliyet 5.07 | Süre 41 sn
+KARŞILAŞTIRMA (aynı aralık, 13.11 öncesi girişler): uygulama hattı 8 işlem / net -11.99; araştırma verisi 7 işlem / net -11.70
+Ortak giriş: 7; yalnız uygulamada: 1 [(ETHFIUSDT, 1794522600000)]; yalnız araştırmada: 0 []

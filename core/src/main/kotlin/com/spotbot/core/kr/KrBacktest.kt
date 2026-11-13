@@ -45,7 +45,17 @@ class KrBacktest(private val cfg: KrConfig, private val costs: KrCosts = cfg.cos
 
     private class Scheduled(val plan: SetupPlan)
 
-    fun run(input: KrBacktestInput, start: Long, end: Long): KrResult {
+    /**
+     * [onProgress] 0..1 arası ilerleme bildirir; [isCancelled] true dönerse [java.util.concurrent.CancellationException]
+     * fırlatılır (uygulamadaki iptal düğmesi).
+     */
+    fun run(
+        input: KrBacktestInput,
+        start: Long,
+        end: Long,
+        onProgress: ((Double) -> Unit)? = null,
+        isCancelled: () -> Boolean = { false },
+    ): KrResult {
         val symbols = input.m15.keys.sorted()
         val trackers = symbols.associateWith { SetupTracker(it, cfg, input.h4[it]) }
         val index = HashMap<String, Int>().apply { symbols.forEach { put(it, 0) } }
@@ -62,7 +72,13 @@ class KrBacktest(private val cfg: KrConfig, private val costs: KrCosts = cfg.cos
 
         val first = input.m15.values.mapNotNull { it.firstOrNull()?.openTime }.minOrNull() ?: start
         var g = first - Math.floorMod(first, M15)
+        val g0 = g
+        var step = 0
         while (g < end) {
+            if (++step % 96 == 0) {
+                if (isCancelled()) throw java.util.concurrent.CancellationException("İptal edildi")
+                onProgress?.invoke((g - g0).toDouble() / (end - g0))
+            }
             val bars = HashMap<String, Candle>()
             for (s in symbols) {
                 val list = input.m15.getValue(s)

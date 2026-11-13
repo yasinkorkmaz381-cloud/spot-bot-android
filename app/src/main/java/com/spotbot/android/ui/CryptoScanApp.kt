@@ -37,7 +37,13 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.spotbot.android.ui.common.Tag
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import com.spotbot.android.ui.detail.ArchiveContent
+import com.spotbot.android.ui.history.HistoryContent
 import com.spotbot.android.ui.detail.DetailContent
 import com.spotbot.android.ui.home.HomeContent
 import com.spotbot.android.ui.opportunities.OpportunitiesContent
@@ -51,6 +57,7 @@ import kotlinx.serialization.Serializable
 @Serializable data object DetailRoute
 @Serializable data object SettingsRoute
 @Serializable data object ArchiveRoute
+@Serializable data object HistoryRoute
 
 /** Ana kullanım üç bölümdür; ayrıntılar ve ayarlar üst çubuktan açılır. */
 private enum class Tab(val route: Any, val label: String, val icon: ImageVector) {
@@ -70,12 +77,20 @@ fun CryptoScanApp(vm: MainViewModel = viewModel(factory = MainViewModel.Factory)
         destination.isOn(DetailRoute) -> "Ayrıntılar"
         destination.isOn(SettingsRoute) -> "Ayarlar"
         destination.isOn(ArchiveRoute) -> "Arşiv (eski stratejiler)"
+        destination.isOn(HistoryRoute) -> "Geçmiş test"
         else -> null
     }
     val state by vm.state.collectAsStateWithLifecycle()
     val settings by vm.settings.collectAsStateWithLifecycle()
     val keyPresent by vm.keyPresent.collectAsStateWithLifecycle()
     val archive by vm.archive.collectAsStateWithLifecycle()
+    val history by vm.history.collectAsStateWithLifecycle()
+    val keyStatus by vm.keyStatus.collectAsStateWithLifecycle()
+    val keyUnreadable by vm.keyUnreadable.collectAsStateWithLifecycle()
+    var pendingExport by remember { mutableStateOf<List<com.spotbot.core.kr.KrTrade>>(emptyList()) }
+    val exporter = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { uri ->
+        if (uri != null) vm.exportCsv(uri, pendingExport)
+    }
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
@@ -119,19 +134,29 @@ fun CryptoScanApp(vm: MainViewModel = viewModel(factory = MainViewModel.Factory)
     ) { padding ->
         NavHost(navController, startDestination = HomeRoute, modifier = Modifier.padding(padding).consumeWindowInsets(padding)) {
             composable<HomeRoute> {
-                HomeContent(state, settings.botMode, keyPresent, vm.now(), onMode = vm::setMode, onOpenSettings = { navController.navigate(SettingsRoute) })
+                HomeContent(
+                    state, settings.botMode, keyPresent, vm.now(), onMode = vm::setMode, onOpenSettings = { navController.navigate(SettingsRoute) },
+                    onOpenHistory = { navController.navigate(HistoryRoute) },
+                )
             }
             composable<OpportunitiesRoute> { OpportunitiesContent(state, vm.now()) }
             composable<TradesRoute> { TradesContent(state, onOpenArchive = { vm.loadArchive(); navController.navigate(ArchiveRoute) }) }
             composable<DetailRoute> { DetailContent(state, vm.now()) }
             composable<SettingsRoute> {
                 SettingsContent(
-                    keyPresent, state.events, onSaveKey = { vm.saveKey(it) }, onClearKey = { vm.clearKey() },
+                    keyPresent, state.events, keyStatus = keyStatus, keyUnreadable = keyUnreadable, onRefreshList = { vm.refreshList() },
+                    onClearCache = { vm.clearHistoryCache() }, onSaveKey = { vm.saveKey(it) }, onClearKey = { vm.clearKey() },
                     onAddEvent = { t, title -> vm.addEvent(t, title) }, onRemoveEvent = { vm.removeEvent(it) }, onReset = { vm.reset() },
                     onOpenArchive = { vm.loadArchive(); navController.navigate(ArchiveRoute) },
                 )
             }
             composable<ArchiveRoute> { ArchiveContent(archive) }
+            composable<HistoryRoute> {
+                HistoryContent(
+                    history, keyPresent, vm.now(), onStart = vm::startHistory, onCancel = vm::cancelHistory, onReset = vm::resetHistory,
+                    onExport = { trades -> pendingExport = trades; exporter.launch("gecmis-test-islemler.csv") },
+                )
+            }
         }
     }
 }

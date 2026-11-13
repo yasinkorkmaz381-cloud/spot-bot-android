@@ -49,6 +49,7 @@ fun HomeContent(
     now: Long,
     onMode: (BotMode) -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenHistory: () -> Unit = {},
 ) {
     val open = state.book.positions.size
     var confirmOff by remember { mutableStateOf(false) }
@@ -100,6 +101,7 @@ fun HomeContent(
                 }
             }
         }
+        OutlinedButton(onClick = onOpenHistory, modifier = Modifier.fillMaxWidth().testTag("open-history")) { Text("Geçmiş test") }
         AppCard {
             Text("Durum", style = MaterialTheme.typography.titleMedium)
             KeyValueRow("Son başarılı fiyat verisi", if (state.lastPriceDataAt > 0) "${formatTime(state.lastPriceDataAt)} TSİ" else "Henüz yok")

@@ -18,12 +18,14 @@ fun main(args: Array<String>) = runBlocking {
         "kr" -> krResearch(options)
         "kr-aux" -> krAux(options)
         "universe" -> universeLive(options)
+        "gecmis-test" -> appHistory(options)
         else -> println(
             """
             CryptoScan Pro — Kırılım–Retest (yalnız paper trading)
               universe [--out dosya]                                  Canlı CMC ilk 300 → MEXC eşleşmesi (CMC anahtarı gerekir)
               kr --phase research|final --data klasör --out klasör    Ön kayıtlı backtest (docs/KR-ONKAYIT.md)
               kr-aux --data klasör --out klasör                       Yardımcı test (Binance 15M, 2023-11 → 2025-10)
+              gecmis-test --gun 30 [--bakiye 1000] [--onbellek klasör] [--karsilastir veri]   Uygulamadaki geçmiş test hattı (canlı MEXC + CMC)
             Veri klasörü: mexc/m15, mexc/h4, mexc/exchangeInfo.json, mexc/bookTicker.json, cmc/hist, binance/m15
             """.trimIndent(),
         )

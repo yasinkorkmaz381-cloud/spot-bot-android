@@ -122,6 +122,7 @@ class FakeKrMarket(val m15: Map<String, List<Candle>>, var infos: List<SymbolInf
         val list = when (timeframe) {
             Timeframe.M15 -> closed(symbol)
             Timeframe.H4 -> Bars.aggregate(closed(symbol), H4)
+            Timeframe.D1 -> Bars.aggregate(closed(symbol), KrConfig.DAY)
             Timeframe.M1 -> m15[symbol].orEmpty().filter { it.openTime <= clock }.flatMap { minutes(it) }.filter { it.closeTime <= clock }
             else -> emptyList()
         }

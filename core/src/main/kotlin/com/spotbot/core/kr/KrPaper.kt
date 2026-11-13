@@ -162,10 +162,23 @@ class KrPaper(
         return s.copy(terms = terms, riskFlagged = symbolInfo.filter { it.riskFlagged }.map { it.symbol }.toSet(), termsAt = now)
     }
 
-    private suspend fun refreshUniverse(s: KrState, now: Long): KrState {
+    /**
+     * Anahtar girildiğinde/değiştiğinde çağrılır: bekleme süresine ve bot moduna bakmadan listeyi hemen yeniler.
+     * Hata varsa açıklamasını döndürür.
+     */
+    suspend fun refreshUniverseNow(): String? = lock.withLock {
+        val now = clock.now()
+        var s = _state.value
+        try { s = refreshTerms(s, now) } catch (e: Exception) { save(s.copy(universeError = "MEXC'ye ulaşılamadı: ${e.message}")); return@withLock _state.value.universeError }
+        s = refreshUniverse(s, now, force = true)
+        save(s)
+        s.universeError
+    }
+
+    private suspend fun refreshUniverse(s: KrState, now: Long, force: Boolean = false): KrState {
         val u = s.universe
         val due = u == null || now - u.list.fetchedAt >= UNIVERSE_REFRESH
-        if (!due || now - s.universeAttemptAt < UNIVERSE_RETRY) return s
+        if (!force && (!due || now - s.universeAttemptAt < UNIVERSE_RETRY)) return s
         return try {
             val list = cmc.latest()
             val prices = api.tickers24h().associate { it.symbol to it.lastPrice }

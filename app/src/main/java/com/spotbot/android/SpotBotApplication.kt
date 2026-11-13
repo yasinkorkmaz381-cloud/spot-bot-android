@@ -7,7 +7,14 @@ import com.spotbot.android.data.FileKrStore
 import com.spotbot.android.data.KeystoreCmcKeyStore
 import com.spotbot.android.data.SettingsRepository
 import com.spotbot.core.exchange.mexc.MexcRestClient
+import com.spotbot.android.bot.HistoryRunner
+import com.spotbot.core.kr.CandleFileStore
 import com.spotbot.core.kr.CmcClient
+import com.spotbot.core.kr.CmcListFileCache
+import com.spotbot.core.kr.KrHistory
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import com.spotbot.core.kr.KrConfig
 import com.spotbot.core.kr.KrPaper
 import com.spotbot.core.util.ServerClock
@@ -30,7 +37,15 @@ class AppContainer(private val app: Application) {
     val config = KrConfig()
     /** MEXC sunucu saatine göre düzeltilmiş saat. */
     val clock = ServerClock()
-    val paper = KrPaper(api, CmcClient({ cmcKey.get() }), FileKrStore(app.filesDir), clock, config)
+    val cmc = CmcClient({ cmcKey.get() })
+    val paper = KrPaper(api, cmc, FileKrStore(app.filesDir), clock, config)
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    /** Geçmiş test önbelleği: mumlar (bellek eşlemeli) ve günlük CMC listeleri. Ayarlar'dan temizlenebilir. */
+    val candleStore = CandleFileStore(File(app.cacheDir, "gecmis-test/mumlar"))
+    val listCache = CmcListFileCache(File(app.filesDir, "gecmis-test/cmc"))
+    val history = HistoryRunner(scope) { req, progress ->
+        KrHistory(api, cmc, cmc, candleStore, listCache, config, now = { clock.now() }).run(req.from, req.to, req.equity, onProgress = progress)
+    }
 
     /** Sanal hesabı sıfırlar: mevcut kayıt silinmez, `archive-kr/kr-paper-<zaman>.json` olarak saklanır. */
     suspend fun resetPaper() {
